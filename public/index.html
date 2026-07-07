@@ -63,6 +63,7 @@
             <button id="back-to-list-btn" class="link-btn back-btn" aria-label="Back to file list">← Back</button>
             <span id="editor-path"></span>
             <span class="spacer"></span>
+            <button id="editor-permission-btn" class="hidden">Permission</button>
             <button id="editor-mode-btn" class="hidden">Edit</button>
             <button id="save-file-btn" class="primary">Save</button>
             <button id="editor-download-btn">⬇ Download</button>
@@ -82,6 +83,7 @@
             <div id="preview-media" class="preview-media hidden"></div>
             <p id="preview-info" class="muted-text"></p>
             <div class="preview-actions">
+              <button id="preview-permission-btn" class="hidden">Permission</button>
               <button id="preview-download-btn" class="primary">⬇ Download</button>
               <button id="preview-move-btn">Move</button>
               <button id="preview-delete-btn" class="danger">Delete</button>
@@ -171,6 +173,17 @@
           <button type="submit" class="primary">Add / update user</button>
           <p id="user-form-error" class="error"></p>
         </form>
+      </details>
+
+      <details class="card" open>
+        <summary>File permissions</summary>
+        <p class="muted-text">Default is User. Add an Admin override to hide a file/folder from normal users.</p>
+        <div class="table-scroll">
+          <table id="permissions-table">
+            <thead><tr><th>Path</th><th>Role</th><th></th></tr></thead>
+            <tbody id="permissions-body"></tbody>
+          </table>
+        </div>
       </details>
 
       <details class="card" open>
