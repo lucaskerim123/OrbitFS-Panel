@@ -208,6 +208,8 @@ const LOG_FILES = {
   "panel-err": path.join(__dirname, "service-err.log"),
   "hive-out": "C:\\mcp-hive-server\\out.log",
   "hive-err": "C:\\mcp-hive-server\\err.log",
+  "hive-events": "C:\\mcp-hive-server\\logs\\master-hive-events.jsonl",
+  "hive-errors": "C:\\mcp-hive-server\\logs\\master-hive-errors.jsonl",
   "tunnel-out": "C:\\cloudflared\\tunnel_out.log",
   "tunnel-err": "C:\\cloudflared\\tunnel_err.log",
 };

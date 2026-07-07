@@ -3,7 +3,7 @@
 // a two-way sync feature that never made sense once it turned out Claude
 // Desktop and the Hive server both just run on this one VPS.
 export function makeHiveClient(baseUrl, apiKey) {
-  const headers = { Authorization: `Bearer ${apiKey}` };
+  const headers = { Authorization: `Bearer ${apiKey}`, "X-Hive-Flow": "webpanel" };
 
   async function ping() {
     try {

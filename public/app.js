@@ -551,6 +551,30 @@ document.querySelectorAll(".restart-btn").forEach((btn) => {
   });
 });
 
+function formatLogLine(line) {
+  try {
+    const entry = JSON.parse(line);
+    if (!entry.event) return line;
+    const { ts, event, ...fields } = entry;
+    const details = Object.entries(fields)
+      .filter(([, value]) => value !== undefined && value !== null && value !== "")
+      .map(([key, value]) => `${key}=${value}`)
+      .join(" ");
+    return `[${ts || "-"}] ${event}${details ? ` ${details}` : ""}`;
+  } catch {
+    return line;
+  }
+}
+
+function parseLogLine(line) {
+  try {
+    const entry = JSON.parse(line);
+    return entry?.event ? entry : null;
+  } catch {
+    return null;
+  }
+}
+
 document.querySelectorAll(".log-tab-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
     const group = btn.closest(".log-tabs");
@@ -560,17 +584,95 @@ document.querySelectorAll(".log-tab-btn").forEach((btn) => {
     const target = which.split("-")[0]; // hive | tunnel | panel
     try {
       const { lines } = await api(`/api/system/logs?which=${which}`);
-      document.getElementById(`log-${target}`).textContent = lines.join("\n") || "(empty)";
+      document.getElementById(`log-${target}`).textContent = lines.map(formatLogLine).join("\n") || "(empty)";
     } catch (err) {
       document.getElementById(`log-${target}`).textContent = err.message;
     }
   });
 });
 
+function classifyOauthClient(client) {
+  if (client.flow === "chatgpt") return "codex";
+  if (client.flow === "claude") return "claude";
+  const redirects = client.redirectUris || [];
+  if (redirects.some((uri) => uri.includes("chatgpt.com/connector/oauth"))) return "codex";
+  if (redirects.some((uri) => uri.includes("claude.ai/api/mcp/auth_callback"))) return "claude";
+  return "other";
+}
+
+function normalizeFlow(flow) {
+  if (flow === "chatgpt" || flow === "codex") return "codex";
+  if (flow === "claude") return "claude";
+  return "shared";
+}
+
+function countFlowEvents(entries, flowKey, eventName) {
+  return entries.filter((entry) => normalizeFlow(entry.flow) === flowKey && entry.event === eventName).length;
+}
+
+function renderFlowStats(entries, flowKey) {
+  const writes = countFlowEvents(entries, flowKey, "file.change.write");
+  const uploads = countFlowEvents(entries, flowKey, "file.change.upload");
+  const moves = countFlowEvents(entries, flowKey, "file.change.move");
+  const deletes = countFlowEvents(entries, flowKey, "file.change.delete");
+  document.getElementById(`flow-${flowKey}-writes`).textContent = writes;
+  document.getElementById(`flow-${flowKey}-uploads`).textContent = uploads;
+  document.getElementById(`flow-${flowKey}-moves`).textContent = moves;
+  document.getElementById(`flow-${flowKey}-deletes`).textContent = deletes;
+}
+
+function renderRecentFlowLog(entries) {
+  const recent = entries
+    .filter((entry) => entry.event?.startsWith("file.change.") || entry.event?.startsWith("oauth.") || entry.event?.startsWith("mcp."))
+    .slice(-12)
+    .map((entry) => formatLogLine(JSON.stringify(entry)));
+  document.getElementById("flow-recent-log").textContent = recent.join("\n") || "(no recent connection events)";
+}
+
+function renderFlowStatus(hiveRunning, oauth, logEntries = []) {
+  const clients = oauth?.clients || [];
+  const flows = {
+    codex: clients.filter((client) => classifyOauthClient(client) === "codex"),
+    claude: clients.filter((client) => classifyOauthClient(client) === "claude"),
+  };
+  const accounts = [...new Set((oauth?.refreshTokens || []).map((token) => token.email))];
+  const mcpEvents = logEntries.filter((entry) => entry.event?.startsWith("mcp.") || entry.event?.startsWith("tool.")).length;
+  const allReady = hiveRunning && flows.codex.length > 0 && flows.claude.length > 0;
+  setPill("flows-pill", allReady, allReady ? "ready" : "check");
+  setPill("flow-shared-pill", hiveRunning, hiveRunning ? "online" : "offline");
+  document.getElementById("flow-shared-detail").textContent = hiveRunning
+    ? "Shared Hive MCP is reachable."
+    : "Shared Hive MCP is offline.";
+  document.getElementById("flow-shared-accounts").textContent = accounts.length;
+  document.getElementById("flow-shared-events").textContent = mcpEvents;
+  renderFlowStats(logEntries, "shared");
+
+  [
+    ["codex", "ChatGPT/Codex"],
+    ["claude", "Claude"],
+  ].forEach(([key, label]) => {
+    const flowReady = hiveRunning && flows[key].length > 0;
+    setPill(`flow-${key}-pill`, flowReady, flowReady ? "registered" : "missing");
+    const detail = document.getElementById(`flow-${key}-detail`);
+    const count = flows[key].length;
+    const flowEvents = logEntries.filter((entry) => normalizeFlow(entry.flow) === key).length;
+    const plural = count === 1 ? "client" : "clients";
+    detail.textContent = hiveRunning
+      ? `${count} ${label} OAuth ${plural} registered.`
+      : "Hive server is stopped, so this flow is offline.";
+    document.getElementById(`flow-${key}-clients`).textContent = count;
+    document.getElementById(`flow-${key}-events`).textContent = flowEvents;
+    renderFlowStats(logEntries, key);
+  });
+  renderRecentFlowLog(logEntries);
+}
+
 async function loadSystem() {
+  let hiveRunning = false;
   try {
     const s = await api("/api/system/status");
-    setPill("svc-hive-pill", s.hive.running, s.hive.running ? "running" : "stopped");
+    hiveRunning = !!s.hive.running;
+    setPill("svc-hive-pill", hiveRunning, hiveRunning ? "running" : "stopped");
     setPill("svc-tunnel-pill", s.tunnel.running, s.tunnel.running ? "running" : "stopped");
     const panelOk = s.panel.status === "Running";
     setPill("svc-panel-pill", panelOk, s.panel.status);
@@ -585,6 +687,8 @@ async function loadSystem() {
 
   try {
     const oauth = await api("/api/system/oauth");
+    const activityLog = await api("/api/system/logs?which=hive-events").catch(() => ({ lines: [] }));
+    const logEntries = (activityLog.lines || []).map(parseLogLine).filter(Boolean);
     const body = document.getElementById("oauth-clients-body");
     body.innerHTML = "";
     oauth.clients.forEach((c) => {
@@ -602,8 +706,10 @@ async function loadSystem() {
       emailsEl.appendChild(li);
     });
     if (!uniqueEmails.length) emailsEl.innerHTML = "<li>(none)</li>";
+    renderFlowStatus(hiveRunning, oauth, logEntries);
   } catch (err) {
     console.error(err);
+    renderFlowStatus(hiveRunning, { clients: [] });
   }
 
   loadUsers();

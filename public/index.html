@@ -105,8 +105,11 @@
           <button class="restart-btn" data-target="hive">Restart</button>
         </div>
         <details><summary>Logs</summary>
+          <p class="muted-text">stdout includes shared MCP, REST, OAuth, ChatGPT/Codex, and Claude flow events.</p>
           <div class="log-tabs">
-            <button class="log-tab-btn active" data-log="hive-out">stdout</button>
+            <button class="log-tab-btn active" data-log="hive-events">activity</button>
+            <button class="log-tab-btn" data-log="hive-errors">errors</button>
+            <button class="log-tab-btn" data-log="hive-out">stdout</button>
             <button class="log-tab-btn" data-log="hive-err">stderr</button>
           </div>
           <pre id="log-hive" class="log-view"></pre>
@@ -151,6 +154,71 @@
         <strong>Disk (C:)</strong>
         <div id="disk-bar" class="disk-bar"><div id="disk-bar-fill" class="disk-bar-fill"></div></div>
         <p id="disk-text" class="muted-text"></p>
+      </div>
+
+      <div class="card">
+        <div class="service-row">
+          <div>
+            <strong>ChatGPT ↔ Claude connection monitor</strong>
+            <span id="flows-pill" class="pill">-</span>
+          </div>
+        </div>
+        <div class="connection-map">
+          <span>ChatGPT / Codex</span>
+          <span class="connection-arrow">↔</span>
+          <span>Shared Hive MCP</span>
+          <span class="connection-arrow">↔</span>
+          <span>Claude</span>
+        </div>
+        <div class="flow-grid">
+          <div class="flow-card">
+            <div class="flow-heading">
+              <strong>ChatGPT / Codex</strong>
+              <span id="flow-codex-pill" class="pill">-</span>
+            </div>
+            <p id="flow-codex-detail" class="muted-text">Waiting for status.</p>
+            <dl class="flow-stats">
+              <div><dt>OAuth clients</dt><dd id="flow-codex-clients">-</dd></div>
+              <div><dt>Recent events</dt><dd id="flow-codex-events">-</dd></div>
+              <div><dt>Writes</dt><dd id="flow-codex-writes">-</dd></div>
+              <div><dt>Uploads</dt><dd id="flow-codex-uploads">-</dd></div>
+              <div><dt>Moves</dt><dd id="flow-codex-moves">-</dd></div>
+              <div><dt>Deletes</dt><dd id="flow-codex-deletes">-</dd></div>
+            </dl>
+          </div>
+          <div class="flow-card">
+            <div class="flow-heading">
+              <strong>Shared MCP</strong>
+              <span id="flow-shared-pill" class="pill">-</span>
+            </div>
+            <p id="flow-shared-detail" class="muted-text">Waiting for status.</p>
+            <dl class="flow-stats">
+              <div><dt>Accounts</dt><dd id="flow-shared-accounts">-</dd></div>
+              <div><dt>MCP events</dt><dd id="flow-shared-events">-</dd></div>
+              <div><dt>Writes</dt><dd id="flow-shared-writes">-</dd></div>
+              <div><dt>Uploads</dt><dd id="flow-shared-uploads">-</dd></div>
+              <div><dt>Moves</dt><dd id="flow-shared-moves">-</dd></div>
+              <div><dt>Deletes</dt><dd id="flow-shared-deletes">-</dd></div>
+            </dl>
+          </div>
+          <div class="flow-card">
+            <div class="flow-heading">
+              <strong>Claude</strong>
+              <span id="flow-claude-pill" class="pill">-</span>
+            </div>
+            <p id="flow-claude-detail" class="muted-text">Waiting for status.</p>
+            <dl class="flow-stats">
+              <div><dt>OAuth clients</dt><dd id="flow-claude-clients">-</dd></div>
+              <div><dt>Recent events</dt><dd id="flow-claude-events">-</dd></div>
+              <div><dt>Writes</dt><dd id="flow-claude-writes">-</dd></div>
+              <div><dt>Uploads</dt><dd id="flow-claude-uploads">-</dd></div>
+              <div><dt>Moves</dt><dd id="flow-claude-moves">-</dd></div>
+              <div><dt>Deletes</dt><dd id="flow-claude-deletes">-</dd></div>
+            </dl>
+          </div>
+        </div>
+        <p class="muted-text">Status uses shared Hive health, OAuth registrations, refresh-token accounts, and recent structured Hive logs.</p>
+        <pre id="flow-recent-log" class="log-view compact-log">(waiting)</pre>
       </div>
 
       <details class="card" open>
