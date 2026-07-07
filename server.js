@@ -307,6 +307,20 @@ app.delete("/api/users/:username", requireAdmin, async (req, res) => {
   }
 });
 
+app.get(["/", "/index.html"], async (req, res, next) => {
+  try {
+    const indexPath = path.join(__dirname, "public", "index.html");
+    const html = await fs.readFile(indexPath, "utf-8");
+    const injected = html.includes("permissions.js")
+      ? html
+      : html.replace("</body>", "  <script src=\"permissions.js\"></script>\n</body>");
+    res.set("Cache-Control", "no-store");
+    res.type("html").send(injected);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // no-store: this panel gets redeployed often and is small enough that
 // caching isn't worth the risk of a phone/CDN serving a stale bundle with
 // missing buttons after every update.
