@@ -59,6 +59,23 @@ function Write-Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "    OK: $msg" -ForegroundColor Green }
 function Write-Warn2($msg) { Write-Host "    NOTE: $msg" -ForegroundColor Yellow }
 
+# Some of the third-party hosts below (nssm.cc especially) intermittently
+# 503 scripted requests. Retry a few times with a browser-like User-Agent
+# before giving up, instead of failing the whole script on the first blip.
+function Invoke-WebRequestWithRetry($Uri, $OutFile, $Attempts = 4) {
+  $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" }
+  for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+    try {
+      Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing -Headers $headers -TimeoutSec 30
+      return $true
+    } catch {
+      Write-Warn2 "Download attempt $attempt/$Attempts from $Uri failed ($($_.Exception.Message))"
+      if ($attempt -lt $Attempts) { Start-Sleep -Seconds ($attempt * 5) }
+    }
+  }
+  return $false
+}
+
 # --- 0. Sanity checks -------------------------------------------------------
 Write-Step "Checking prerequisites"
 
@@ -82,11 +99,32 @@ Write-Ok "the-master-brain found at $AppDir with dependencies and .env in place"
 Write-Step "Ensuring NSSM is available"
 
 $nssmExe = Join-Path $NssmDir "nssm.exe"
+
 if (-not (Test-Path $nssmExe)) {
-  Write-Warn2 "NSSM not found at $nssmExe, downloading..."
+  $onPath = Get-Command nssm -ErrorAction SilentlyContinue
+  if ($onPath) {
+    $nssmExe = $onPath.Source
+    Write-Ok "NSSM already available on PATH at $nssmExe"
+  }
+}
+
+if (-not (Test-Path $nssmExe) -and (Get-Command choco -ErrorAction SilentlyContinue)) {
+  Write-Warn2 "NSSM not found, installing via Chocolatey..."
+  choco install nssm -y --no-progress | Out-Null
+  $onPath = Get-Command nssm -ErrorAction SilentlyContinue
+  if ($onPath) {
+    $nssmExe = $onPath.Source
+    Write-Ok "NSSM installed via Chocolatey at $nssmExe"
+  }
+}
+
+if (-not (Test-Path $nssmExe)) {
+  Write-Warn2 "NSSM not found at $nssmExe, downloading from nssm.cc..."
   $zipPath = Join-Path $env:TEMP "nssm.zip"
   $extractPath = Join-Path $env:TEMP "nssm-extract"
-  Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile $zipPath -UseBasicParsing
+  if (-not (Invoke-WebRequestWithRetry "https://nssm.cc/release/nssm-2.24.zip" $zipPath)) {
+    throw "Couldn't download NSSM from nssm.cc after several attempts (it intermittently 503s under load). Options: re-run this script in a few minutes; install Chocolatey (https://chocolatey.org/install) so this script can 'choco install nssm' instead; or download https://nssm.cc/release/nssm-2.24.zip manually in a browser, extract nssm-2.24\win64\nssm.exe to $nssmExe, then re-run this script."
+  }
   if (Test-Path $extractPath) { Remove-Item $extractPath -Recurse -Force }
   Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
   $arch = if ([Environment]::Is64BitOperatingSystem) { "win64" } else { "win32" }
@@ -142,7 +180,9 @@ function Test-IISModuleInstalled($registryName) {
 if (-not (Test-IISModuleInstalled "URL Rewrite")) {
   Write-Warn2 "URL Rewrite module not found, downloading + installing..."
   $msi = Join-Path $env:TEMP "urlrewrite.msi"
-  Invoke-WebRequest -Uri "https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_en-US.msi" -OutFile $msi -UseBasicParsing
+  if (-not (Invoke-WebRequestWithRetry "https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_en-US.msi" $msi)) {
+    throw "Couldn't download the URL Rewrite module after several attempts. Re-run this script, or install it manually: https://www.iis.net/downloads/microsoft/url-rewrite"
+  }
   Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /quiet /norestart" -Wait
   Remove-Item $msi -Force
   Write-Ok "URL Rewrite installed"
@@ -153,7 +193,9 @@ if (-not (Test-IISModuleInstalled "URL Rewrite")) {
 if (-not (Test-IISModuleInstalled "Application Request Routing")) {
   Write-Warn2 "Application Request Routing (ARR) not found, downloading + installing..."
   $msi = Join-Path $env:TEMP "arr.msi"
-  Invoke-WebRequest -Uri "https://download.microsoft.com/download/E/9/8/E9849D6A-020E-47E4-9FD0-A023E99B54EB/requestRouter_amd64.msi" -OutFile $msi -UseBasicParsing
+  if (-not (Invoke-WebRequestWithRetry "https://download.microsoft.com/download/E/9/8/E9849D6A-020E-47E4-9FD0-A023E99B54EB/requestRouter_amd64.msi" $msi)) {
+    throw "Couldn't download Application Request Routing after several attempts. Re-run this script, or install it manually: https://www.iis.net/downloads/microsoft/application-request-routing"
+  }
   Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /quiet /norestart" -Wait
   Remove-Item $msi -Force
   Write-Ok "ARR installed"
