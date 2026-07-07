@@ -2,56 +2,67 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f1115" />
 <title>The Master Brain</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235b8cff'/%3E%3Ctext x='32' y='43' font-size='30' font-family='sans-serif' text-anchor='middle' fill='white'%3E%F0%9F%A7%A0%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="login" class="login-screen">
     <form id="login-form">
-      <h1>The Master Brain</h1>
+      <div class="brand">
+        <span class="brand-mark">🧠</span>
+        <h1>The Master Brain</h1>
+      </div>
+      <p class="brand-subtitle">PC ⇄ VPS file sync &amp; control panel</p>
       <input id="login-username" type="text" placeholder="Username" autocomplete="username" />
-      <input id="login-pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="current-password" />
-      <button type="submit">Enter</button>
+      <input id="login-pin" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="PIN" autocomplete="current-password" />
+      <button type="submit" class="primary">Enter</button>
       <p id="login-error" class="error"></p>
     </form>
   </div>
 
   <div id="app" class="hidden">
     <header>
-      <h1>The Master Brain</h1>
+      <div class="header-title">
+        <span class="brand-mark small">🧠</span>
+        <h1>Master Brain</h1>
+      </div>
       <div class="status-pills">
         <span id="status-pc" class="pill">PC</span>
         <span id="status-vps" class="pill">VPS</span>
-        <span id="current-user" class="muted-text"></span>
-        <button id="logout" class="link-btn">Log out</button>
+        <button id="logout" class="link-btn" aria-label="Log out">⏻</button>
       </div>
     </header>
+    <p id="current-user" class="muted-text current-user"></p>
 
     <nav class="tabs">
-      <button class="tab-btn active" data-tab="files">Files</button>
-      <button class="tab-btn" data-tab="sync">Sync</button>
+      <button class="tab-btn active" data-tab="files">📁 Files</button>
+      <button class="tab-btn" data-tab="sync">🔄 Sync</button>
     </nav>
 
     <section id="tab-files" class="tab-panel active">
       <div class="toolbar">
         <select id="node-select">
-          <option value="pc">PC</option>
-          <option value="vps">VPS</option>
+          <option value="pc">💻 PC</option>
+          <option value="vps">☁️ VPS</option>
         </select>
         <span id="breadcrumb" class="breadcrumb"></span>
-        <span class="spacer"></span>
+      </div>
+      <div class="toolbar new-item-bar">
         <input id="new-name" placeholder="new-file.txt or folder/" />
         <button id="new-file-btn">+ File</button>
         <button id="new-folder-btn">+ Folder</button>
       </div>
-      <div class="files-layout">
+      <div id="files-layout" class="files-layout">
         <ul id="file-list" class="file-list"></ul>
         <div id="editor" class="editor hidden">
           <div class="editor-toolbar">
+            <button id="back-to-list-btn" class="link-btn back-btn" aria-label="Back to file list">← Back</button>
             <span id="editor-path"></span>
             <span class="spacer"></span>
-            <button id="save-file-btn">Save</button>
+            <button id="save-file-btn" class="primary">Save</button>
             <button id="delete-file-btn" class="danger">Delete</button>
           </div>
           <textarea id="editor-content" spellcheck="false"></textarea>
@@ -60,39 +71,45 @@
     </section>
 
     <section id="tab-sync" class="tab-panel">
-      <div class="sync-summary">
-        <button id="sync-now-btn">Sync now</button>
+      <div class="card sync-summary">
+        <button id="sync-now-btn" class="primary">Sync now</button>
         <span id="sync-status-text"></span>
       </div>
 
-      <h2>Config</h2>
-      <form id="config-form" class="config-form">
-        <label>Direction
-          <select id="cfg-direction">
-            <option value="two-way">Two-way</option>
-            <option value="pc-to-vps">PC &rarr; VPS only</option>
-            <option value="vps-to-pc">VPS &rarr; PC only</option>
-          </select>
-        </label>
-        <label>Auto-sync interval (minutes, 0 = off)
-          <input id="cfg-interval" type="number" min="0" />
-        </label>
-        <label>Include patterns (one per line)
-          <textarea id="cfg-include" rows="3"></textarea>
-        </label>
-        <label>Exclude patterns (one per line)
-          <textarea id="cfg-exclude" rows="3"></textarea>
-        </label>
-        <button type="submit">Save config</button>
-      </form>
+      <details class="card" open>
+        <summary>Config</summary>
+        <form id="config-form" class="config-form">
+          <label>Direction
+            <select id="cfg-direction">
+              <option value="two-way">Two-way</option>
+              <option value="pc-to-vps">PC &rarr; VPS only</option>
+              <option value="vps-to-pc">VPS &rarr; PC only</option>
+            </select>
+          </label>
+          <label>Auto-sync interval (minutes, 0 = off)
+            <input id="cfg-interval" type="number" min="0" inputmode="numeric" />
+          </label>
+          <label>Include patterns (one per line)
+            <textarea id="cfg-include" rows="3"></textarea>
+          </label>
+          <label>Exclude patterns (one per line)
+            <textarea id="cfg-exclude" rows="3"></textarea>
+          </label>
+          <button type="submit" class="primary">Save config</button>
+        </form>
+      </details>
 
-      <h2>History</h2>
-      <table id="history-table">
-        <thead>
-          <tr><th>Time</th><th>Op</th><th>Path</th><th>Direction</th><th>Result</th></tr>
-        </thead>
-        <tbody id="history-body"></tbody>
-      </table>
+      <details class="card">
+        <summary>History</summary>
+        <div class="table-scroll">
+          <table id="history-table">
+            <thead>
+              <tr><th>Time</th><th>Op</th><th>Path</th><th>Direction</th><th>Result</th></tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </details>
     </section>
   </div>
 
