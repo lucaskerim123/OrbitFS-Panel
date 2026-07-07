@@ -251,18 +251,13 @@ select, input[type="text"], input[type="number"] {
 }
 .back-btn { display: none; }
 #editor-path, #preview-path { word-break: break-all; }
-#editor-content {
+.CodeMirror {
   width: 100%;
-  min-height: 50vh;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  padding: 0.85rem;
+  height: 50vh;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.92rem;
-  resize: vertical;
+  border-radius: 0 0 var(--radius) var(--radius);
 }
-#editor-content:focus { outline: none; }
 
 .preview-body { padding: 1.25rem; }
 .preview-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.75rem; }
@@ -348,25 +343,28 @@ th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(
 td { white-space: normal; word-break: break-word; }
 th { color: var(--muted); font-weight: 500; }
 
-/* --- Compact mode: phones --- */
-@media (max-width: 420px) {
-  header { padding: 0.5rem 0.65rem 0.25rem; }
-  header h1 { font-size: 0.92rem; }
-  .brand-mark.small { font-size: 0.95rem; }
-  .current-user { margin: 0 0.65rem 0.5rem; padding-bottom: 0.5rem; font-size: 0.7rem; }
-  .pill { font-size: 0.65rem; padding: 0.2rem 0.45rem; }
+/* --- Compact mode: phones (bumped to 600px - large phones like Pro Max
+   report ~430px CSS width, wider than a typical 420px phone breakpoint) --- */
+@media (max-width: 600px) {
+  header { padding: 0.35rem 0.55rem 0.2rem; gap: 0.35rem; }
+  header h1 { font-size: 0.8rem; }
+  .brand-mark.small { font-size: 0.85rem; }
+  .current-user { margin: 0 0.55rem 0.35rem; padding-bottom: 0.35rem; font-size: 0.66rem; }
+  .status-pills { gap: 0.3rem; }
+  .pill { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
 
-  .tabs { padding: 0 0.4rem; }
-  .tab-btn { padding: 0.5rem 0.3rem; font-size: 0.8rem; min-height: 38px; }
-  .tab-panel { padding: 0.65rem; }
+  .tabs { padding: 0 0.3rem; gap: 0.1rem; }
+  .tab-btn { padding: 0.4rem 0.25rem; font-size: 0.74rem; min-height: 32px; }
+  .tab-panel { padding: 0.55rem; }
 
-  button { padding: 0.42rem 0.65rem; font-size: 0.8rem; min-height: 36px; }
-  button.link-btn { padding: 0.35rem; }
+  button { padding: 0.36rem 0.55rem; font-size: 0.74rem; min-height: 32px; }
+  button.link-btn { padding: 0.3rem; font-size: 0.9rem; }
 
-  .card { padding: 0.7rem 0.8rem; margin-bottom: 0.75rem; }
-  .toolbar { gap: 0.4rem; margin-bottom: 0.4rem; }
-  .action-bar { margin-bottom: 0.75rem; }
-  .breadcrumb { font-size: 0.76rem; }
+  .card { padding: 0.6rem 0.7rem; margin-bottom: 0.6rem; }
+  .card summary { font-size: 0.85rem; }
+  .toolbar { gap: 0.35rem; margin-bottom: 0.35rem; }
+  .action-bar { margin-bottom: 0.6rem; }
+  .breadcrumb { font-size: 0.7rem; }
 
   .file-list { max-height: 55vh; }
   .file-list li { padding: 0.4rem 0.5rem; font-size: 0.82rem; gap: 0.3rem; }
@@ -374,7 +372,7 @@ th { color: var(--muted); font-weight: 500; }
   .icon-btn { padding: 0.3rem 0.32rem; font-size: 0.88rem; }
 
   .editor-toolbar { padding: 0.4rem 0.5rem; font-size: 0.78rem; gap: 0.3rem; }
-  #editor-content { font-size: 0.82rem; padding: 0.6rem; min-height: 40vh; }
+  .CodeMirror { font-size: 0.82rem; height: 40vh; }
   .rendered-view { padding: 0.7rem; max-height: 55vh; font-size: 0.88rem; }
   .preview-body { padding: 0.85rem; }
   .preview-media img, .preview-media video { max-height: 45vh; }

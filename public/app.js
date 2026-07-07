@@ -14,17 +14,32 @@ const TEXT_EXTENSIONS = new Set([
   "kt", "swift", "dart", "lua", "r", "pl", "vue", "graphql", "conf", "cfg",
 ]);
 
-// Extensions that get a syntax-highlighted read view (mapped to a
-// highlight.js language name); anything text-editable but not in here or
-// "md" is just plain text (txt/log/csv/ini/etc.).
-const CODE_LANGUAGES = {
-  js: "javascript", mjs: "javascript", cjs: "javascript", jsx: "javascript",
-  ts: "typescript", tsx: "typescript", py: "python", json: "json",
-  html: "xml", htm: "xml", css: "css", sh: "bash", ps1: "powershell",
-  yml: "yaml", yaml: "yaml", xml: "xml", java: "java", c: "c", h: "c",
-  cpp: "cpp", hpp: "cpp", cs: "csharp", go: "go", rs: "rust", rb: "ruby",
-  php: "php", sql: "sql", kt: "kotlin", swift: "swift", dart: "dart",
-  lua: "lua", r: "r", pl: "perl", vue: "xml", graphql: "graphql",
+// Extensions mapped to a CodeMirror mode/mime, used for live syntax
+// highlighting while editing. Anything text-editable but not listed here
+// still opens in the editor, just without highlighting (plain monospace).
+const CM_MODES = {
+  js: "javascript", mjs: "javascript", cjs: "javascript",
+  jsx: { name: "javascript", jsx: true },
+  ts: "text/typescript",
+  tsx: { name: "javascript", jsx: true, typescript: true },
+  json: { name: "javascript", json: true },
+  py: "python",
+  html: "htmlmixed", htm: "htmlmixed", vue: "htmlmixed",
+  css: "css",
+  sh: "shell",
+  ps1: "powershell",
+  yml: "yaml", yaml: "yaml",
+  xml: "xml",
+  sql: "text/x-sql",
+  java: "text/x-java",
+  c: "text/x-csrc", h: "text/x-csrc",
+  cpp: "text/x-c++src", hpp: "text/x-c++src",
+  cs: "text/x-csharp",
+  php: "application/x-httpd-php",
+  rb: "ruby",
+  go: "go",
+  rs: "rust",
+  md: "markdown",
 };
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"]);
@@ -41,10 +56,7 @@ function isTextFile(name) {
 }
 
 function editorModeFor(name) {
-  const ext = extOf(name);
-  if (ext === "md") return "markdown";
-  if (CODE_LANGUAGES[ext]) return "code";
-  return "plain";
+  return extOf(name) === "md" ? "markdown" : "code";
 }
 
 function mediaKindFor(name) {
@@ -271,18 +283,41 @@ function renderRow(list, entry) {
   list.appendChild(li);
 }
 
+// Full editor, not just a textarea: line numbers + live syntax highlighting
+// while typing, backed by CodeMirror. Created once, reused across files by
+// swapping its content/mode.
+let cm = null;
+function ensureCodeMirror() {
+  if (cm) return cm;
+  cm = CodeMirror.fromTextArea(document.getElementById("editor-content"), {
+    lineNumbers: true,
+    lineWrapping: true,
+    theme: "material-darker",
+    indentUnit: 2,
+    tabSize: 2,
+    viewportMargin: 500,
+  });
+  return cm;
+}
+
 async function openFile(filepath) {
   try {
     const { content } = await api(`/api/file?path=${encodeURIComponent(filepath)}`);
     closeAllPanels();
     state.openFile = filepath;
     state.editorMode = editorModeFor(filepath);
-    state.editorViewing = state.editorMode === "plain" ? "edit" : "rendered";
+    state.editorViewing = "edit";
     document.getElementById("editor-path").textContent = filepath;
-    document.getElementById("editor-content").value = content;
-    renderEditorView();
+
+    const editor = ensureCodeMirror();
+    editor.setValue(content);
+    editor.setOption("mode", CM_MODES[extOf(filepath)] || null);
+    editor.clearHistory();
+
     document.getElementById("editor").classList.remove("hidden");
     document.getElementById("files-layout").classList.add("editor-open");
+    renderEditorView();
+    setTimeout(() => editor.refresh(), 30);
   } catch (err) {
     alert(err.message);
   }
@@ -290,47 +325,35 @@ async function openFile(filepath) {
 
 function renderEditorView() {
   const rendered = document.getElementById("editor-rendered");
-  const textarea = document.getElementById("editor-content");
   const modeBtn = document.getElementById("editor-mode-btn");
+  const cmWrapper = cm ? cm.getWrapperElement() : null;
 
-  if (state.editorMode === "plain") {
+  if (state.editorMode !== "markdown") {
     modeBtn.classList.add("hidden");
     rendered.classList.add("hidden");
-    textarea.classList.remove("hidden");
+    if (cmWrapper) cmWrapper.classList.remove("hidden");
     return;
   }
 
   modeBtn.classList.remove("hidden");
   if (state.editorViewing === "edit") {
-    modeBtn.textContent = state.editorMode === "markdown" ? "Preview" : "View";
+    modeBtn.textContent = "Preview";
     rendered.classList.add("hidden");
-    textarea.classList.remove("hidden");
+    if (cmWrapper) cmWrapper.classList.remove("hidden");
     return;
   }
 
   modeBtn.textContent = "Edit";
-  textarea.classList.add("hidden");
+  if (cmWrapper) cmWrapper.classList.add("hidden");
   rendered.classList.remove("hidden");
-  rendered.innerHTML = "";
-
-  if (state.editorMode === "markdown") {
-    const raw = window.marked ? marked.parse(textarea.value) : textarea.value;
-    rendered.innerHTML = window.DOMPurify ? DOMPurify.sanitize(raw) : raw;
-  } else {
-    const lang = CODE_LANGUAGES[extOf(state.openFile)] || "plaintext";
-    const pre = document.createElement("pre");
-    const code = document.createElement("code");
-    code.className = `language-${lang}`;
-    code.textContent = textarea.value;
-    pre.appendChild(code);
-    rendered.appendChild(pre);
-    if (window.hljs) hljs.highlightElement(code);
-  }
+  const raw = window.marked ? marked.parse(cm.getValue()) : cm.getValue();
+  rendered.innerHTML = window.DOMPurify ? DOMPurify.sanitize(raw) : raw;
 }
 
 document.getElementById("editor-mode-btn").addEventListener("click", () => {
   state.editorViewing = state.editorViewing === "edit" ? "rendered" : "edit";
   renderEditorView();
+  if (state.editorViewing === "edit" && cm) setTimeout(() => cm.refresh(), 30);
 });
 
 async function openPreview(filepath, entry) {
@@ -391,8 +414,8 @@ document.getElementById("back-to-list-btn").addEventListener("click", closeAllPa
 document.getElementById("preview-back-btn").addEventListener("click", closeAllPanels);
 
 document.getElementById("save-file-btn").addEventListener("click", async () => {
-  if (!state.openFile) return;
-  const content = document.getElementById("editor-content").value;
+  if (!state.openFile || !cm) return;
+  const content = cm.getValue();
   try {
     await api("/api/file", {
       method: "PUT",
