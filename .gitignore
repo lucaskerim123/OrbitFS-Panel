@@ -1,0 +1,6 @@
+node_modules/
+.env
+*.log
+config.json
+sync-state.json
+sync-history.jsonl
