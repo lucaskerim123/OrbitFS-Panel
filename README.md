@@ -5,7 +5,7 @@ Web panel for browsing and syncing the two Master Hive nodes:
 - **PC node** — the `mcp-hive-server` instance running on your Windows PC, reached over its Cloudflare tunnel.
 - **VPS node** — a second `mcp-hive-server` instance running on this VPS, always online.
 
-The panel lets you browse/edit files on either node, and keeps the two in sync
+The panel lets you browse/edit files on either node, and keeps the two in syncnpm install
 (two-way, last-write-wins by modified time, with deletion propagation), with a
 manual "Sync now" button, a configurable auto-sync interval, and a sync
 history log. The UI is mobile-first, so it's fully usable from a phone.

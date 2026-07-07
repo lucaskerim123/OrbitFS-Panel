@@ -1,0 +1,6 @@
+{
+  "direction": "two-way",
+  "intervalMinutes": 15,
+  "include": ["**"],
+  "exclude": ["*.log", "node_modules/**"]
+}

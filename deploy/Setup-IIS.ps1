@@ -43,7 +43,7 @@
 
 [CmdletBinding()]
 param(
-  [string]$AppDir = "C:\the-master-brain",
+  [string]$AppDir = "C:\mcp-hive-server",
   [string]$ServiceName = "MasterBrainPanel",
   [int]$PanelPort = 4000,
   [string]$SiteName = "MasterBrainPanel",
