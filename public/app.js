@@ -155,6 +155,7 @@ async function openFile(filepath) {
     document.getElementById("editor-path").textContent = filepath;
     document.getElementById("editor-content").value = content;
     document.getElementById("editor").classList.remove("hidden");
+    document.getElementById("files-layout").classList.add("editor-open");
   } catch (err) {
     alert(err.message);
   }
@@ -163,7 +164,10 @@ async function openFile(filepath) {
 function closeEditor() {
   state.openFile = null;
   document.getElementById("editor").classList.add("hidden");
+  document.getElementById("files-layout").classList.remove("editor-open");
 }
+
+document.getElementById("back-to-list-btn").addEventListener("click", closeEditor);
 
 document.getElementById("save-file-btn").addEventListener("click", async () => {
   if (!state.openFile) return;

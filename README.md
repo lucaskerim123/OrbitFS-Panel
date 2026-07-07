@@ -8,7 +8,7 @@ Web panel for browsing and syncing the two Master Hive nodes:
 The panel lets you browse/edit files on either node, and keeps the two in sync
 (two-way, last-write-wins by modified time, with deletion propagation), with a
 manual "Sync now" button, a configurable auto-sync interval, and a sync
-history log.
+history log. The UI is mobile-first, so it's fully usable from a phone.
 
 ## Setup on the VPS
 
@@ -47,6 +47,46 @@ Each user logs in with a username + PIN (not a shared key). PINs are hashed
 15 minutes. Manage accounts with `node scripts/add-user.mjs <username> <pin>`;
 there's no in-app user management UI by design, since this is meant for a
 small, trusted set of people with shell access to the server.
+
+## Quick deploy on IIS (Windows VPS, no PC required)
+
+If you're managing the VPS entirely over RDP (no separate PC), after steps
+1-5 above, `deploy/Setup-IIS.ps1` automates the rest — installing the panel
+as a background Windows service and putting it behind IIS as a reverse
+proxy:
+
+```powershell
+# In an elevated PowerShell (Run as Administrator) on the VPS, after
+# cloning the repo to C:\the-master-brain and completing steps 1-5 above:
+cd C:\the-master-brain
+.\deploy\Setup-IIS.ps1 -HostHeader brain.your-domain.com
+```
+
+What it does:
+- Installs [NSSM](https://nssm.cc/) if missing and registers the panel as a
+  `MasterBrainPanel` Windows service (auto-starts on boot, restarts on
+  failure, logs to `service-out.log` / `service-err.log` in the repo).
+- Downloads + silently installs the IIS **URL Rewrite** and **Application
+  Request Routing (ARR)** modules if they aren't already present.
+- Enables ARR's reverse-proxy feature and creates an IIS site that forwards
+  all traffic to the panel's local port.
+
+It's safe to re-run (e.g. after `git pull && npm install`) — it only
+restarts the service and refreshes the IIS config, it won't duplicate
+anything. Run `Get-Help .\deploy\Setup-IIS.ps1 -Full` for all parameters
+(ports, service name, site name, etc.).
+
+After it finishes, manually:
+1. Point DNS for your domain at the VPS, if using `-HostHeader`.
+2. Bind HTTPS in IIS Manager (Sites → your site → Bindings → Add `https`)
+   with a real certificate — [win-acme](https://www.win-acme.com/) is the
+   easiest way to get a free auto-renewing Let's Encrypt cert on IIS. This
+   matters: login PINs and session tokens travel over this connection.
+3. Open `https://<your-domain>/` from your phone and log in.
+
+The sections below cover the same setup by hand, and other hosting options
+(systemd on Linux, or a manual nginx/IIS reverse proxy), if you'd rather not
+run the script or aren't on Windows.
 
 ## Running as a service (systemd)
 
@@ -90,7 +130,11 @@ server {
 Put this behind HTTPS (e.g. certbot) since login PINs and session tokens are
 sent from the browser.
 
-## Running on IIS (Windows Server)
+## Running on IIS (Windows Server), by hand
+
+`deploy/Setup-IIS.ps1` (see "Quick deploy on IIS" above) automates
+everything below — this section is the manual walkthrough of what it does,
+useful if you want to understand or customize the setup.
 
 Node/Express doesn't run inside IIS's worker process natively. The
 straightforward way to put this behind IIS is a reverse proxy — run the
