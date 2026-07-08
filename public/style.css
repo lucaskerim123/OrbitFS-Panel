@@ -135,6 +135,18 @@ header h1 { font-size: 1.05rem; margin: 0; }
 
 .pill.ok { color: var(--ok); border-color: var(--ok); }
 .pill.down { color: var(--danger); border-color: var(--danger); }
+
+.permission-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  vertical-align: middle;
+}
+.permission-badge.admin { color: var(--accent); border-color: var(--accent); }
 .muted-text { color: var(--muted); font-size: 0.78rem; }
 .current-user { margin: 0 1rem 0.6rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
 
@@ -459,3 +471,44 @@ th { color: var(--muted); font-weight: 500; }
   .brand h1 { font-size: 1.1rem; }
   #login-form { padding: 1.5rem 1.25rem; }
 }
+
+/* --- Sort confirmation modal --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.modal-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.modal-box h2 { margin: 0 0 0.4rem; font-size: 1.05rem; }
+
+.sort-modal-list { display: flex; flex-direction: column; gap: 0.6rem; margin: 0.75rem 0; }
+
+.sort-modal-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+.sort-modal-row .sort-item-name { flex: 0 0 auto; max-width: 40%; overflow-wrap: anywhere; font-size: 0.85rem; }
+.sort-modal-row .sort-arrow { color: var(--muted); }
+.sort-modal-row input[type="text"] { flex: 1; min-width: 0; }
+.sort-modal-row.new-folder .sort-dest-badge { color: var(--accent); font-size: 0.75rem; white-space: nowrap; }
+
+.modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.75rem; }

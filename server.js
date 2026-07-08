@@ -7,6 +7,7 @@ import { execFile, spawn } from "child_process";
 import { Readable } from "stream";
 import { makeHiveClient } from "./hive-client.js";
 import { verifyLogin, validateSession, invalidateSession, listUsers, upsertUser, removeUser } from "./auth.js";
+import { canAccessPath, filterEntriesForRole, listPermissions, setPermission, clearPermission } from "./permissions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PANEL_PORT || 4000;
@@ -53,6 +54,12 @@ function sessionOf(req) {
 function requireAdmin(req, res, next) {
   if (req.role !== "admin") return res.status(403).json({ error: "Admin access required" });
   next();
+}
+
+async function requireFileAccess(req, res, filepath) {
+  if (await canAccessPath(req.role, filepath)) return true;
+  res.status(403).json({ error: "File access denied" });
+  return false;
 }
 
 // --- Auth ------------------------------------------------------------------
@@ -109,10 +116,13 @@ app.get("/api/status", async (req, res) => {
 // Thin passthrough to the Hive node's own REST API (see mcp-hive-server),
 // except upload/download which stream raw bytes rather than round-tripping
 // through JSON, so this handles any file type/size sanely.
+// File permissions are intentionally basic: default user access, with optional
+// admin-only path overrides stored by this panel.
 
 app.get("/api/files", async (req, res) => {
   try {
-    res.json({ entries: await hive.listFiles(req.query.subpath) });
+    const entries = await hive.listFiles(req.query.subpath);
+    res.json({ entries: await filterEntriesForRole(entries, req.role, req.query.subpath || "") });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -120,6 +130,7 @@ app.get("/api/files", async (req, res) => {
 
 app.get("/api/file", async (req, res) => {
   try {
+    if (!(await requireFileAccess(req, res, req.query.path))) return;
     res.json({ content: await hive.readFile(req.query.path) });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -128,6 +139,7 @@ app.get("/api/file", async (req, res) => {
 
 app.put("/api/file", express.json({ limit: "25mb" }), async (req, res) => {
   try {
+    if (!(await requireFileAccess(req, res, req.body.path))) return;
     await hive.writeFile(req.body.path, req.body.content ?? "");
     res.json({ ok: true });
   } catch (err) {
@@ -137,6 +149,7 @@ app.put("/api/file", express.json({ limit: "25mb" }), async (req, res) => {
 
 app.delete("/api/file", async (req, res) => {
   try {
+    if (!(await requireFileAccess(req, res, req.query.path))) return;
     await hive.deleteFile(req.query.path);
     res.json({ ok: true });
   } catch (err) {
@@ -146,6 +159,8 @@ app.delete("/api/file", async (req, res) => {
 
 app.post("/api/move", express.json(), async (req, res) => {
   try {
+    if (!(await requireFileAccess(req, res, req.body.from))) return;
+    if (!(await requireFileAccess(req, res, req.body.to))) return;
     await hive.moveFile(req.body.from, req.body.to);
     res.json({ ok: true });
   } catch (err) {
@@ -153,8 +168,31 @@ app.post("/api/move", express.json(), async (req, res) => {
   }
 });
 
+app.post("/api/sort/preview", async (req, res) => {
+  try {
+    if (!(await requireFileAccess(req, res, "_sorter"))) return;
+    res.json(await hive.previewSort());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/sort/apply", express.json(), async (req, res) => {
+  try {
+    const moves = req.body?.moves || [];
+    for (const m of moves) {
+      if (!(await requireFileAccess(req, res, `_sorter/${m.item}`))) return;
+      if (!(await requireFileAccess(req, res, `${m.destination}/${m.item}`))) return;
+    }
+    res.json(await hive.applySort(moves));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/mkdir", express.json(), async (req, res) => {
   try {
+    if (!(await requireFileAccess(req, res, req.body.path))) return;
     await hive.mkdir(req.body.path);
     res.json({ ok: true });
   } catch (err) {
@@ -164,6 +202,7 @@ app.post("/api/mkdir", express.json(), async (req, res) => {
 
 app.get("/api/download", async (req, res) => {
   try {
+    if (!(await requireFileAccess(req, res, req.query.path))) return;
     const url = new URL("/api/download", hive.baseUrl);
     url.searchParams.set("path", req.query.path);
     const upstream = await fetch(url, { headers: hive.headers });
@@ -179,6 +218,7 @@ app.get("/api/download", async (req, res) => {
 
 app.post("/api/upload", express.raw({ type: () => true, limit: "2gb" }), async (req, res) => {
   try {
+    if (!(await requireFileAccess(req, res, req.query.path))) return;
     const url = new URL("/api/upload", hive.baseUrl);
     url.searchParams.set("path", req.query.path);
     const upstream = await fetch(url, {
@@ -190,6 +230,34 @@ app.post("/api/upload", express.raw({ type: () => true, limit: "2gb" }), async (
     res.status(upstream.status).json(body);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/file-permissions", requireAdmin, async (req, res) => {
+  try {
+    res.json({ rules: await listPermissions() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/file-permissions", requireAdmin, express.json(), async (req, res) => {
+  const { path: filepath, role } = req.body || {};
+  if (!filepath && filepath !== "") return res.status(400).json({ error: "path required" });
+  if (!["admin", "user"].includes(role)) return res.status(400).json({ error: "role must be admin or user" });
+  try {
+    res.json({ ok: true, permission: await setPermission(filepath, role) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/file-permissions", requireAdmin, async (req, res) => {
+  if (!req.query.path && req.query.path !== "") return res.status(400).json({ error: "path required" });
+  try {
+    res.json({ ok: true, permission: await clearPermission(req.query.path) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -308,6 +376,20 @@ app.delete("/api/users/:username", requireAdmin, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+app.get(["/", "/index.html"], async (req, res, next) => {
+  try {
+    const indexPath = path.join(__dirname, "public", "index.html");
+    const html = await fs.readFile(indexPath, "utf-8");
+    const injected = html.includes("permissions.js")
+      ? html
+      : html.replace("</body>", "  <script src=\"permissions.js\"></script>\n</body>");
+    res.set("Cache-Control", "no-store");
+    res.type("html").send(injected);
+  } catch (err) {
+    next(err);
   }
 });
 

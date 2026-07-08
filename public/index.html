@@ -54,6 +54,7 @@
         <button id="new-folder-btn">+ Folder</button>
         <button id="upload-btn">⬆ Upload</button>
         <input id="upload-input" type="file" multiple class="hidden" />
+        <button id="sort-inbox-btn" title="Sort everything in _sorter into its real home">🧹 Sort</button>
       </div>
       <div id="files-layout" class="files-layout">
         <ul id="file-list" class="file-list"></ul>
@@ -63,6 +64,7 @@
             <button id="back-to-list-btn" class="link-btn back-btn" aria-label="Back to file list">← Back</button>
             <span id="editor-path"></span>
             <span class="spacer"></span>
+            <button id="editor-permission-btn" class="hidden">Permission</button>
             <button id="editor-mode-btn" class="hidden">Edit</button>
             <button id="save-file-btn" class="primary">Save</button>
             <button id="editor-download-btn">⬇ Download</button>
@@ -82,10 +84,24 @@
             <div id="preview-media" class="preview-media hidden"></div>
             <p id="preview-info" class="muted-text"></p>
             <div class="preview-actions">
+              <button id="preview-permission-btn" class="hidden">Permission</button>
               <button id="preview-download-btn" class="primary">⬇ Download</button>
               <button id="preview-move-btn">Move</button>
               <button id="preview-delete-btn" class="danger">Delete</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="sort-modal-overlay" class="modal-overlay hidden">
+        <div class="modal-box">
+          <h2>Confirm sort destinations</h2>
+          <p class="muted-text">Nothing has moved yet. Review each destination below, uncheck anything you don't want moved, and edit any destination that looks wrong.</p>
+          <div id="sort-modal-list" class="sort-modal-list"></div>
+          <p id="sort-modal-errors" class="error hidden"></p>
+          <div class="modal-actions">
+            <button id="sort-modal-cancel-btn">Cancel</button>
+            <button id="sort-modal-confirm-btn" class="primary">Move selected</button>
           </div>
         </div>
       </div>
@@ -242,6 +258,17 @@
           <button type="submit" class="primary">Add / update user</button>
           <p id="user-form-error" class="error"></p>
         </form>
+      </details>
+
+      <details class="card" open>
+        <summary>File permissions</summary>
+        <p class="muted-text">Default is User. Add an Admin override to hide a file/folder from normal users.</p>
+        <div class="table-scroll">
+          <table id="permissions-table">
+            <thead><tr><th>Path</th><th>Role</th><th></th></tr></thead>
+            <tbody id="permissions-body"></tbody>
+          </table>
+        </div>
       </details>
 
       <details class="card" open>

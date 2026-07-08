@@ -4,7 +4,9 @@ Mobile-first admin panel for the Master Hive file server. Two things, so
 there's no reason to RDP into the VPS for routine work:
 
 - **Files** — browse, open/edit text files in-place, upload, download, move
-  or rename, create folders, and delete — anywhere in the Hive.
+  or rename, create folders, delete, and **Sort** — drop files/folders into
+  `_sorter` and hit the Sort button to have the Hive server ask Claude to
+  file each one into its real home elsewhere in the store.
 - **System** — see whether the Hive server, the Cloudflare tunnel, and this
   panel itself are up, restart any of them, tail their logs, check disk
   space, and see which MCP clients (Claude, ChatGPT) are currently
@@ -17,7 +19,9 @@ this panel runs on, reached over `localhost`.
 ## Setup on the VPS
 
 1. Have `mcp-hive-server` already running on this VPS (its own `HIVE_ROOT`,
-   port, `HIVE_API_KEY`, etc. — see that repo's own setup).
+   port, `HIVE_API_KEY`, etc. — see that repo's own setup). For the Sort
+   button to work, that server also needs `ANTHROPIC_API_KEY` set in its
+   `.env` — Sort is powered by that server's own model call, not this panel.
 2. Clone this repo and install dependencies:
    ```
    git clone <this repo>

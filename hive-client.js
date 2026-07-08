@@ -64,6 +64,24 @@ export function makeHiveClient(baseUrl, apiKey) {
     if (!resp.ok) throw new Error(`mkdir failed: ${resp.status}`);
   }
 
+  async function previewSort() {
+    const resp = await fetch(new URL("/api/sort/preview", baseUrl), { method: "POST", headers });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(body.error || `sort preview failed: ${resp.status}`);
+    return body;
+  }
+
+  async function applySort(moves) {
+    const resp = await fetch(new URL("/api/sort/apply", baseUrl), {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ moves }),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(body.error || `sort apply failed: ${resp.status}`);
+    return body;
+  }
+
   async function oauthState() {
     const resp = await fetch(new URL("/api/oauth-state", baseUrl), { headers });
     if (!resp.ok) throw new Error(`oauth-state failed: ${resp.status}`);
@@ -73,5 +91,5 @@ export function makeHiveClient(baseUrl, apiKey) {
   // Upload/download are proxied by server.js as raw byte streams rather than
   // wrapped here, so large files never get buffered into a JS string.
 
-  return { baseUrl, headers, ping, listFiles, readFile, writeFile, deleteFile, moveFile, mkdir, oauthState };
+  return { baseUrl, headers, ping, listFiles, readFile, writeFile, deleteFile, moveFile, mkdir, previewSort, applySort, oauthState };
 }
