@@ -306,6 +306,7 @@ select, input[type="text"], input[type="number"] {
 .service-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
 .service-row strong { margin-right: 0.5rem; }
 .service-row > div { display: flex; align-items: center; }
+.btn-group { gap: 0.4rem; flex-wrap: wrap; }
 
 .log-tabs { display: flex; gap: 0.4rem; margin: 0.6rem 0 0.4rem; }
 .log-tab-btn {

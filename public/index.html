@@ -210,15 +210,26 @@
         <summary>Server controls</summary>
         <div class="service-row">
           <div><strong>Hive server</strong></div>
-          <button class="restart-btn" data-target="hive">Restart</button>
+          <div class="btn-group">
+            <button class="control-btn" data-target="hive" data-action="start">Start</button>
+            <button class="control-btn danger" data-target="hive" data-action="stop">Stop</button>
+            <button class="control-btn" data-target="hive" data-action="restart">Restart</button>
+          </div>
         </div>
         <div class="service-row">
           <div><strong>Cloudflare Tunnel</strong></div>
-          <button class="restart-btn" data-target="tunnel">Restart</button>
+          <div class="btn-group">
+            <button class="control-btn" data-target="tunnel" data-action="start">Start</button>
+            <button class="control-btn danger" data-target="tunnel" data-action="stop">Stop</button>
+            <button class="control-btn" data-target="tunnel" data-action="restart">Restart</button>
+          </div>
         </div>
         <div class="service-row">
           <div><strong>This panel</strong></div>
-          <button class="restart-btn" data-target="panel">Restart</button>
+          <div class="btn-group">
+            <button class="control-btn danger" data-target="panel" data-action="stop">Stop</button>
+            <button class="control-btn" data-target="panel" data-action="restart">Restart</button>
+          </div>
         </div>
       </details>
 

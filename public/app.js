@@ -653,16 +653,21 @@ document.getElementById("upload-input").addEventListener("change", async (e) => 
 // --- System tab ------------------------------------------------------------
 document.getElementById("system-refresh-btn").addEventListener("click", loadSystem);
 
-document.querySelectorAll(".restart-btn").forEach((btn) => {
+document.querySelectorAll(".control-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
     const target = btn.dataset.target;
-    if (!confirm(`Restart ${target}?`)) return;
+    const action = btn.dataset.action;
+    let confirmMsg = `${action[0].toUpperCase()}${action.slice(1)} ${target}?`;
+    if (target === "panel" && action !== "restart") {
+      confirmMsg += " This panel will become unreachable until it's started again some other way (RDP, or Start-Service MasterBrainPanel).";
+    }
+    if (!confirm(confirmMsg)) return;
     btn.disabled = true;
     try {
-      const body = await api("/api/system/restart", {
+      const body = await api("/api/system/control", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target }),
+        body: JSON.stringify({ target, action }),
       });
       if (body.note) alert(body.note);
       setTimeout(loadSystem, 3000);

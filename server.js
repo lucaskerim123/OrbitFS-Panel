@@ -288,29 +288,37 @@ app.get("/api/system/status", async (req, res) => {
   }
 });
 
-const RESTART_TARGETS = new Set(["hive", "tunnel", "panel"]);
+const CONTROL_TARGETS = new Set(["hive", "tunnel", "panel"]);
+const CONTROL_ACTIONS = new Set(["start", "stop", "restart"]);
 
-app.post("/api/system/restart", express.json(), async (req, res) => {
+app.post("/api/system/control", requireAdmin, express.json(), async (req, res) => {
   const target = req.body?.target;
-  if (!RESTART_TARGETS.has(target)) return res.status(400).json({ error: "invalid target" });
+  const action = req.body?.action || "restart";
+  if (!CONTROL_TARGETS.has(target)) return res.status(400).json({ error: "invalid target" });
+  if (!CONTROL_ACTIONS.has(action)) return res.status(400).json({ error: "invalid action" });
 
-  const scriptPath = path.join(__dirname, "scripts", "system-restart.ps1");
+  const scriptPath = path.join(__dirname, "scripts", "system-control.ps1");
 
-  if (target === "panel") {
-    // This kills the very process handling this request, so respond first,
-    // then let a detached child do the restart a second later.
-    res.json({ ok: true, note: "Panel restarting - reconnect in a few seconds." });
+  if (target === "panel" && action !== "start") {
+    // stop/restart kill the very process handling this request, so respond
+    // first, then let a detached child do it a second later.
+    const verb = action === "stop" ? "stopping" : "restarting";
+    res.json({ ok: true, note: `Panel ${verb} - reconnect in a few seconds.` });
     const child = spawn(
       "powershell.exe",
-      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath, "-Target", "panel"],
-      { detached: true, stdio: "ignore" }
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath, "-Target", "panel", "-Action", action],
+      { detached: true, stdio: ["ignore", "pipe", "pipe"] }
     );
+    child.stdout.on("data", (d) => logEvent("panel.control.child.stdout", { data: d.toString() }));
+    child.stderr.on("data", (d) => logEvent("panel.control.child.stderr", { data: d.toString() }));
+    child.on("error", (e) => logError("panel.control.child.error", e));
+    child.on("exit", (code, signal) => logEvent("panel.control.child.exit", { code, signal }));
     child.unref();
     return;
   }
 
   try {
-    await runPs(["-File", scriptPath, "-Target", target]);
+    await runPs(["-File", scriptPath, "-Target", target, "-Action", action]);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
