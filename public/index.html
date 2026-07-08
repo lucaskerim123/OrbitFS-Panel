@@ -69,7 +69,7 @@
             <button id="save-file-btn" class="primary">Save</button>
             <button id="editor-download-btn">⬇ Download</button>
             <button id="move-file-btn">Move</button>
-            <button id="delete-file-btn" class="danger">Move To 🗑 Trash</button>
+            <button id="delete-file-btn" class="danger">Move To Trash</button>
           </div>
           <div id="editor-rendered" class="rendered-view hidden"></div>
           <textarea id="editor-content" spellcheck="false"></textarea>
@@ -87,7 +87,7 @@
               <button id="preview-permission-btn" class="hidden">Permission</button>
               <button id="preview-download-btn" class="primary">⬇ Download</button>
               <button id="preview-move-btn">Move</button>
-              <button id="preview-delete-btn" class="danger">Move To 🗑 Trash</button>
+              <button id="preview-delete-btn" class="danger">Move To Trash</button>
             </div>
           </div>
         </div>
@@ -233,8 +233,20 @@
         </div>
       </details>
 
+      <details class="card">
+        <summary>Heavily guarded: Hard stop</summary>
+        <p class="muted-text">Admin only. This runs `C:\Users\Lucas\Desktop\hardstop.ps1` on the server. It requires both the exact confirmation phrase and a separate hard-stop password.</p>
+        <form id="guarded-hardstop-form" class="user-form">
+          <input id="guarded-hardstop-confirm" type="text" placeholder="Type RUN HARDSTOP to confirm" autocapitalize="off" autocorrect="off" spellcheck="false" required />
+          <input id="guarded-hardstop-password" type="password" placeholder="Hard-stop password" autocapitalize="off" autocorrect="off" spellcheck="false" required />
+          <button type="submit" id="guarded-hardstop-run-btn" class="danger">Run hard stop</button>
+          <p id="guarded-hardstop-message" class="muted-text"></p>
+        </form>
+        <pre id="guarded-hardstop-output" class="log-view compact-log">(script not run yet)</pre>
+      </details>
+
       <details class="card" open>
-        <summary>🗑 Trash settings</summary>
+        <summary>Trash settings</summary>
         <p class="muted-text">Admin only. File deletes from the panel move items into `🗑 Trash`. Auto-purge timing and full emptying are controlled here.</p>
         <form id="trash-config-form" class="user-form">
           <input id="trash-retention-days" type="number" min="1" max="365" placeholder="Retention days" required />

@@ -357,6 +357,9 @@ app.get("/api/system/status", async (req, res) => {
 
 const CONTROL_TARGETS = new Set(["hive", "tunnel", "panel"]);
 const CONTROL_ACTIONS = new Set(["start", "stop", "restart"]);
+const HARDSTOP_SCRIPT_PATH = "C:\\Users\\Lucas\\Desktop\\hardstop.ps1";
+const GUARDED_HARDSTOP_CONFIRM_TEXT = "RUN HARDSTOP";
+const HARDSTOP_PASSWORD = process.env.PANEL_HARDSTOP_PASSWORD || "";
 
 app.post("/api/system/control", requireAdmin, express.json(), async (req, res) => {
   const target = req.body?.target;
@@ -403,6 +406,42 @@ app.post("/api/system/control", requireAdmin, express.json(), async (req, res) =
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+app.post("/api/system/hardstop", requireAdmin, express.json({ limit: "8kb" }), async (req, res) => {
+  const confirmText = typeof req.body?.confirmText === "string" ? req.body.confirmText.trim() : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+
+  if (confirmText !== GUARDED_HARDSTOP_CONFIRM_TEXT) {
+    return res.status(400).json({ error: `type ${GUARDED_HARDSTOP_CONFIRM_TEXT} exactly` });
+  }
+  if (!HARDSTOP_PASSWORD) {
+    return res.status(503).json({ error: "PANEL_HARDSTOP_PASSWORD is not configured on the server" });
+  }
+  if (password !== HARDSTOP_PASSWORD) {
+    logEvent("panel.guarded_hardstop.denied", { ...requestContext(req), reason: "bad_password" });
+    return res.status(403).json({ error: "Invalid hard-stop password" });
+  }
+  logEvent("panel.guarded_hardstop.start", { ...requestContext(req), scriptPath: HARDSTOP_SCRIPT_PATH });
+
+  execFile(
+    POWERSHELL_CMD,
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", HARDSTOP_SCRIPT_PATH],
+    { timeout: 20000, maxBuffer: 4 * 1024 * 1024, windowsHide: true },
+    (err, stdout, stderr) => {
+      if (err) {
+        logError("panel.guarded_hardstop.error", err, { ...requestContext(req), scriptPath: HARDSTOP_SCRIPT_PATH });
+        return res.status(500).json({ error: stderr?.trim() || stdout?.trim() || err.message });
+      }
+      logEvent("panel.guarded_hardstop.ok", {
+        ...requestContext(req),
+        scriptPath: HARDSTOP_SCRIPT_PATH,
+        stdoutBytes: Buffer.byteLength(stdout || ""),
+        stderrBytes: Buffer.byteLength(stderr || ""),
+      });
+      res.json({ ok: true, stdout, stderr });
+    }
+  );
 });
 
 const LOG_FILES = {

@@ -294,7 +294,7 @@ function renderRow(list, entry) {
   const del = document.createElement("button");
   del.className = "icon-btn danger";
   del.textContent = "🗑";
-    del.title = "Move to 🗑 Trash";
+  del.title = "Move to trash";
   del.addEventListener("click", (e) => { e.stopPropagation(); trashPath(full); });
   actions.appendChild(del);
   if (isProtectedRootFolderPath(full, entry.type)) actions.querySelector(".icon-btn.danger")?.remove();
@@ -971,6 +971,48 @@ document.getElementById("empty-trash-btn").addEventListener("click", async () =>
     if (state.subpath === "🗑 Trash" || state.subpath === "_trash") loadFiles();
   } catch (err) {
     messageEl.textContent = err.message;
+  }
+});
+
+document.getElementById("guarded-hardstop-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const confirmText = document.getElementById("guarded-hardstop-confirm").value.trim();
+  const password = document.getElementById("guarded-hardstop-password").value;
+  const messageEl = document.getElementById("guarded-hardstop-message");
+  const outputEl = document.getElementById("guarded-hardstop-output");
+  const runBtn = document.getElementById("guarded-hardstop-run-btn");
+
+  messageEl.textContent = "";
+  if (confirmText !== "RUN HARDSTOP") {
+    messageEl.textContent = "Type RUN HARDSTOP exactly.";
+    return;
+  }
+  if (!password) {
+    messageEl.textContent = "Hard-stop password is required.";
+    return;
+  }
+  if (!confirm("Run hardstop.ps1 now?")) return;
+
+  runBtn.disabled = true;
+  outputEl.textContent = "(running...)";
+  try {
+    const resp = await api("/api/system/hardstop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmText, password }),
+    });
+    messageEl.textContent = "Script completed.";
+    outputEl.textContent = [resp.stdout?.trim(), resp.stderr?.trim()]
+      .filter(Boolean)
+      .join("\n\n[stderr]\n") || "(no output)";
+    document.getElementById("guarded-hardstop-confirm").value = "";
+    document.getElementById("guarded-hardstop-password").value = "";
+    loadSystem();
+  } catch (err) {
+    messageEl.textContent = err.message;
+    outputEl.textContent = "(script failed)";
+  } finally {
+    runBtn.disabled = false;
   }
 });
 
