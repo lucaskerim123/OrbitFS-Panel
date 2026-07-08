@@ -498,6 +498,28 @@ document.getElementById("new-folder-btn").addEventListener("click", async () => 
   }
 });
 
+document.getElementById("sort-inbox-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("sort-inbox-btn");
+  btn.disabled = true;
+  btn.textContent = "🧹 Sorting…";
+  try {
+    const { moved, errors, note } = await api("/api/sort", { method: "POST" });
+    if (note) {
+      alert(note);
+    } else {
+      const lines = (moved || []).map((m) => `${m.item} -> ${m.to}${m.isNewFolder ? " (new folder)" : ""}`);
+      if ((errors || []).length) lines.push("", "Errors:", ...errors.map((e) => `${e.item}: ${e.error}`));
+      alert(lines.length ? lines.join("\n") : "Nothing in _sorter to sort.");
+    }
+    loadFiles();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🧹 Sort";
+  }
+});
+
 document.getElementById("upload-btn").addEventListener("click", () => {
   document.getElementById("upload-input").click();
 });

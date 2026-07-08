@@ -153,6 +153,14 @@ app.post("/api/move", express.json(), async (req, res) => {
   }
 });
 
+app.post("/api/sort", async (req, res) => {
+  try {
+    res.json(await hive.sortInbox());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/mkdir", express.json(), async (req, res) => {
   try {
     await hive.mkdir(req.body.path);
