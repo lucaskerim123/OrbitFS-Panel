@@ -135,6 +135,18 @@ header h1 { font-size: 1.05rem; margin: 0; }
 
 .pill.ok { color: var(--ok); border-color: var(--ok); }
 .pill.down { color: var(--danger); border-color: var(--danger); }
+
+.permission-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  vertical-align: middle;
+}
+.permission-badge.admin { color: var(--accent); border-color: var(--accent); }
 .muted-text { color: var(--muted); font-size: 0.78rem; }
 .current-user { margin: 0 1rem 0.6rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
 
