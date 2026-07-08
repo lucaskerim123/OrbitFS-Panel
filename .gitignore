@@ -4,3 +4,4 @@ node_modules/
 startclaude.bat
 Claude.msix
 website/CLAUDE.md
+logs/master-brain-panel-events.jsonl
