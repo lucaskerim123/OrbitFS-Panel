@@ -294,7 +294,7 @@ function renderRow(list, entry) {
   const del = document.createElement("button");
   del.className = "icon-btn danger";
   del.textContent = "🗑";
-  del.title = "Move to trash";
+    del.title = "Move to 🗑 Trash";
   del.addEventListener("click", (e) => { e.stopPropagation(); trashPath(full); });
   actions.appendChild(del);
   if (isProtectedRootFolderPath(full, entry.type)) actions.querySelector(".icon-btn.danger")?.remove();
