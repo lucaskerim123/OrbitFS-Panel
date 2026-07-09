@@ -375,7 +375,7 @@ app.get("/api/system/status", async (req, res) => {
 
 const CONTROL_TARGETS = new Set(["hive", "tunnel", "panel"]);
 const CONTROL_ACTIONS = new Set(["start", "stop", "restart"]);
-const HARDSTOP_SCRIPT_PATH = "C:\\Users\\Lucas\\Desktop\\hardstop.ps1";
+const HARDSTOP_SCRIPT_PATH = process.env.PANEL_HARDSTOP_SCRIPT_PATH || "C:\\Users\\Lucas\\Desktop\\hardstop.ps1";
 const GUARDED_HARDSTOP_CONFIRM_TEXT = "RUN HARDSTOP";
 const HARDSTOP_PASSWORD = process.env.PANEL_HARDSTOP_PASSWORD || "";
 

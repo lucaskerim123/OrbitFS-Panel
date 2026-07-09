@@ -16,8 +16,15 @@ It is the operator UI for the shared Hive server and covers:
 
 ## Setup on a new machine
 
+New machine, nothing installed yet? Run `deploy/Install-BaseStructure.ps1`
+- it creates the shared Hive file folders, generates `.env` for this repo
+and for `mcp-hive-server`, and runs `npm install` for both. Full
+walkthrough in [GETTING_STARTED.md](GETTING_STARTED.md).
+
+Short version, once both repos are cloned:
+
 1. Install Node.js.
-2. Clone this repo.
+2. Clone this repo (and `mcp-hive-server`, as a sibling folder).
 3. Run `npm install`.
 4. Copy `.env.example` to `.env`.
 5. Set `HIVE_URL` to the Hive server, usually `http://localhost:3939`.
