@@ -126,7 +126,7 @@ $protectedRoots = @(
   "1. Master Court System",
   "2. Mental Health System",
   "3. Legal Charges - AVO",
-  "Media"
+  "_media"
 )
 foreach ($folder in $protectedRoots) {
   Ensure-Dir (Join-Path $HiveRoot $folder)

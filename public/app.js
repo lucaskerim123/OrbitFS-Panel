@@ -45,17 +45,12 @@ const CM_MODES = {
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "m4a", "flac", "aac"]);
-const PROTECTED_ROOT_FOLDERS = new Set([
-  "_system",
-  "_sorter",
-  "🗑 Trash",
-  "_trash",
-  "0. Core Folder",
-  "1. Master Court System",
-  "2. Mental Health System",
-  "3. Legal Charges - AVO",
-  "Media",
-]);
+// TEMPORARILY EMPTY during the top-level folder redesign, matching
+// mcp-hive-server/server.js. Restore the real list once the new structure
+// is settled:
+//   "_system", "_sorter", "🗑 Trash", "0. Core", "1. Legal",
+//   "2. Wellbeing", "_media"
+const PROTECTED_ROOT_FOLDERS = new Set([]);
 
 function extOf(name) {
   const i = name.lastIndexOf(".");
