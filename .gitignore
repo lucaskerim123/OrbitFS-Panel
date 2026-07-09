@@ -1,6 +1,8 @@
 node_modules/
 .env
 *.log
+users.json
+sessions.json
 startclaude.bat
 Claude.msix
 website/CLAUDE.md
