@@ -188,7 +188,7 @@ app.delete("/api/file", async (req, res) => {
 app.post("/api/trash", express.json(), async (req, res) => {
   try {
     if (!(await requireFileAccess(req, res, req.body.path))) return;
-    if (!(await requireFileAccess(req, res, "🗑 Trash"))) return;
+    if (!(await requireFileAccess(req, res, "_trash"))) return;
     res.json(await hive.moveToTrash(req.body.path));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -197,7 +197,7 @@ app.post("/api/trash", express.json(), async (req, res) => {
 
 app.post("/api/trash/empty", requireAdmin, async (req, res) => {
   try {
-    if (!(await requireFileAccess(req, res, "🗑 Trash"))) return;
+    if (!(await requireFileAccess(req, res, "_trash"))) return;
     res.json(await hive.emptyTrash());
   } catch (err) {
     res.status(400).json({ error: err.message });

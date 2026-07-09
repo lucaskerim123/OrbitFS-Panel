@@ -6,7 +6,7 @@ It is the operator UI for the shared Hive server and covers:
 
 - File browsing, editing, upload, download, move, rename, and sort operations
 - System status for the Hive server, Cloudflare tunnel, and this panel
-- Admin-only controls for users, permissions, trash retention, and emptying `🗑 Trash`
+- Admin-only controls for users, permissions, trash retention, and emptying `_trash`
 
 ## What it talks to
 
@@ -39,8 +39,8 @@ Short version, once both repos are cloned:
 
 ## Trash workflow
 
-- Panel deletes move items into `🗑 Trash`
-- `🗑 Trash` can be emptied from the admin System tab
+- Panel deletes move items into `_trash`
+- `_trash` can be emptied from the admin System tab
 - Trash retention is configurable in the System tab
 - Protected root folders cannot be deleted or moved to trash
 
