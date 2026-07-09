@@ -1,0 +1,21 @@
+$Root = "C:\Project FireStorm\The Master Hive"
+
+New-Item -ItemType Directory -Force -Path `
+  "$Root\_system", `
+    "$Root\A) Global Core files", `
+      "$Root\B) Global Master Charges - AVO", `
+        "$Root\1. Master Court System\0. Document Output", `
+          "$Root\1. Master Court System\1. Plugin-Addon (Plug and Play)", `
+            "$Root\1. Master Court System\current", `
+              "$Root\1. Master Court System\imports", `
+                "$Root\1. Master Court System\archive", `
+                  "$Root\2. Mental Health System\0. Document Output", `
+                    "$Root\2. Mental Health System\1. Plugin-Addon (Plug and Play)", `
+                      "$Root\2. Mental Health System\2. Letters - Documents", `
+                        "$Root\2. Mental Health System\3. Pure vent mode", `
+                          "$Root\2. Mental Health System\current", `
+                            "$Root\2. Mental Health System\imports", `
+                              "$Root\2. Mental Health System\archive", `
+                                "$Root\Media\Photos", `
+                                  "$Root\Media\Videos", `
+                                    "$Root\Media\Audio"`
