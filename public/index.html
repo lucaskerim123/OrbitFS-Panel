@@ -121,7 +121,7 @@
         <button id="new-folder-btn">+ Folder</button>
         <button id="upload-btn">⬆ Upload</button>
         <input id="upload-input" type="file" multiple class="hidden" />
-        <button id="sort-inbox-btn" title="Sort everything in _sorter into its real home">🧹 Sort</button>
+        <button id="sort-inbox-btn" title="Opens the sorter tool in a new tab">🧹 Sort</button>
       </div>
       <div id="files-layout" class="files-layout">
         <ul id="file-list" class="file-list"></ul>
@@ -160,18 +160,6 @@
         </div>
       </div>
 
-      <div id="sort-modal-overlay" class="modal-overlay hidden">
-        <div class="modal-box">
-          <h2>Confirm sort destinations</h2>
-          <p class="muted-text">Nothing has moved yet. Review each destination below, uncheck anything you don't want moved, and edit any destination that looks wrong.</p>
-          <div id="sort-modal-list" class="sort-modal-list"></div>
-          <p id="sort-modal-errors" class="error hidden"></p>
-          <div class="modal-actions">
-            <button id="sort-modal-cancel-btn">Cancel</button>
-            <button id="sort-modal-confirm-btn" class="primary">Move selected</button>
-          </div>
-        </div>
-      </div>
     </section>
 
     <section id="tab-system" class="tab-panel">
@@ -205,6 +193,10 @@
           <div class="infra-item">
             <span>This panel</span>
             <span id="svc-panel-pill" class="pill">-</span>
+          </div>
+          <div class="infra-item">
+            <span>Sorter</span>
+            <span id="svc-sorter-pill" class="pill">-</span>
           </div>
           <div class="infra-item">
             <span>Disk (C:)</span>
@@ -297,6 +289,14 @@
           <div class="btn-group">
             <button class="control-btn danger" data-target="panel" data-action="stop">Stop</button>
             <button class="control-btn" data-target="panel" data-action="restart">Restart</button>
+          </div>
+        </div>
+        <div class="service-row">
+          <div><strong>Sorter</strong></div>
+          <div class="btn-group">
+            <button class="control-btn" data-target="sorter" data-action="start">Start</button>
+            <button class="control-btn danger" data-target="sorter" data-action="stop">Stop</button>
+            <button class="control-btn" data-target="sorter" data-action="restart">Restart</button>
           </div>
         </div>
       </details>

@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet("hive", "tunnel", "panel")]
+  [ValidateSet("hive", "tunnel", "panel", "sorter")]
   [string]$Target,
 
   [ValidateSet("start", "stop", "restart")]
@@ -14,7 +14,9 @@ param(
 
   [string]$CloudflaredServiceName = $(if ($env:CLOUDFLARED_SERVICE_NAME) { $env:CLOUDFLARED_SERVICE_NAME } else { "MasterHiveTunnel" }),
 
-  [string]$CloudflaredDir = $(if ($env:CLOUDFLARED_DIR) { $env:CLOUDFLARED_DIR } else { "C:\cloudflared" })
+  [string]$CloudflaredDir = $(if ($env:CLOUDFLARED_DIR) { $env:CLOUDFLARED_DIR } else { "C:\cloudflared" }),
+
+  [string]$SorterServiceName = $(if ($env:SORTER_SERVICE_NAME) { $env:SORTER_SERVICE_NAME } else { "MasterHiveSorter" })
 )
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -262,6 +264,10 @@ switch ("$Target.$Action") {
   "panel.start"    { Assert-ServiceExists -Name $PanelServiceName; Start-Service -Name $PanelServiceName -ErrorAction Stop }
   "panel.stop"     { Assert-ServiceExists -Name $PanelServiceName; Start-Sleep -Seconds 1; Stop-Service -Name $PanelServiceName -Force -ErrorAction Stop }
   "panel.restart"  { Assert-ServiceExists -Name $PanelServiceName; Start-Sleep -Seconds 1; Restart-Service -Name $PanelServiceName -Force -ErrorAction Stop }
+
+  "sorter.start"   { Assert-ServiceExists -Name $SorterServiceName; Start-Service -Name $SorterServiceName -ErrorAction Stop }
+  "sorter.stop"    { Assert-ServiceExists -Name $SorterServiceName; Stop-Service -Name $SorterServiceName -Force -ErrorAction Stop }
+  "sorter.restart" { Assert-ServiceExists -Name $SorterServiceName; Restart-Service -Name $SorterServiceName -Force -ErrorAction Stop }
 }
 
 Write-Output '{"ok":true}'

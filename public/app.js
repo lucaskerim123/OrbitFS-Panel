@@ -540,127 +540,15 @@ document.getElementById("new-folder-btn").addEventListener("click", async () => 
   }
 });
 
-// Sort is preview-then-confirm: /api/sort/preview only asks the model where
-// things would go, nothing moves until the user reviews/edits the modal and
-// hits "Move selected", which calls /api/sort/apply with exactly what they
-// approved (not necessarily what the model originally proposed).
-function closeSortModal() {
-  document.getElementById("sort-modal-overlay").classList.add("hidden");
-  document.getElementById("sort-modal-list").innerHTML = "";
-  document.getElementById("sort-modal-errors").classList.add("hidden");
-}
-
-function renderSortProposals(proposals) {
-  const list = document.getElementById("sort-modal-list");
-  list.innerHTML = "";
-  proposals.forEach((p, i) => {
-    const row = document.createElement("div");
-    row.className = "sort-modal-row" + (p.isNewFolder ? " new-folder" : "");
-    row.dataset.item = p.item;
-
-    const check = document.createElement("input");
-    check.type = "checkbox";
-    check.checked = true;
-    check.id = `sort-check-${i}`;
-    row.appendChild(check);
-
-    const name = document.createElement("span");
-    name.className = "sort-item-name";
-    name.textContent = p.item;
-    name.title = p.reason || "";
-    row.appendChild(name);
-
-    const arrow = document.createElement("span");
-    arrow.className = "sort-arrow";
-    arrow.textContent = "→";
-    row.appendChild(arrow);
-
-    const dest = document.createElement("input");
-    dest.type = "text";
-    dest.value = p.destination;
-    dest.className = "sort-dest-input";
-    row.appendChild(dest);
-
-    if (p.isNewFolder) {
-      const badge = document.createElement("span");
-      badge.className = "sort-dest-badge";
-      badge.textContent = "new";
-      row.appendChild(badge);
-    }
-
-    list.appendChild(row);
-  });
-}
-
-document.getElementById("sort-inbox-btn").addEventListener("click", async () => {
-  const btn = document.getElementById("sort-inbox-btn");
-  btn.disabled = true;
-  btn.textContent = "🧹 Checking…";
-  try {
-    const { proposals, errors, note } = await api("/api/sort/preview", { method: "POST" });
-    if (note) {
-      alert(note);
-      return;
-    }
-    if (!proposals || !proposals.length) {
-      const msg = (errors || []).length
-        ? `Nothing could be classified:\n${errors.map((e) => `${e.item}: ${e.error}`).join("\n")}`
-        : "Nothing in _sorter to sort.";
-      alert(msg);
-      return;
-    }
-    renderSortProposals(proposals);
-    const errEl = document.getElementById("sort-modal-errors");
-    if ((errors || []).length) {
-      errEl.textContent = `Could not classify: ${errors.map((e) => `${e.item} (${e.error})`).join(", ")}`;
-      errEl.classList.remove("hidden");
-    }
-    document.getElementById("sort-modal-overlay").classList.remove("hidden");
-  } catch (err) {
-    alert(err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "🧹 Sort";
-  }
-});
-
-document.getElementById("sort-modal-cancel-btn").addEventListener("click", closeSortModal);
-
-document.getElementById("sort-modal-confirm-btn").addEventListener("click", async () => {
-  const rows = [...document.querySelectorAll("#sort-modal-list .sort-modal-row")];
-  const moves = rows
-    .filter((row) => row.querySelector('input[type="checkbox"]').checked)
-    .map((row) => ({
-      item: row.dataset.item,
-      destination: row.querySelector(".sort-dest-input").value.trim(),
-    }))
-    .filter((m) => m.destination);
-
-  if (!moves.length) {
-    closeSortModal();
-    return;
-  }
-
-  const btn = document.getElementById("sort-modal-confirm-btn");
-  btn.disabled = true;
-  btn.textContent = "Moving…";
-  try {
-    const { moved, errors } = await api("/api/sort/apply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ moves }),
-    });
-    closeSortModal();
-    const lines = (moved || []).map((m) => `${m.item} -> ${m.to}`);
-    if ((errors || []).length) lines.push("", "Errors:", ...errors.map((e) => `${e.item}: ${e.error}`));
-    alert(lines.length ? lines.join("\n") : "Nothing moved.");
-    loadFiles();
-  } catch (err) {
-    alert(err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Move selected";
-  }
+// The old flow here called /api/sort/preview, which asks an AI model
+// (ANTHROPIC_API_KEY) to classify each item - broken whenever that key isn't
+// configured (which it hasn't been). The addon sorter classifies locally by
+// rule/keyword matching against the live folder tree instead, so it works
+// without any AI key and doesn't leave the file in an unsortable state.
+// It's a standalone service (MasterHiveSorter) with its own start/stop
+// controls in the System tab; this just opens its UI.
+document.getElementById("sort-inbox-btn").addEventListener("click", () => {
+  window.open("http://localhost:4055", "_blank", "noopener");
 });
 
 document.getElementById("upload-btn").addEventListener("click", () => {
@@ -850,6 +738,10 @@ async function loadSystem() {
     setPill("svc-tunnel-pill", s.tunnel.running, s.tunnel.running ? "running" : "stopped");
     const panelOk = s.panel.status === "Running";
     setPill("svc-panel-pill", panelOk, s.panel.status);
+    if (s.sorter) {
+      const sorterKnown = typeof s.sorter.running === "boolean";
+      setPill("svc-sorter-pill", sorterKnown ? s.sorter.running : null, sorterKnown ? (s.sorter.running ? "running" : "stopped") : "unknown");
+    }
 
     const usedPct = Math.round((s.disk.usedGB / s.disk.totalGB) * 100);
     document.getElementById("disk-bar-fill").style.width = `${usedPct}%`;

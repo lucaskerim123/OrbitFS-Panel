@@ -23,6 +23,9 @@ const HIVE_SERVER_DIR = process.env.HIVE_SERVER_DIR || "C:\\mcp-hive-server";
 const HIVE_LOG_DIR = process.env.HIVE_LOG_DIR || path.join(HIVE_SERVER_DIR, "logs");
 const CLOUDFLARED_SERVICE_NAME = process.env.CLOUDFLARED_SERVICE_NAME || "MasterHiveTunnel";
 const CLOUDFLARED_DIR = process.env.CLOUDFLARED_DIR || "C:\\cloudflared";
+const SORTER_SERVICE_NAME = process.env.SORTER_SERVICE_NAME || "MasterHiveSorter";
+const SORTER_DIR = process.env.SORTER_DIR || "F:\\hive-addon-sorter";
+const SORTER_URL = process.env.SORTER_URL || "http://localhost:4055";
 const POWERSHELL_CANDIDATES = [
   process.env.PANEL_POWERSHELL_PATH,
   "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
@@ -395,6 +398,8 @@ app.get("/api/system/status", async (req, res) => {
       CLOUDFLARED_SERVICE_NAME,
       "-CloudflaredDir",
       CLOUDFLARED_DIR,
+      "-SorterServiceName",
+      SORTER_SERVICE_NAME,
     ]);
     const status = JSON.parse(out);
     const hiveOk = await hive.ping();
@@ -411,7 +416,7 @@ app.get("/api/system/status", async (req, res) => {
   }
 });
 
-const CONTROL_TARGETS = new Set(["hive", "tunnel", "panel"]);
+const CONTROL_TARGETS = new Set(["hive", "tunnel", "panel", "sorter"]);
 const CONTROL_ACTIONS = new Set(["start", "stop", "restart"]);
 const HARDSTOP_SCRIPT_PATH = process.env.PANEL_HARDSTOP_SCRIPT_PATH || "C:\\Users\\Lucas\\Desktop\\hardstop.ps1";
 const GUARDED_HARDSTOP_CONFIRM_TEXT = "RUN HARDSTOP";
@@ -452,6 +457,8 @@ app.post("/api/system/control", requireAdmin, express.json(), async (req, res) =
         CLOUDFLARED_SERVICE_NAME,
         "-CloudflaredDir",
         CLOUDFLARED_DIR,
+        "-SorterServiceName",
+        SORTER_SERVICE_NAME,
       ],
       { detached: true, stdio: ["ignore", "pipe", "pipe"] }
     );
@@ -481,6 +488,8 @@ app.post("/api/system/control", requireAdmin, express.json(), async (req, res) =
       CLOUDFLARED_SERVICE_NAME,
       "-CloudflaredDir",
       CLOUDFLARED_DIR,
+      "-SorterServiceName",
+      SORTER_SERVICE_NAME,
     ]);
     res.json(out ? JSON.parse(out) : { ok: true });
   } catch (err) {
@@ -535,6 +544,8 @@ const LOG_FILES = {
   "hive-errors": path.join(HIVE_LOG_DIR, "master-hive-errors.jsonl"),
   "tunnel-out": path.join(CLOUDFLARED_DIR, "tunnel_out.log"),
   "tunnel-err": path.join(CLOUDFLARED_DIR, "tunnel_err.log"),
+  "sorter-out": path.join(SORTER_DIR, "out.log"),
+  "sorter-err": path.join(SORTER_DIR, "err.log"),
 };
 
 app.get("/api/system/logs", async (req, res) => {
