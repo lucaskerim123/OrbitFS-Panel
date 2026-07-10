@@ -181,6 +181,16 @@ app.get("/api/status", async (req, res) => {
   res.json({ hive: { ok: await hive.ping(), url: hive.baseUrl }, checkedAt: new Date().toISOString() });
 });
 
+// Cheap, synchronous presence check (no PowerShell shell-out) so the Sort
+// button and Sorter controls can hide themselves on installs that never
+// added the addon sorter, rather than always showing a feature that's not
+// there. SORTER_ENABLED=false forces it hidden even if the folder exists.
+app.get("/api/sorter-available", (req, res) => {
+  const enabled = process.env.SORTER_ENABLED !== "false";
+  const installed = enabled && fsSync.existsSync(SORTER_DIR);
+  res.json({ available: installed, url: SORTER_URL });
+});
+
 // --- Files -------------------------------------------------------------
 // Thin passthrough to the Hive node's own REST API (see mcp-hive-server),
 // except upload/download which stream raw bytes rather than round-tripping

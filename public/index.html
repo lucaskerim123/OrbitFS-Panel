@@ -121,7 +121,7 @@
         <button id="new-folder-btn">+ Folder</button>
         <button id="upload-btn">⬆ Upload</button>
         <input id="upload-input" type="file" multiple class="hidden" />
-        <button id="sort-inbox-btn" title="Opens the sorter tool in a new tab">🧹 Sort</button>
+        <button id="sort-inbox-btn" class="hidden" title="Opens the sorter tool in a new tab">🧹 Sort</button>
       </div>
       <div id="files-layout" class="files-layout">
         <ul id="file-list" class="file-list"></ul>
@@ -194,7 +194,7 @@
             <span>This panel</span>
             <span id="svc-panel-pill" class="pill">-</span>
           </div>
-          <div class="infra-item">
+          <div id="infra-item-sorter" class="infra-item hidden">
             <span>Sorter</span>
             <span id="svc-sorter-pill" class="pill">-</span>
           </div>
@@ -291,7 +291,7 @@
             <button class="control-btn" data-target="panel" data-action="restart">Restart</button>
           </div>
         </div>
-        <div class="service-row">
+        <div id="service-row-sorter" class="service-row hidden">
           <div><strong>Sorter</strong></div>
           <div class="btn-group">
             <button class="control-btn" data-target="sorter" data-action="start">Start</button>

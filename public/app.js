@@ -142,6 +142,17 @@ function logout() {
   }
 }
 
+async function checkSorterAvailable() {
+  try {
+    const { available } = await api("/api/sorter-available");
+    document.getElementById("sort-inbox-btn").classList.toggle("hidden", !available);
+    document.getElementById("infra-item-sorter").classList.toggle("hidden", !available);
+    document.getElementById("service-row-sorter").classList.toggle("hidden", !available);
+  } catch {
+    // if the check itself fails, leave it hidden - the default state
+  }
+}
+
 function showApp() {
   document.getElementById("login").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
@@ -151,6 +162,7 @@ function showApp() {
   document.getElementById("tab-btn-system").classList.toggle("hidden", state.role !== "admin");
   refreshStatus();
   loadFiles();
+  checkSorterAvailable();
 }
 
 document.getElementById("login-form").addEventListener("submit", async (e) => {
