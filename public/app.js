@@ -45,17 +45,12 @@ const CM_MODES = {
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "m4a", "flac", "aac"]);
-const PROTECTED_ROOT_FOLDERS = new Set([
-  "_system",
-  "_sorter",
-  "🗑 Trash",
-  "_trash",
-  "0. Core Folder",
-  "1. Master Court System",
-  "2. Mental Health System",
-  "3. Legal Charges - AVO",
-  "Media",
-]);
+// TEMPORARILY EMPTY during the top-level folder redesign, matching
+// mcp-hive-server/server.js. Restore the real list once the new structure
+// is settled:
+//   "_system", "_sorter", "_trash", "0. Core", "1. Legal",
+//   "2. Wellbeing", "_media"
+const PROTECTED_ROOT_FOLDERS = new Set([]);
 
 function extOf(name) {
   const i = name.lastIndexOf(".");
@@ -479,7 +474,7 @@ document.getElementById("preview-move-btn").addEventListener("click", () => stat
 document.getElementById("preview-download-btn").addEventListener("click", () => state.previewFile && downloadFile(state.previewFile));
 
 async function trashPath(filepath, onDone) {
-  if (!confirm(`Move ${filepath} to 🗑 Trash?`)) return;
+  if (!confirm(`Move ${filepath} to _trash?`)) return;
   try {
     await api("/api/trash", {
       method: "POST",
@@ -986,15 +981,15 @@ document.getElementById("trash-config-form").addEventListener("submit", async (e
 });
 
 document.getElementById("empty-trash-btn").addEventListener("click", async () => {
-  if (!confirm("Permanently delete everything in 🗑 Trash?")) return;
+  if (!confirm("Permanently delete everything in _trash?")) return;
   const messageEl = document.getElementById("trash-config-message");
   messageEl.textContent = "";
   try {
     const resp = await api("/api/trash/empty", { method: "POST" });
     messageEl.textContent = resp.deletedCount
       ? `Deleted ${resp.deletedCount} trash entr${resp.deletedCount === 1 ? "y" : "ies"}.`
-      : "🗑 Trash is already empty.";
-    if (state.subpath === "🗑 Trash" || state.subpath === "_trash") loadFiles();
+      : "_trash is already empty.";
+    if (state.subpath === "_trash" || state.subpath === "🗑 Trash") loadFiles();
   } catch (err) {
     messageEl.textContent = err.message;
   }
