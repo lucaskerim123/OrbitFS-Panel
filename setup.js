@@ -112,7 +112,6 @@ export async function runSetup(input, { panelDir, hiveServerDir, panelPort }) {
     err.status = 400;
     throw err;
   }
-  const publicBaseUrl = String(input.publicBaseUrl || "").trim() || `http://localhost:${hivePort}`;
   const adminUsername = String(input.adminUsername || "").trim();
   const adminPin = String(input.adminPin || "").trim();
   if (!adminUsername) {
@@ -138,8 +137,13 @@ export async function runSetup(input, { panelDir, hiveServerDir, panelPort }) {
   const hiveEnvExample = path.join(hiveServerDir, ".env.example");
   const existingApiKey = readEnvValue(hiveEnvPath, "HIVE_API_KEY");
   const existingSessionSecret = readEnvValue(hiveEnvPath, "SESSION_SECRET");
+  const existingPublicBaseUrl = readEnvValue(hiveEnvPath, "PUBLIC_BASE_URL");
   const hiveApiKey = existingApiKey || randomSecret();
   const sessionSecret = existingSessionSecret || randomSecret();
+  // Never clobber an already-configured public URL (e.g. a real Cloudflare
+  // Access setup) just because the wizard's optional field was left blank -
+  // only fall back to localhost if there's truly nothing there yet.
+  const publicBaseUrl = String(input.publicBaseUrl || "").trim() || existingPublicBaseUrl || `http://localhost:${hivePort}`;
 
   await upsertEnvFile(hiveEnvPath, hiveEnvExample, {
     HIVE_ROOT: dataFolder,
