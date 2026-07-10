@@ -12,6 +12,13 @@ function randomSecret(bytes = 32) {
   return crypto.randomBytes(bytes).toString("hex");
 }
 
+// The folder the user picks in the wizard is a base location (e.g.
+// "F:\Project Firestorm") - the actual working root always lives one level
+// deeper, inside this subfolder, so the base folder can hold other things
+// (installers, other projects) without them getting mixed into the Hive's
+// own _system/_sorter/_trash structure.
+const HIVE_SUBFOLDER_NAME = "The Master Hive";
+
 // Merges `overrides` into an .env file's KEY=value lines. If the file
 // doesn't exist yet, starts from `templatePath` (usually .env.example).
 // Existing keys not in `overrides` are left untouched; keys in `overrides`
@@ -92,12 +99,13 @@ export async function runSetup(input, { panelDir, hiveServerDir, panelPort }) {
     throw err;
   }
 
-  const dataFolder = String(input.dataFolder || "").trim();
-  if (!dataFolder || !/^[a-zA-Z]:[\\/]/.test(dataFolder)) {
+  const baseFolder = String(input.dataFolder || "").trim();
+  if (!baseFolder || !/^[a-zA-Z]:[\\/]/.test(baseFolder)) {
     const err = new Error("Data folder must be a full Windows path starting with a drive letter (e.g. D:\\MyFiles)");
     err.status = 400;
     throw err;
   }
+  const dataFolder = path.join(baseFolder, HIVE_SUBFOLDER_NAME);
   const hivePort = String(input.hivePort || "3939").trim();
   if (!/^\d{2,5}$/.test(hivePort)) {
     const err = new Error("Server port must be a number");
