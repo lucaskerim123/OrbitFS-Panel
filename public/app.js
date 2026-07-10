@@ -147,14 +147,20 @@ function logout() {
 }
 
 async function checkSorterAvailable() {
+  let online = false;
   try {
-    const { available } = await api("/api/sorter-available");
-    document.getElementById("sort-inbox-btn").classList.toggle("hidden", !available);
-    document.getElementById("infra-item-sorter").classList.toggle("hidden", !available);
-    document.getElementById("service-row-sorter").classList.toggle("hidden", !available);
+    ({ online } = await api("/api/sorter-available"));
   } catch {
-    // if the check itself fails, leave it hidden - the default state
+    // panel unreachable or check failed - treat as offline
   }
+  // The Sorter tab only exists while the sorter service is actually answering.
+  document.getElementById("tab-btn-sorter").classList.toggle("hidden", !online);
+  // If the sorter dies while its tab is open, bounce back to Files.
+  if (!online && document.getElementById("tab-sorter").classList.contains("active")) switchTab("files");
+  // System-tab controls stay visible either way, so it can be started from there.
+  document.getElementById("infra-item-sorter").classList.remove("hidden");
+  document.getElementById("service-row-sorter").classList.remove("hidden");
+  return online;
 }
 
 function showApp() {
@@ -211,6 +217,7 @@ function switchTab(tabName) {
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${tabName}`));
   if (tabName === "system") loadSystem();
+  if (tabName === "sorter") sorterLoad();
 }
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -912,15 +919,196 @@ document.getElementById("new-folder-btn").addEventListener("click", async () => 
   }
 });
 
-// The old flow here called /api/sort/preview, which asks an AI model
-// (ANTHROPIC_API_KEY) to classify each item - broken whenever that key isn't
-// configured (which it hasn't been). The addon sorter classifies locally by
-// rule/keyword matching against the live folder tree instead, so it works
-// without any AI key and doesn't leave the file in an unsortable state.
-// It's a standalone service (MasterHiveSorter) with its own start/stop
-// controls in the System tab; this just opens its UI.
-document.getElementById("sort-inbox-btn").addEventListener("click", () => {
-  window.open("https://brain.incendiarynetworks.cc/sorter", "_blank", "noopener");
+// --- Sorter tab -------------------------------------------------------------
+// The addon sorter is a separate localhost service (MasterHiveSorter); the
+// panel proxies its API at /api/sorter/* behind panel auth. This tab drives
+// the whole preview -> edit -> confirm flow inline: items on the left,
+// destination picker for the selected item on the right. Nothing moves on
+// disk until Confirm.
+const sorter = { session: null, folders: [], selected: -1, filter: "" };
+
+function sorterApi(subpath, opts = {}) {
+  return api(`/api/sorter${subpath}`, opts);
+}
+
+function sorterItems() {
+  return sorter.session?.items || [];
+}
+
+function sorterSetStatus(text) {
+  document.getElementById("sorter-status").textContent = text;
+}
+
+let sorterSaveTimer = null;
+function sorterSaveSoon() {
+  clearTimeout(sorterSaveTimer);
+  sorterSaveTimer = setTimeout(() => {
+    if (!sorter.session) return;
+    sorterApi("/session", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sorter.session),
+    }).catch(() => {});
+  }, 400);
+}
+
+function sorterRenderItems() {
+  const listEl = document.getElementById("sorter-items");
+  const items = sorterItems();
+  listEl.innerHTML = "";
+  document.getElementById("sorter-items-empty").classList.toggle("hidden", items.length > 0);
+  items.forEach((item, i) => {
+    const li = document.createElement("li");
+    li.className = `${i === sorter.selected ? "selected " : ""}${item.approved ? "approved" : ""}`;
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!item.approved;
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", () => {
+      item.approved = cb.checked;
+      sorterRenderItems();
+      sorterRenderDetail();
+      sorterSaveSoon();
+    });
+    const name = document.createElement("span");
+    name.className = "sorter-item-name";
+    name.textContent = item.name;
+    const klass = document.createElement("span");
+    klass.className = "sorter-item-class";
+    klass.textContent = item.classification || "";
+    li.append(cb, name, klass);
+    li.addEventListener("click", () => {
+      sorter.selected = i;
+      sorterRenderItems();
+      sorterRenderDetail();
+    });
+    listEl.appendChild(li);
+  });
+  const approved = items.filter((x) => x.approved).length;
+  if (items.length) sorterSetStatus(`${items.length} item(s) in preview — ${approved} approved. Nothing moves until you confirm.`);
+  document.getElementById("sorter-approve-all").checked = items.length > 0 && approved === items.length;
+}
+
+function sorterRenderDetail() {
+  const item = sorterItems()[sorter.selected];
+  document.getElementById("sorter-detail-empty").classList.toggle("hidden", !!item);
+  document.getElementById("sorter-detail").classList.toggle("hidden", !item);
+  if (!item) return;
+  document.getElementById("sorter-detail-name").textContent = item.name;
+  document.getElementById("sorter-detail-reason").textContent = [item.classification, item.reason].filter(Boolean).join(" — ");
+  document.getElementById("sorter-detail-approve").checked = !!item.approved;
+  document.getElementById("sorter-detail-dest").value = item.selectedDestination || "";
+  const folderEl = document.getElementById("sorter-folders");
+  folderEl.innerHTML = "";
+  const filter = sorter.filter.toLowerCase();
+  sorter.folders
+    .filter((f) => !filter || f.toLowerCase().includes(filter))
+    .forEach((f) => {
+      const li = document.createElement("li");
+      li.textContent = f;
+      if (item.selectedDestination?.startsWith(`${f}/`)) li.classList.add("selected");
+      li.addEventListener("click", () => {
+        item.selectedDestination = `${f}/${item.name}`;
+        item.approved = true; // picking a folder implies you want it moved
+        sorterRenderItems();
+        sorterRenderDetail();
+        sorterSaveSoon();
+      });
+      folderEl.appendChild(li);
+    });
+}
+
+async function sorterLoad() {
+  try {
+    const [session, foldersResp] = await Promise.all([
+      sorterApi("/session"),
+      sorterApi("/folders").catch(() => ({ folders: [] })),
+    ]);
+    sorter.session = session;
+    sorter.folders = (foldersResp.folders || []).map((f) => f.path || f);
+    if (sorter.selected >= sorterItems().length) sorter.selected = -1;
+    sorterRenderItems();
+    sorterRenderDetail();
+    if (!sorterItems().length) {
+      sorterSetStatus(session.status === "confirmed" ? "Last run confirmed. Load a new preview when ready." : "No preview loaded.");
+    }
+  } catch (err) {
+    sorterSetStatus(err.message);
+  }
+}
+
+document.getElementById("sorter-refresh-btn").addEventListener("click", sorterLoad);
+
+document.getElementById("sorter-start-btn").addEventListener("click", async () => {
+  sorterSetStatus("Scanning inbox…");
+  try {
+    sorter.session = await sorterApi("/startsorter", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    sorter.selected = sorterItems().length ? 0 : -1;
+    sorterRenderItems();
+    sorterRenderDetail();
+    if (!sorterItems().length) sorterSetStatus("Inbox is empty — nothing to sort.");
+  } catch (err) {
+    sorterSetStatus(err.message);
+  }
+});
+
+document.getElementById("sorter-stop-btn").addEventListener("click", async () => {
+  try {
+    sorter.session = await sorterApi("/stopsorter", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    sorter.selected = -1;
+    sorterRenderItems();
+    sorterRenderDetail();
+    sorterSetStatus("Preview discarded. Nothing was moved.");
+  } catch (err) {
+    sorterSetStatus(err.message);
+  }
+});
+
+document.getElementById("sorter-confirm-btn").addEventListener("click", async () => {
+  const items = sorterItems();
+  if (!items.length) return alert("Nothing to confirm — load a preview first.");
+  const approved = items.filter((x) => x.approved);
+  if (!approved.length) return alert("No items approved. Tick the ones you want moved.");
+  if (!confirm(`Move ${approved.length} approved item(s) to their destinations?`)) return;
+  try {
+    // Flush pending edits so confirm sees the latest destinations.
+    clearTimeout(sorterSaveTimer);
+    await sorterApi("/session", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sorter.session) });
+    const result = await sorterApi("/confirmsorter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) });
+    sorter.selected = -1;
+    await sorterLoad();
+    sorterSetStatus(`Moved ${result.moved?.length ?? 0} item(s)${result.skipped?.length ? `, skipped ${result.skipped.length}` : ""}.`);
+    loadFiles(); // moved files change the Files listing
+  } catch (err) {
+    sorterSetStatus(err.message);
+  }
+});
+
+document.getElementById("sorter-approve-all").addEventListener("change", (e) => {
+  sorterItems().forEach((x) => (x.approved = e.target.checked));
+  sorterRenderItems();
+  sorterRenderDetail();
+  sorterSaveSoon();
+});
+
+document.getElementById("sorter-detail-approve").addEventListener("change", (e) => {
+  const item = sorterItems()[sorter.selected];
+  if (!item) return;
+  item.approved = e.target.checked;
+  sorterRenderItems();
+  sorterSaveSoon();
+});
+
+document.getElementById("sorter-folder-filter").addEventListener("input", (e) => {
+  sorter.filter = e.target.value;
+  sorterRenderDetail();
+});
+
+document.getElementById("sorter-detail-dest").addEventListener("input", (e) => {
+  const item = sorterItems()[sorter.selected];
+  if (!item) return;
+  item.selectedDestination = e.target.value;
+  sorterSaveSoon();
 });
 
 document.getElementById("upload-btn").addEventListener("click", () => {
@@ -1413,4 +1601,7 @@ async function bootstrap() {
 }
 
 bootstrap();
-setInterval(refreshStatus, 30000);
+setInterval(() => {
+  refreshStatus();
+  if (state.token) checkSorterAvailable(); // tab tracks the service coming and going
+}, 30000);

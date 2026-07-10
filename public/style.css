@@ -858,3 +858,126 @@ table.data-table tr:hover td { background: var(--bg); }
 .sort-modal-row.new-folder .sort-dest-badge { color: var(--accent); font-size: 0.75rem; white-space: nowrap; }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.75rem; }
+/* --- Sorter tab ------------------------------------------------------------ */
+/* Mirrors the Files tab components: .file-list-style cards, same row metrics
+   (0.55/0.7rem padding, border-bottom separators, var(--bg) hover), global
+   input styling, and emoji row prefixes. */
+
+.sorter-toolbar { align-items: center; }
+.sorter-toolbar .spacer { flex: 1; }
+
+.sorter-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 5fr) minmax(280px, 4fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.sorter-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.92rem;
+}
+.sorter-approve-all {
+  color: var(--muted);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+/* Left pane: same card treatment as .file-list */
+.sorter-item-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.sorter-item-list:empty { display: none; }
+.sorter-item-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.sorter-item-list li:last-child { border-bottom: none; }
+.sorter-item-list li:hover { background: var(--bg); }
+.sorter-item-list li.selected {
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.sorter-item-list li .sorter-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sorter-item-list li .sorter-item-name::before { content: "📄 "; }
+.sorter-item-list li .sorter-item-class { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+.sorter-item-list li.approved .sorter-item-name::after { content: " ✓"; color: var(--ok); }
+
+/* Right pane: card like the editor/preview panes */
+.sorter-detail-pane {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 0.8rem;
+}
+.sorter-detail-name { margin: 0 0 0.2rem; font-size: 1rem; overflow-wrap: anywhere; }
+.sorter-detail-name::before { content: "📄 "; }
+.sorter-approve-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.6rem 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+#sorter-folder-filter, #sorter-detail-dest { width: 100%; }
+
+.sorter-folder-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.sorter-folder-list li {
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--border);
+}
+.sorter-folder-list li::before { content: "📁 "; }
+.sorter-folder-list li:last-child { border-bottom: none; }
+.sorter-folder-list li:hover { background: var(--panel); }
+.sorter-folder-list li.selected {
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--accent);
+}
+
+.sorter-dest-label { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 0.6rem; }
+.sorter-dest-label input { margin-top: 0.3rem; }
+
+@media (max-width: 700px) {
+  .sorter-layout { grid-template-columns: 1fr; }
+  .sorter-item-list { max-height: 38vh; }
+  .sorter-folder-list { max-height: 30vh; }
+}

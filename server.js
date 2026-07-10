@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs/promises";
 import fsSync from "fs";
-import { execFile, spawn } from "child_process";
+import { execFile, spawn, exec } from "child_process";
 import { Readable } from "stream";
 import { makeHiveClient } from "./hive-client.js";
 import { verifyLogin, validateSession, invalidateSession, listUsers, upsertUser, removeUser } from "./auth.js";
@@ -24,7 +24,7 @@ const HIVE_LOG_DIR = process.env.HIVE_LOG_DIR || path.join(HIVE_SERVER_DIR, "log
 const CLOUDFLARED_SERVICE_NAME = process.env.CLOUDFLARED_SERVICE_NAME || "MasterHiveTunnel";
 const CLOUDFLARED_DIR = process.env.CLOUDFLARED_DIR || "C:\\cloudflared";
 const SORTER_SERVICE_NAME = process.env.SORTER_SERVICE_NAME || "MasterHiveSorter";
-const SORTER_DIR = process.env.SORTER_DIR || "F:\\hive-addon-sorter";
+const SORTER_DIR = process.env.SORTER_DIR || "F:\\mcp-hive-server\\hive-addon-sorter";
 const SORTER_URL = process.env.SORTER_URL || "http://localhost:4055";
 const POWERSHELL_CANDIDATES = [
   process.env.PANEL_POWERSHELL_PATH,
@@ -181,14 +181,59 @@ app.get("/api/status", async (req, res) => {
   res.json({ hive: { ok: await hive.ping(), url: hive.baseUrl }, checkedAt: new Date().toISOString() });
 });
 
-// Cheap, synchronous presence check (no PowerShell shell-out) so the Sort
-// button and Sorter controls can hide themselves on installs that never
-// added the addon sorter, rather than always showing a feature that's not
-// there. SORTER_ENABLED=false forces it hidden even if the folder exists.
-app.get("/api/sorter-available", (req, res) => {
+// --- Sorter integration ----------------------------------------------------
+// The addon sorter runs as its own localhost service and auto-picks a port
+// (written to <SORTER_DIR>/.sorter-port on startup). The panel proxies its
+// API under /api/sorter/* so the Sorter tab works same-origin behind panel
+// auth - the browser never talks to the sorter's port or needs its key.
+
+function sorterPort() {
+  try {
+    const p = Number(fsSync.readFileSync(path.join(SORTER_DIR, ".sorter-port"), "utf8").trim());
+    if (Number.isInteger(p) && p > 0) return p;
+  } catch {}
+  try {
+    return Number(new URL(SORTER_URL).port) || 4055;
+  } catch {
+    return 4055;
+  }
+}
+
+async function sorterOnline(port) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1500);
+  try {
+    const resp = await fetch(`http://localhost:${port}/api/status`, { signal: controller.signal });
+    return resp.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// installed = folder exists (feature present at all); online = service is
+// actually answering right now. The Sorter tab shows only when online.
+// SORTER_ENABLED=false forces it hidden even if the folder exists.
+app.get("/api/sorter-available", async (req, res) => {
   const enabled = process.env.SORTER_ENABLED !== "false";
   const installed = enabled && fsSync.existsSync(SORTER_DIR);
-  res.json({ available: installed, url: SORTER_URL });
+  const online = installed && (await sorterOnline(sorterPort()));
+  res.json({ available: installed, online, url: SORTER_URL });
+});
+
+app.use("/api/sorter", express.raw({ type: "*/*", limit: "2mb" }), async (req, res) => {
+  try {
+    const resp = await fetch(`http://localhost:${sorterPort()}/api${req.url}`, {
+      method: req.method,
+      headers: { "Content-Type": req.get("content-type") || "application/json" },
+      body: ["GET", "HEAD"].includes(req.method) || !req.body?.length ? undefined : req.body,
+    });
+    const text = await resp.text();
+    res.status(resp.status).type(resp.headers.get("content-type") || "application/json").send(text);
+  } catch (err) {
+    res.status(502).json({ error: `Sorter unreachable: ${err.message}` });
+  }
 });
 
 // --- Files -------------------------------------------------------------
@@ -630,6 +675,10 @@ app.use(
   })
 );
 
+// The panel must stay on a fixed port: IIS reverse-proxies
+// brain.incendiarynetworks.cc to localhost:4000 via a hardcoded web.config
+// rule, so auto-picking a port here would silently break the public URL.
+// Only the sorter auto-ports (it owns updating the cloudflared ingress).
 app.listen(PORT, () => {
   logEvent("panel.powershell.command", { command: POWERSHELL_CMD });
   logEvent("panel.server.start", {

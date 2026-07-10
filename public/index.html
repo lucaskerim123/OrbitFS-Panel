@@ -110,6 +110,7 @@
 
     <nav class="tabs">
       <button class="tab-btn active" data-tab="files">📁 Files</button>
+      <button class="tab-btn hidden" id="tab-btn-sorter" data-tab="sorter">🧹 Sorter</button>
       <button class="tab-btn hidden" id="tab-btn-system" data-tab="system">🖥️ System</button>
     </nav>
 
@@ -121,7 +122,6 @@
         <button id="new-folder-btn">+ Folder</button>
         <button id="upload-btn">⬆ Upload</button>
         <input id="upload-input" type="file" multiple class="hidden" />
-        <button id="sort-inbox-btn" class="hidden" title="Opens the sorter tool in a new tab">🧹 Sort</button>
       </div>
       <div id="files-layout" class="files-layout">
         <ul id="file-list" class="file-list"></ul>
@@ -186,6 +186,40 @@
         </div>
       </div>
 
+    </section>
+
+    <section id="tab-sorter" class="tab-panel">
+      <div class="toolbar action-bar sorter-toolbar">
+        <span id="sorter-status" class="muted-text">No preview loaded.</span>
+        <span class="spacer"></span>
+        <button id="sorter-refresh-btn" title="Reload session">⟳</button>
+        <button id="sorter-start-btn" class="primary">▶ Preview inbox</button>
+        <button id="sorter-stop-btn">✕ Discard</button>
+        <button id="sorter-confirm-btn" class="primary">✓ Confirm moves</button>
+      </div>
+      <div class="sorter-layout">
+        <div class="sorter-pane sorter-items-pane">
+          <div class="sorter-pane-head">
+            <strong>Inbox items</strong>
+            <label class="sorter-approve-all"><input type="checkbox" id="sorter-approve-all" /> approve all</label>
+          </div>
+          <ul id="sorter-items" class="sorter-item-list"></ul>
+          <p id="sorter-items-empty" class="muted-text">Nothing loaded. Hit ▶ Preview inbox to scan the _sorter folder — nothing moves until you confirm.</p>
+        </div>
+        <div class="sorter-pane sorter-detail-pane">
+          <p id="sorter-detail-empty" class="muted-text">Select an item on the left to pick its destination folder.</p>
+          <div id="sorter-detail" class="hidden">
+            <h3 id="sorter-detail-name" class="sorter-detail-name"></h3>
+            <p id="sorter-detail-reason" class="muted-text"></p>
+            <label class="sorter-approve-row"><input type="checkbox" id="sorter-detail-approve" /> Approve this move</label>
+            <input id="sorter-folder-filter" type="text" placeholder="Filter folders…" autocomplete="off" spellcheck="false" />
+            <ul id="sorter-folders" class="sorter-folder-list"></ul>
+            <label class="sorter-dest-label">Destination path
+              <input id="sorter-detail-dest" type="text" spellcheck="false" autocomplete="off" />
+            </label>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section id="tab-system" class="tab-panel sys-panel">
