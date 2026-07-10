@@ -4,15 +4,39 @@ Mobile-first admin panel for the Master Hive file server.
 
 It is the operator UI for the shared Hive server and covers:
 
-- File browsing, editing, upload, download, move, rename, and sort operations
-- System status for the Hive server, Cloudflare tunnel, and this panel
-- Admin-only controls for users, permissions, trash retention, and emptying `_trash`
+- File browsing, upload, download, move, rename, and sort operations
+- A full-featured file viewer/editor:
+  - Code and text files: syntax-highlighted CodeMirror editor with an
+    Edit/Read toggle (Read mode is the same highlighted buffer, locked),
+    Find & Replace, adjustable font family/size, and an unsaved-changes
+    guard before you can navigate away or close the tab
+  - Markdown: same Edit/Read toggle, Read mode renders sanitized HTML
+  - PDF: in-app viewer with page thumbnails, page nav, and zoom (not the
+    bare browser iframe)
+  - DOCX: rendered with formatting via `mammoth.js`
+  - XLSX/CSV: read-only table, with sheet tabs for multi-sheet workbooks
+  - ZIP: browse contents (name/size, nested) without downloading first
+  - All of the above are view-only where the format can't be safely
+    edited in-browser (PDF, DOCX) — download, edit locally, re-upload
+- Per-file admin permission overrides (🔒 on a file row hides it from
+  non-admin users)
+- System tab: infrastructure telemetry (Hive/tunnel/panel/sorter health,
+  disk usage, ChatGPT↔Claude connection flows), power controls for each
+  service, and admin management (users, file permissions, trash, connected
+  MCP clients)
+- The Sorter — a separate optional addon (`hive-addon-sorter`) that
+  previews AI-free, rule-based destination suggestions for files dropped in
+  `_sorter`, and only moves them once you approve and confirm. Opens from
+  the Files tab's Sort button; has its own "← Back to Master Brain" link
+- Home button (the "Master Brain" title) jumps back to the Files tab root
+  from anywhere; re-clicking the active Files tab does the same
 
 ## What it talks to
 
 - `mcp-hive-server` over REST (`/api/*`)
 - The same server's MCP endpoint for Claude and ChatGPT clients
 - The shared FireStorm file root at `C:\Project FireStorm\The Master Hive`
+- `hive-addon-sorter` (optional, its own service) for the Sort feature
 
 ## Setup on a new machine
 

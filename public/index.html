@@ -97,10 +97,10 @@
 
   <div id="app" class="hidden">
     <header>
-      <div class="header-title">
+      <button id="home-btn" class="header-title" aria-label="Home — back to root folder" type="button">
         <span class="brand-mark small">🧠</span>
         <h1>Master Brain</h1>
-      </div>
+      </button>
       <div class="status-pills">
         <span id="status-hive" class="pill">Hive</span>
         <button id="logout" class="link-btn" aria-label="Log out">⏻</button>
@@ -129,14 +129,40 @@
         <div id="editor" class="editor hidden">
           <div class="editor-toolbar">
             <button id="back-to-list-btn" class="link-btn back-btn" aria-label="Back to file list">← Back</button>
+            <span id="editor-dirty-dot" class="dirty-dot hidden" title="Unsaved changes"></span>
             <span id="editor-path"></span>
             <span class="spacer"></span>
+            <div id="editor-view-toggle" class="toggle-pair hidden">
+              <button id="editor-edit-btn" type="button">Edit</button>
+              <button id="editor-read-btn" type="button">Read</button>
+            </div>
+            <div id="editor-font-pop" class="font-pop">
+              <select id="editor-font-family" title="Editor font">
+                <option value="ui-monospace, 'SF Mono', Menlo, monospace">SF Mono</option>
+                <option value="'JetBrains Mono', ui-monospace, monospace">JetBrains Mono</option>
+                <option value="'Fira Code', ui-monospace, monospace">Fira Code</option>
+              </select>
+              <div class="step">
+                <button id="editor-font-dec" type="button" aria-label="Decrease font size">–</button>
+                <span id="editor-font-size-display">13</span>
+                <button id="editor-font-inc" type="button" aria-label="Increase font size">+</button>
+              </div>
+            </div>
+            <button id="editor-find-btn" type="button">🔍 Find</button>
             <button id="editor-permission-btn" class="hidden">Permission</button>
-            <button id="editor-mode-btn" class="hidden">Edit</button>
             <button id="save-file-btn" class="primary">Save</button>
             <button id="editor-download-btn">⬇ Download</button>
             <button id="move-file-btn">Move</button>
             <button id="delete-file-btn" class="danger">Move To Trash</button>
+          </div>
+          <div id="editor-find-bar" class="find-bar hidden">
+            <input id="editor-find-input" type="text" placeholder="Find" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+            <input id="editor-replace-input" type="text" placeholder="Replace" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+            <span id="editor-find-count" class="find-count"></span>
+            <button id="editor-find-prev" type="button">↑</button>
+            <button id="editor-find-next" type="button">↓</button>
+            <button id="editor-replace-all-btn" type="button">Replace all</button>
+            <button id="editor-find-close" type="button" class="link-btn" aria-label="Close find bar">✕</button>
           </div>
           <div id="editor-rendered" class="rendered-view hidden"></div>
           <textarea id="editor-content" spellcheck="false"></textarea>
@@ -162,228 +188,248 @@
 
     </section>
 
-    <section id="tab-system" class="tab-panel">
-      <div class="toolbar">
-        <button id="system-refresh-btn">↻ Refresh</button>
+    <section id="tab-system" class="tab-panel sys-panel">
+      <div class="sys-header">
+        <div class="sys-header-text">
+          <h2 class="sys-title">System</h2>
+          <p class="sys-subtitle">Master Hive infrastructure control</p>
+        </div>
+        <button id="system-refresh-btn" class="sys-refresh-btn">⟳ Refresh</button>
       </div>
 
-      <div class="card primary-system-card">
-        <div class="service-row">
-          <div>
-            <strong>ChatGPT ↔ Claude connection monitor</strong>
-            <span id="flows-pill" class="pill">-</span>
-          </div>
-        </div>
-        <div class="connection-map">
-          <span>ChatGPT / Codex</span>
-          <span class="connection-arrow">↔</span>
-          <span>Shared Hive MCP</span>
-          <span class="connection-arrow">↔</span>
-          <span>Claude</span>
-        </div>
-        <div class="infra-grid">
-          <div class="infra-item">
-            <span>Hive server</span>
-            <span id="svc-hive-pill" class="pill">-</span>
-          </div>
-          <div class="infra-item">
-            <span>Cloudflare Tunnel</span>
-            <span id="svc-tunnel-pill" class="pill">-</span>
-          </div>
-          <div class="infra-item">
-            <span>This panel</span>
-            <span id="svc-panel-pill" class="pill">-</span>
-          </div>
-          <div id="infra-item-sorter" class="infra-item hidden">
-            <span>Sorter</span>
-            <span id="svc-sorter-pill" class="pill">-</span>
-          </div>
-          <div class="infra-item">
-            <span>Disk (C:)</span>
-            <span id="disk-summary" class="muted-text">-</span>
-          </div>
-        </div>
-        <div id="disk-bar" class="disk-bar"><div id="disk-bar-fill" class="disk-bar-fill"></div></div>
-        <div class="flow-grid">
-          <div class="flow-card">
-            <div class="flow-heading">
-              <strong>ChatGPT / Codex</strong>
-              <span id="flow-codex-pill" class="pill">-</span>
+      <div class="sys-zone sys-zone-telemetry">
+        <div class="sys-zone-label"><span class="sys-zone-dot"></span>Telemetry</div>
+
+        <div class="card primary-system-card">
+          <div class="service-row">
+            <div>
+              <strong>ChatGPT ↔ Claude connection monitor</strong>
+              <span id="flows-pill" class="pill">-</span>
             </div>
-            <p id="flow-codex-detail" class="muted-text">Waiting for status.</p>
-            <dl class="flow-stats">
-              <div><dt>OAuth clients</dt><dd id="flow-codex-clients">-</dd></div>
-              <div><dt>Recent events</dt><dd id="flow-codex-events">-</dd></div>
-              <div><dt>Writes</dt><dd id="flow-codex-writes">-</dd></div>
-              <div><dt>Uploads</dt><dd id="flow-codex-uploads">-</dd></div>
-              <div><dt>Moves</dt><dd id="flow-codex-moves">-</dd></div>
-              <div><dt>Deletes</dt><dd id="flow-codex-deletes">-</dd></div>
-            </dl>
           </div>
-          <div class="flow-card">
-            <div class="flow-heading">
-              <strong>Shared MCP</strong>
-              <span id="flow-shared-pill" class="pill">-</span>
+          <div class="topology">
+            <span class="topology-node">ChatGPT / Codex</span>
+            <span class="topology-link" aria-hidden="true"><span class="topology-pulse"></span></span>
+            <span class="topology-node topology-node-hub">Shared Hive MCP</span>
+            <span class="topology-link" aria-hidden="true"><span class="topology-pulse"></span></span>
+            <span class="topology-node">Claude</span>
+          </div>
+          <div class="infra-grid">
+            <div class="infra-item">
+              <span>Hive server</span>
+              <span id="svc-hive-pill" class="pill">-</span>
             </div>
-            <p id="flow-shared-detail" class="muted-text">Waiting for status.</p>
-            <dl class="flow-stats">
-              <div><dt>Accounts</dt><dd id="flow-shared-accounts">-</dd></div>
-              <div><dt>MCP events</dt><dd id="flow-shared-events">-</dd></div>
-              <div><dt>Writes</dt><dd id="flow-shared-writes">-</dd></div>
-              <div><dt>Uploads</dt><dd id="flow-shared-uploads">-</dd></div>
-              <div><dt>Moves</dt><dd id="flow-shared-moves">-</dd></div>
-              <div><dt>Deletes</dt><dd id="flow-shared-deletes">-</dd></div>
-            </dl>
-          </div>
-          <div class="flow-card">
-            <div class="flow-heading">
-              <strong>Claude</strong>
-              <span id="flow-claude-pill" class="pill">-</span>
+            <div class="infra-item">
+              <span>Cloudflare Tunnel</span>
+              <span id="svc-tunnel-pill" class="pill">-</span>
             </div>
-            <p id="flow-claude-detail" class="muted-text">Waiting for status.</p>
-            <dl class="flow-stats">
-              <div><dt>OAuth clients</dt><dd id="flow-claude-clients">-</dd></div>
-              <div><dt>Recent events</dt><dd id="flow-claude-events">-</dd></div>
-              <div><dt>Writes</dt><dd id="flow-claude-writes">-</dd></div>
-              <div><dt>Uploads</dt><dd id="flow-claude-uploads">-</dd></div>
-              <div><dt>Moves</dt><dd id="flow-claude-moves">-</dd></div>
-              <div><dt>Deletes</dt><dd id="flow-claude-deletes">-</dd></div>
-            </dl>
+            <div class="infra-item">
+              <span>This panel</span>
+              <span id="svc-panel-pill" class="pill">-</span>
+            </div>
+            <div id="infra-item-sorter" class="infra-item hidden">
+              <span>Sorter</span>
+              <span id="svc-sorter-pill" class="pill">-</span>
+            </div>
+            <div class="infra-item">
+              <span>Disk (C:)</span>
+              <span id="disk-summary" class="muted-text">-</span>
+            </div>
           </div>
+          <div id="disk-bar" class="disk-bar"><div id="disk-bar-fill" class="disk-bar-fill"></div></div>
+          <div class="flow-grid">
+            <div class="flow-card">
+              <div class="flow-heading">
+                <strong>ChatGPT / Codex</strong>
+                <span id="flow-codex-pill" class="pill">-</span>
+              </div>
+              <p id="flow-codex-detail" class="muted-text">Waiting for status.</p>
+              <dl class="flow-stats">
+                <div><dt>OAuth clients</dt><dd id="flow-codex-clients">-</dd></div>
+                <div><dt>Recent events</dt><dd id="flow-codex-events">-</dd></div>
+                <div><dt>Writes</dt><dd id="flow-codex-writes">-</dd></div>
+                <div><dt>Uploads</dt><dd id="flow-codex-uploads">-</dd></div>
+                <div><dt>Moves</dt><dd id="flow-codex-moves">-</dd></div>
+                <div><dt>Deletes</dt><dd id="flow-codex-deletes">-</dd></div>
+              </dl>
+            </div>
+            <div class="flow-card">
+              <div class="flow-heading">
+                <strong>Shared MCP</strong>
+                <span id="flow-shared-pill" class="pill">-</span>
+              </div>
+              <p id="flow-shared-detail" class="muted-text">Waiting for status.</p>
+              <dl class="flow-stats">
+                <div><dt>Accounts</dt><dd id="flow-shared-accounts">-</dd></div>
+                <div><dt>MCP events</dt><dd id="flow-shared-events">-</dd></div>
+                <div><dt>Writes</dt><dd id="flow-shared-writes">-</dd></div>
+                <div><dt>Uploads</dt><dd id="flow-shared-uploads">-</dd></div>
+                <div><dt>Moves</dt><dd id="flow-shared-moves">-</dd></div>
+                <div><dt>Deletes</dt><dd id="flow-shared-deletes">-</dd></div>
+              </dl>
+            </div>
+            <div class="flow-card">
+              <div class="flow-heading">
+                <strong>Claude</strong>
+                <span id="flow-claude-pill" class="pill">-</span>
+              </div>
+              <p id="flow-claude-detail" class="muted-text">Waiting for status.</p>
+              <dl class="flow-stats">
+                <div><dt>OAuth clients</dt><dd id="flow-claude-clients">-</dd></div>
+                <div><dt>Recent events</dt><dd id="flow-claude-events">-</dd></div>
+                <div><dt>Writes</dt><dd id="flow-claude-writes">-</dd></div>
+                <div><dt>Uploads</dt><dd id="flow-claude-uploads">-</dd></div>
+                <div><dt>Moves</dt><dd id="flow-claude-moves">-</dd></div>
+                <div><dt>Deletes</dt><dd id="flow-claude-deletes">-</dd></div>
+              </dl>
+            </div>
+          </div>
+          <p class="muted-text">Status uses shared Hive health, OAuth registrations, refresh-token accounts, and recent structured Hive logs.</p>
+          <pre id="flow-recent-log" class="log-view compact-log">(waiting)</pre>
+          <details><summary>Hive activity logs</summary>
+            <p class="muted-text">Activity includes shared MCP, REST, OAuth, ChatGPT/Codex, Claude, web panel, and file-change events.</p>
+            <div class="log-tabs">
+              <button class="log-tab-btn active" data-log="hive-events">activity</button>
+              <button class="log-tab-btn" data-log="hive-errors">errors</button>
+              <button class="log-tab-btn" data-log="hive-out">stdout</button>
+              <button class="log-tab-btn" data-log="hive-err">stderr</button>
+            </div>
+            <pre id="log-hive" class="log-view"></pre>
+          </details>
         </div>
-        <p class="muted-text">Status uses shared Hive health, OAuth registrations, refresh-token accounts, and recent structured Hive logs.</p>
-        <pre id="flow-recent-log" class="log-view compact-log">(waiting)</pre>
-        <details><summary>Hive activity logs</summary>
-          <p class="muted-text">Activity includes shared MCP, REST, OAuth, ChatGPT/Codex, Claude, web panel, and file-change events.</p>
-          <div class="log-tabs">
-            <button class="log-tab-btn active" data-log="hive-events">activity</button>
-            <button class="log-tab-btn" data-log="hive-errors">errors</button>
-            <button class="log-tab-btn" data-log="hive-out">stdout</button>
-            <button class="log-tab-btn" data-log="hive-err">stderr</button>
+      </div>
+
+      <div class="sys-zone sys-zone-controls">
+        <div class="sys-zone-label"><span class="sys-zone-dot"></span>Controls</div>
+
+        <details class="card" open>
+          <summary>Server controls</summary>
+          <p id="system-control-message" class="muted-text"></p>
+          <div class="breaker-row">
+            <div class="breaker-name">Hive server</div>
+            <div class="btn-group">
+              <button class="control-btn" data-target="hive" data-action="start">Start</button>
+              <button class="control-btn danger" data-target="hive" data-action="stop">Stop</button>
+              <button class="control-btn" data-target="hive" data-action="restart">Restart</button>
+            </div>
           </div>
-          <pre id="log-hive" class="log-view"></pre>
+          <div class="breaker-row">
+            <div class="breaker-name">Cloudflare Tunnel</div>
+            <div class="btn-group">
+              <button class="control-btn" data-target="tunnel" data-action="start">Start</button>
+              <button class="control-btn danger" data-target="tunnel" data-action="stop">Stop</button>
+              <button class="control-btn" data-target="tunnel" data-action="restart">Restart</button>
+            </div>
+          </div>
+          <div class="breaker-row">
+            <div class="breaker-name">This panel</div>
+            <div class="btn-group">
+              <button class="control-btn danger" data-target="panel" data-action="stop">Stop</button>
+              <button class="control-btn" data-target="panel" data-action="restart">Restart</button>
+            </div>
+          </div>
+          <div id="service-row-sorter" class="breaker-row hidden">
+            <div class="breaker-name">Sorter</div>
+            <div class="btn-group">
+              <button class="control-btn" data-target="sorter" data-action="start">Start</button>
+              <button class="control-btn danger" data-target="sorter" data-action="stop">Stop</button>
+              <button class="control-btn" data-target="sorter" data-action="restart">Restart</button>
+            </div>
+          </div>
+        </details>
+
+        <details class="card hazard-card">
+          <summary>Heavily guarded: Hard stop</summary>
+          <p class="muted-text">Admin only. This runs `C:\Users\Lucas\Desktop\hardstop.ps1` on the server. It requires both the exact confirmation phrase and a separate hard-stop password.</p>
+          <form id="guarded-hardstop-form" class="user-form">
+            <input id="guarded-hardstop-confirm" type="text" placeholder="Type RUN HARDSTOP to confirm" autocapitalize="off" autocorrect="off" spellcheck="false" required />
+            <input id="guarded-hardstop-password" type="password" placeholder="Hard-stop password" autocapitalize="off" autocorrect="off" spellcheck="false" required />
+            <button type="submit" id="guarded-hardstop-run-btn" class="danger">Run hard stop</button>
+            <p id="guarded-hardstop-message" class="muted-text"></p>
+          </form>
+          <pre id="guarded-hardstop-output" class="log-view compact-log">(script not run yet)</pre>
         </details>
       </div>
 
-      <details class="card">
-        <summary>Server controls</summary>
-        <p id="system-control-message" class="muted-text"></p>
-        <div class="service-row">
-          <div><strong>Hive server</strong></div>
-          <div class="btn-group">
-            <button class="control-btn" data-target="hive" data-action="start">Start</button>
-            <button class="control-btn danger" data-target="hive" data-action="stop">Stop</button>
-            <button class="control-btn" data-target="hive" data-action="restart">Restart</button>
+      <div class="sys-zone sys-zone-admin">
+        <div class="sys-zone-label"><span class="sys-zone-dot"></span>Administration</div>
+
+        <details class="card" open>
+          <summary>Trash settings</summary>
+          <p class="muted-text">Admin only. File deletes from the panel move items into `_trash`. Auto-purge timing and full emptying are controlled here.</p>
+          <form id="trash-config-form" class="user-form">
+            <input id="trash-retention-days" type="number" min="1" max="365" placeholder="Retention days" required />
+            <button type="submit" class="primary">Save retention</button>
+            <button type="button" id="empty-trash-btn" class="danger">Empty Bin Now</button>
+            <p id="trash-config-message" class="muted-text"></p>
+          </form>
+        </details>
+
+        <details class="card" open>
+          <summary>Users</summary>
+          <div class="table-scroll">
+            <table id="users-table">
+              <thead><tr><th>Username</th><th>Role</th><th></th></tr></thead>
+              <tbody id="users-body"></tbody>
+            </table>
           </div>
-        </div>
-        <div class="service-row">
-          <div><strong>Cloudflare Tunnel</strong></div>
-          <div class="btn-group">
-            <button class="control-btn" data-target="tunnel" data-action="start">Start</button>
-            <button class="control-btn danger" data-target="tunnel" data-action="stop">Stop</button>
-            <button class="control-btn" data-target="tunnel" data-action="restart">Restart</button>
+          <form id="user-form" class="user-form">
+            <input id="user-form-username" type="text" placeholder="Username" autocapitalize="off" autocorrect="off" spellcheck="false" required />
+            <input id="user-form-pin" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="PIN (4-10 digits)" required />
+            <select id="user-form-role">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button type="submit" class="primary">Add / update user</button>
+            <p id="user-form-error" class="error"></p>
+          </form>
+        </details>
+
+        <details class="card" open>
+          <summary>File permissions</summary>
+          <p class="muted-text">Default is User. Add an Admin override to hide a file/folder from normal users.</p>
+          <div class="table-scroll">
+            <table id="permissions-table">
+              <thead><tr><th>Path</th><th>Role</th><th></th></tr></thead>
+              <tbody id="permissions-body"></tbody>
+            </table>
           </div>
-        </div>
-        <div class="service-row">
-          <div><strong>This panel</strong></div>
-          <div class="btn-group">
-            <button class="control-btn danger" data-target="panel" data-action="stop">Stop</button>
-            <button class="control-btn" data-target="panel" data-action="restart">Restart</button>
+        </details>
+
+        <details class="card" open>
+          <summary>Connected MCP clients</summary>
+          <div class="table-scroll">
+            <table id="oauth-table">
+              <thead><tr><th>Client</th><th>Redirect host</th></tr></thead>
+              <tbody id="oauth-clients-body"></tbody>
+            </table>
           </div>
-        </div>
-        <div id="service-row-sorter" class="service-row hidden">
-          <div><strong>Sorter</strong></div>
-          <div class="btn-group">
-            <button class="control-btn" data-target="sorter" data-action="start">Start</button>
-            <button class="control-btn danger" data-target="sorter" data-action="stop">Stop</button>
-            <button class="control-btn" data-target="sorter" data-action="restart">Restart</button>
+          <p class="muted-text">Accounts with an active refresh token:</p>
+          <ul id="oauth-emails" class="plain-list"></ul>
+        </details>
+      </div>
+
+      <div class="sys-zone sys-zone-diagnostics">
+        <div class="sys-zone-label"><span class="sys-zone-dot"></span>Diagnostics</div>
+
+        <details class="card">
+          <summary>Panel logs</summary>
+          <div class="log-tabs">
+            <button class="log-tab-btn active" data-log="panel-out">stdout</button>
+            <button class="log-tab-btn" data-log="panel-err">stderr</button>
           </div>
-        </div>
-      </details>
+          <pre id="log-panel" class="log-view"></pre>
+        </details>
 
-      <details class="card">
-        <summary>Heavily guarded: Hard stop</summary>
-        <p class="muted-text">Admin only. This runs `C:\Users\Lucas\Desktop\hardstop.ps1` on the server. It requires both the exact confirmation phrase and a separate hard-stop password.</p>
-        <form id="guarded-hardstop-form" class="user-form">
-          <input id="guarded-hardstop-confirm" type="text" placeholder="Type RUN HARDSTOP to confirm" autocapitalize="off" autocorrect="off" spellcheck="false" required />
-          <input id="guarded-hardstop-password" type="password" placeholder="Hard-stop password" autocapitalize="off" autocorrect="off" spellcheck="false" required />
-          <button type="submit" id="guarded-hardstop-run-btn" class="danger">Run hard stop</button>
-          <p id="guarded-hardstop-message" class="muted-text"></p>
-        </form>
-        <pre id="guarded-hardstop-output" class="log-view compact-log">(script not run yet)</pre>
-      </details>
-
-      <details class="card" open>
-        <summary>Trash settings</summary>
-        <p class="muted-text">Admin only. File deletes from the panel move items into `_trash`. Auto-purge timing and full emptying are controlled here.</p>
-        <form id="trash-config-form" class="user-form">
-          <input id="trash-retention-days" type="number" min="1" max="365" placeholder="Retention days" required />
-          <button type="submit" class="primary">Save retention</button>
-          <button type="button" id="empty-trash-btn" class="danger">Empty Bin Now</button>
-          <p id="trash-config-message" class="muted-text"></p>
-        </form>
-      </details>
-
-      <details class="card">
-        <summary>Panel logs</summary>
-        <div class="log-tabs">
-          <button class="log-tab-btn active" data-log="panel-out">stdout</button>
-          <button class="log-tab-btn" data-log="panel-err">stderr</button>
-        </div>
-        <pre id="log-panel" class="log-view"></pre>
-      </details>
-
-      <details class="card">
-        <summary>Tunnel logs</summary>
-        <div class="log-tabs">
-          <button class="log-tab-btn active" data-log="tunnel-out">stdout</button>
-          <button class="log-tab-btn" data-log="tunnel-err">stderr</button>
-        </div>
-        <pre id="log-tunnel" class="log-view"></pre>
-      </details>
-
-      <details class="card" open>
-        <summary>Users</summary>
-        <div class="table-scroll">
-          <table id="users-table">
-            <thead><tr><th>Username</th><th>Role</th><th></th></tr></thead>
-            <tbody id="users-body"></tbody>
-          </table>
-        </div>
-        <form id="user-form" class="user-form">
-          <input id="user-form-username" type="text" placeholder="Username" autocapitalize="off" autocorrect="off" spellcheck="false" required />
-          <input id="user-form-pin" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="PIN (4-10 digits)" required />
-          <select id="user-form-role">
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button type="submit" class="primary">Add / update user</button>
-          <p id="user-form-error" class="error"></p>
-        </form>
-      </details>
-
-      <details class="card" open>
-        <summary>File permissions</summary>
-        <p class="muted-text">Default is User. Add an Admin override to hide a file/folder from normal users.</p>
-        <div class="table-scroll">
-          <table id="permissions-table">
-            <thead><tr><th>Path</th><th>Role</th><th></th></tr></thead>
-            <tbody id="permissions-body"></tbody>
-          </table>
-        </div>
-      </details>
-
-      <details class="card" open>
-        <summary>Connected MCP clients</summary>
-        <div class="table-scroll">
-          <table id="oauth-table">
-            <thead><tr><th>Client</th><th>Redirect host</th></tr></thead>
-            <tbody id="oauth-clients-body"></tbody>
-          </table>
-        </div>
-        <p class="muted-text">Accounts with an active refresh token:</p>
-        <ul id="oauth-emails" class="plain-list"></ul>
-      </details>
+        <details class="card">
+          <summary>Tunnel logs</summary>
+          <div class="log-tabs">
+            <button class="log-tab-btn active" data-log="tunnel-out">stdout</button>
+            <button class="log-tab-btn" data-log="tunnel-err">stderr</button>
+          </div>
+          <pre id="log-tunnel" class="log-view"></pre>
+        </details>
+      </div>
     </section>
   </div>
 
@@ -406,6 +452,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/powershell/powershell.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="app.js"></script>
+  <script src="permissions.js"></script>
 </body>
 </html>

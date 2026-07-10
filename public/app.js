@@ -9,7 +9,7 @@ const state = {
 
 const TEXT_EXTENSIONS = new Set([
   "md", "txt", "json", "js", "mjs", "cjs", "ts", "tsx", "jsx", "py", "yml", "yaml", "html",
-  "htm", "css", "csv", "log", "xml", "sh", "ps1", "ini", "toml", "env",
+  "htm", "css", "log", "xml", "sh", "ps1", "ini", "toml", "env",
   "java", "c", "h", "cpp", "hpp", "cs", "go", "rs", "rb", "php", "sql",
   "kt", "swift", "dart", "lua", "r", "pl", "vue", "graphql", "conf", "cfg",
 ]);
@@ -45,6 +45,7 @@ const CM_MODES = {
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "m4a", "flac", "aac"]);
+const SHEET_EXTENSIONS = new Set(["xlsx", "xls", "csv"]);
 // TEMPORARILY EMPTY during the top-level folder redesign, matching
 // mcp-hive-server/server.js. Restore the real list once the new structure
 // is settled:
@@ -71,6 +72,9 @@ function mediaKindFor(name) {
   if (VIDEO_EXTENSIONS.has(ext)) return "video";
   if (AUDIO_EXTENSIONS.has(ext)) return "audio";
   if (ext === "pdf") return "pdf";
+  if (ext === "docx") return "docx";
+  if (SHEET_EXTENSIONS.has(ext)) return "sheet";
+  if (ext === "zip") return "zip";
   return null;
 }
 
@@ -203,14 +207,32 @@ document.getElementById("pin-toggle").addEventListener("click", () => {
 });
 
 // --- Tabs --------------------------------------------------------------
+function switchTab(tabName) {
+  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
+  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${tabName}`));
+  if (tabName === "system") loadSystem();
+}
+
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
-    if (btn.dataset.tab === "system") loadSystem();
+    const alreadyActive = btn.classList.contains("active");
+    switchTab(btn.dataset.tab);
+    // Re-clicking the already-active Files tab acts as a "go to root" shortcut.
+    if (alreadyActive && btn.dataset.tab === "files" && confirmDiscardIfDirty()) {
+      closeAllPanels();
+      state.subpath = "";
+      loadFiles();
+    }
   });
+});
+
+// Header title doubles as a Home button: jump to the Files tab root folder.
+document.getElementById("home-btn").addEventListener("click", () => {
+  if (!confirmDiscardIfDirty()) return;
+  closeAllPanels();
+  state.subpath = "";
+  switchTab("files");
+  loadFiles();
 });
 
 // --- Status pill ---------------------------------------------------------
@@ -241,6 +263,9 @@ function closeAllPanels() {
   document.getElementById("files-layout").classList.remove("editor-open");
   state.openFile = null;
   state.previewFile = null;
+  savedGeneration = null;
+  hideFindBar();
+  updateDirtyIndicator();
   if (previewObjectUrl) {
     URL.revokeObjectURL(previewObjectUrl);
     previewObjectUrl = null;
@@ -337,6 +362,42 @@ function renderRow(list, entry) {
 // while typing, backed by CodeMirror. Created once, reused across files by
 // swapping its content/mode.
 let cm = null;
+let savedGeneration = null;
+
+function isEditorDirty() {
+  return !!(cm && state.openFile && savedGeneration != null && !cm.isClean(savedGeneration));
+}
+
+// Guard before any navigation that would throw away the open file's buffer
+// (switching files/folders, closing the panel, or leaving the page).
+function confirmDiscardIfDirty() {
+  if (!isEditorDirty()) return true;
+  return confirm("You have unsaved changes. Discard them?");
+}
+
+window.addEventListener("beforeunload", (e) => {
+  if (!isEditorDirty()) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+function updateDirtyIndicator() {
+  const dot = document.getElementById("editor-dirty-dot");
+  if (dot) dot.classList.toggle("hidden", !isEditorDirty());
+}
+
+function applyEditorFontPrefs() {
+  const wrapper = cm ? cm.getWrapperElement() : null;
+  if (!wrapper) return;
+  const familySelect = document.getElementById("editor-font-family");
+  const family = localStorage.getItem("panelEditorFontFamily") || familySelect.value;
+  const size = parseInt(localStorage.getItem("panelEditorFontSize"), 10) || 13;
+  wrapper.style.fontFamily = family;
+  wrapper.style.fontSize = `${size}px`;
+  if (familySelect.value !== family) familySelect.value = family;
+  document.getElementById("editor-font-size-display").textContent = size;
+}
+
 function ensureCodeMirror() {
   if (cm) return cm;
   cm = CodeMirror.fromTextArea(document.getElementById("editor-content"), {
@@ -347,10 +408,29 @@ function ensureCodeMirror() {
     tabSize: 2,
     viewportMargin: 500,
   });
+  cm.on("changes", updateDirtyIndicator);
+  applyEditorFontPrefs();
   return cm;
 }
 
+document.getElementById("editor-font-family").addEventListener("change", (e) => {
+  localStorage.setItem("panelEditorFontFamily", e.target.value);
+  applyEditorFontPrefs();
+  if (cm) setTimeout(() => cm.refresh(), 30);
+});
+
+function stepEditorFontSize(delta) {
+  const current = parseInt(localStorage.getItem("panelEditorFontSize"), 10) || 13;
+  const next = Math.max(10, Math.min(22, current + delta));
+  localStorage.setItem("panelEditorFontSize", next);
+  applyEditorFontPrefs();
+  if (cm) setTimeout(() => cm.refresh(), 30);
+}
+document.getElementById("editor-font-dec").addEventListener("click", () => stepEditorFontSize(-1));
+document.getElementById("editor-font-inc").addEventListener("click", () => stepEditorFontSize(1));
+
 async function openFile(filepath) {
+  if (!confirmDiscardIfDirty()) return;
   try {
     const { content } = await api(`/api/file?path=${encodeURIComponent(filepath)}`);
     closeAllPanels();
@@ -360,9 +440,14 @@ async function openFile(filepath) {
     document.getElementById("editor-path").textContent = filepath;
 
     const editor = ensureCodeMirror();
+    editor.setOption("readOnly", false);
     editor.setValue(content);
     editor.setOption("mode", CM_MODES[extOf(filepath)] || null);
     editor.clearHistory();
+    savedGeneration = editor.changeGeneration(true);
+    updateDirtyIndicator();
+    applyEditorFontPrefs();
+    hideFindBar();
 
     document.getElementById("editor").classList.remove("hidden");
     document.getElementById("files-layout").classList.add("editor-open");
@@ -373,40 +458,113 @@ async function openFile(filepath) {
   }
 }
 
+// Edit/Read toggle works for every text file, not just Markdown: Markdown's
+// Read view renders sanitized HTML; everything else's Read view is the same
+// CodeMirror buffer (still syntax-highlighted) just switched to read-only,
+// so there's one consistent toggle instead of a Markdown-only special case.
 function renderEditorView() {
   const rendered = document.getElementById("editor-rendered");
-  const modeBtn = document.getElementById("editor-mode-btn");
+  const toggle = document.getElementById("editor-view-toggle");
+  const editBtn = document.getElementById("editor-edit-btn");
+  const readBtn = document.getElementById("editor-read-btn");
   const cmWrapper = cm ? cm.getWrapperElement() : null;
 
-  if (state.editorMode !== "markdown") {
-    modeBtn.classList.add("hidden");
-    rendered.classList.add("hidden");
-    if (cmWrapper) cmWrapper.classList.remove("hidden");
+  toggle.classList.remove("hidden");
+  editBtn.classList.toggle("on", state.editorViewing === "edit");
+  readBtn.classList.toggle("on", state.editorViewing === "read");
+
+  if (state.editorMode === "markdown" && state.editorViewing === "read") {
+    if (cmWrapper) cmWrapper.classList.add("hidden");
+    rendered.classList.remove("hidden");
+    const raw = window.marked ? marked.parse(cm.getValue()) : cm.getValue();
+    rendered.innerHTML = window.DOMPurify ? DOMPurify.sanitize(raw) : raw;
     return;
   }
 
-  modeBtn.classList.remove("hidden");
-  if (state.editorViewing === "edit") {
-    modeBtn.textContent = "Preview";
-    rendered.classList.add("hidden");
-    if (cmWrapper) cmWrapper.classList.remove("hidden");
-    return;
-  }
-
-  modeBtn.textContent = "Edit";
-  if (cmWrapper) cmWrapper.classList.add("hidden");
-  rendered.classList.remove("hidden");
-  const raw = window.marked ? marked.parse(cm.getValue()) : cm.getValue();
-  rendered.innerHTML = window.DOMPurify ? DOMPurify.sanitize(raw) : raw;
+  rendered.classList.add("hidden");
+  if (cmWrapper) cmWrapper.classList.remove("hidden");
+  if (cm) cm.setOption("readOnly", state.editorViewing === "read");
 }
 
-document.getElementById("editor-mode-btn").addEventListener("click", () => {
-  state.editorViewing = state.editorViewing === "edit" ? "rendered" : "edit";
+function setEditorViewing(mode) {
+  if (state.editorViewing === mode) return;
+  state.editorViewing = mode;
   renderEditorView();
-  if (state.editorViewing === "edit" && cm) setTimeout(() => cm.refresh(), 30);
+  if (cm) setTimeout(() => cm.refresh(), 30);
+}
+document.getElementById("editor-edit-btn").addEventListener("click", () => setEditorViewing("edit"));
+document.getElementById("editor-read-btn").addEventListener("click", () => setEditorViewing("read"));
+
+// --- Find & replace (CodeMirror's searchcursor addon, custom-styled bar) --
+function hideFindBar() {
+  document.getElementById("editor-find-bar").classList.add("hidden");
+  document.getElementById("editor-find-count").textContent = "";
+}
+
+function countMatches(query) {
+  if (!cm || !query) return 0;
+  const cursor = cm.getSearchCursor(query, null, { caseFold: true });
+  let count = 0;
+  while (cursor.findNext()) count++;
+  return count;
+}
+
+function findStep(dir) {
+  const query = document.getElementById("editor-find-input").value;
+  const countEl = document.getElementById("editor-find-count");
+  if (!cm || !query) {
+    countEl.textContent = "";
+    return;
+  }
+  const total = countMatches(query);
+  if (!total) {
+    countEl.textContent = "0 of 0";
+    return;
+  }
+  const cursor = cm.getSearchCursor(query, cm.getCursor(dir > 0 ? "to" : "from"), { caseFold: true });
+  const found = dir > 0 ? cursor.findNext() : cursor.findPrevious();
+  if (!found) {
+    // wrap around
+    const wrapped = cm.getSearchCursor(query, dir > 0 ? { line: 0, ch: 0 } : { line: cm.lineCount() - 1, ch: 0 }, { caseFold: true });
+    if (dir > 0 ? wrapped.findNext() : wrapped.findPrevious()) {
+      cm.setSelection(wrapped.from(), wrapped.to());
+      cm.scrollIntoView({ from: wrapped.from(), to: wrapped.to() }, 60);
+    }
+  } else {
+    cm.setSelection(cursor.from(), cursor.to());
+    cm.scrollIntoView({ from: cursor.from(), to: cursor.to() }, 60);
+  }
+  countEl.textContent = `${total} match${total === 1 ? "" : "es"}`;
+}
+
+document.getElementById("editor-find-btn").addEventListener("click", () => {
+  const bar = document.getElementById("editor-find-bar");
+  bar.classList.toggle("hidden");
+  if (!bar.classList.contains("hidden")) document.getElementById("editor-find-input").focus();
+});
+document.getElementById("editor-find-close").addEventListener("click", hideFindBar);
+document.getElementById("editor-find-next").addEventListener("click", () => findStep(1));
+document.getElementById("editor-find-prev").addEventListener("click", () => findStep(-1));
+document.getElementById("editor-find-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") findStep(e.shiftKey ? -1 : 1);
+});
+document.getElementById("editor-replace-all-btn").addEventListener("click", () => {
+  const query = document.getElementById("editor-find-input").value;
+  const replacement = document.getElementById("editor-replace-input").value;
+  if (!cm || !query) return;
+  const cursor = cm.getSearchCursor(query, null, { caseFold: true });
+  let count = 0;
+  cm.operation(() => {
+    while (cursor.findNext()) {
+      cursor.replace(replacement);
+      count++;
+    }
+  });
+  document.getElementById("editor-find-count").textContent = `Replaced ${count}`;
 });
 
 async function openPreview(filepath, entry) {
+  if (!confirmDiscardIfDirty()) return;
   closeAllPanels();
   state.previewFile = filepath;
   document.getElementById("preview-path").textContent = filepath;
@@ -435,32 +593,232 @@ async function openPreview(filepath, entry) {
     if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
     previewObjectUrl = URL.createObjectURL(blob);
 
-    let el;
     if (kind === "image") {
-      el = document.createElement("img");
+      const el = document.createElement("img");
       el.src = previewObjectUrl;
+      mediaEl.appendChild(el);
+      infoEl.textContent = entry.size != null ? formatBytes(entry.size) : "";
     } else if (kind === "video") {
-      el = document.createElement("video");
+      const el = document.createElement("video");
       el.src = previewObjectUrl;
       el.controls = true;
+      mediaEl.appendChild(el);
+      infoEl.textContent = entry.size != null ? formatBytes(entry.size) : "";
     } else if (kind === "audio") {
-      el = document.createElement("audio");
+      const el = document.createElement("audio");
       el.src = previewObjectUrl;
       el.controls = true;
+      mediaEl.appendChild(el);
+      infoEl.textContent = entry.size != null ? formatBytes(entry.size) : "";
     } else if (kind === "pdf") {
-      el = document.createElement("iframe");
-      el.src = previewObjectUrl;
-      el.className = "preview-pdf";
+      await renderPdfPreview(mediaEl, await blob.arrayBuffer());
+      infoEl.textContent = entry.size != null ? `${formatBytes(entry.size)} · view only, download to edit` : "";
+    } else if (kind === "docx") {
+      await renderDocxPreview(mediaEl, await blob.arrayBuffer());
+      infoEl.textContent = entry.size != null ? `${formatBytes(entry.size)} · view only, download to edit` : "";
+    } else if (kind === "sheet") {
+      await renderSheetPreview(mediaEl, blob, entry.name);
+      infoEl.textContent = entry.size != null ? formatBytes(entry.size) : "";
+    } else if (kind === "zip") {
+      await renderZipPreview(mediaEl, blob);
+      infoEl.textContent = entry.size != null ? formatBytes(entry.size) : "";
     }
-    mediaEl.appendChild(el);
     mediaEl.classList.remove("hidden");
-    infoEl.textContent = entry.size != null ? formatBytes(entry.size) : "";
   } catch (err) {
     infoEl.textContent = err.message;
   }
 }
 
-document.getElementById("back-to-list-btn").addEventListener("click", closeAllPanels);
+// --- PDF: real in-app viewer (pdf.js) instead of a bare browser iframe ----
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+
+async function renderPdfPreview(container, arrayBuffer) {
+  if (!window.pdfjsLib) {
+    container.textContent = "PDF viewer failed to load.";
+    return;
+  }
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let currentPage = 1;
+
+  const wrap = document.createElement("div");
+  wrap.className = "pdf-viewer";
+  const thumbs = document.createElement("div");
+  thumbs.className = "pdf-thumbs";
+  const pageArea = document.createElement("div");
+  pageArea.className = "pdf-page";
+  const canvas = document.createElement("canvas");
+  pageArea.appendChild(canvas);
+  wrap.append(thumbs, pageArea);
+
+  const controls = document.createElement("div");
+  controls.className = "pdf-controls";
+  let zoom = 1.1;
+  const prevBtn = Object.assign(document.createElement("button"), { textContent: "‹" });
+  const pageLabel = document.createElement("span");
+  const nextBtn = Object.assign(document.createElement("button"), { textContent: "›" });
+  const zoomOutBtn = Object.assign(document.createElement("button"), { textContent: "–" });
+  const zoomLabel = document.createElement("span");
+  const zoomInBtn = Object.assign(document.createElement("button"), { textContent: "+" });
+  controls.append(prevBtn, pageLabel, nextBtn, zoomOutBtn, zoomLabel, zoomInBtn);
+
+  container.append(wrap, controls);
+
+  async function renderPage(num) {
+    currentPage = Math.max(1, Math.min(pdf.numPages, num));
+    const page = await pdf.getPage(currentPage);
+    const viewport = page.getViewport({ scale: zoom });
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    pageLabel.textContent = `Page ${currentPage} / ${pdf.numPages}`;
+    zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+    thumbs.querySelectorAll(".pdf-thumb").forEach((t) => t.classList.toggle("current", Number(t.dataset.page) === currentPage));
+  }
+
+  prevBtn.addEventListener("click", () => renderPage(currentPage - 1));
+  nextBtn.addEventListener("click", () => renderPage(currentPage + 1));
+  zoomOutBtn.addEventListener("click", () => { zoom = Math.max(0.4, zoom - 0.15); renderPage(currentPage); });
+  zoomInBtn.addEventListener("click", () => { zoom = Math.min(3, zoom + 0.15); renderPage(currentPage); });
+
+  const thumbScale = 0.18;
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const thumbBtn = document.createElement("button");
+    thumbBtn.className = "pdf-thumb";
+    thumbBtn.dataset.page = String(i);
+    thumbBtn.textContent = String(i);
+    thumbBtn.addEventListener("click", () => renderPage(i));
+    thumbs.appendChild(thumbBtn);
+    // Best-effort thumbnail render; page-number label is the fallback if this fails.
+    pdf.getPage(i).then((page) => {
+      const vp = page.getViewport({ scale: thumbScale });
+      const tCanvas = document.createElement("canvas");
+      tCanvas.width = vp.width;
+      tCanvas.height = vp.height;
+      return page.render({ canvasContext: tCanvas.getContext("2d"), viewport: vp }).promise.then(() => {
+        thumbBtn.textContent = "";
+        thumbBtn.appendChild(tCanvas);
+      });
+    }).catch(() => {});
+  }
+
+  await renderPage(1);
+}
+
+// --- DOCX: render via mammoth.js (already loaded, previously unused) -----
+async function renderDocxPreview(container, arrayBuffer) {
+  if (!window.mammoth) {
+    container.textContent = "DOCX viewer failed to load.";
+    return;
+  }
+  const banner = document.createElement("div");
+  banner.className = "docx-banner";
+  banner.textContent = "View only — download and edit in Word, then re-upload.";
+  const page = document.createElement("div");
+  page.className = "docx-page";
+  try {
+    const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+    page.innerHTML = window.DOMPurify ? DOMPurify.sanitize(html) : html;
+  } catch (err) {
+    page.textContent = `Couldn't render this file: ${err.message}`;
+  }
+  container.append(banner, page);
+}
+
+// --- XLSX/CSV: read-only table via SheetJS --------------------------------
+async function renderSheetPreview(container, blob, filename) {
+  if (!window.XLSX) {
+    container.textContent = "Spreadsheet viewer failed to load.";
+    return;
+  }
+  const type = extOf(filename) === "csv" ? "string" : "array";
+  const data = type === "string" ? await blob.text() : new Uint8Array(await blob.arrayBuffer());
+  const workbook = XLSX.read(data, { type });
+
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "table-wrap";
+  const tabsEl = document.createElement("div");
+  tabsEl.className = "sheet-tabs";
+
+  function showSheet(name) {
+    const sheet = workbook.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+    const table = document.createElement("table");
+    table.className = "data-table";
+    if (rows.length) {
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      rows[0].forEach((cellVal) => {
+        const th = document.createElement("th");
+        th.textContent = cellVal ?? "";
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      const tbody = document.createElement("tbody");
+      rows.slice(1).forEach((row) => {
+        const tr = document.createElement("tr");
+        row.forEach((cellVal) => {
+          const td = document.createElement("td");
+          td.textContent = cellVal ?? "";
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.append(thead, tbody);
+    }
+    tableWrap.innerHTML = "";
+    tableWrap.appendChild(table);
+    tabsEl.querySelectorAll(".sheet-tab").forEach((t) => t.classList.toggle("on", t.textContent === name));
+  }
+
+  workbook.SheetNames.forEach((name) => {
+    const tab = document.createElement("span");
+    tab.className = "sheet-tab";
+    tab.textContent = name;
+    tab.addEventListener("click", () => showSheet(name));
+    tabsEl.appendChild(tab);
+  });
+
+  container.append(tableWrap, tabsEl);
+  if (workbook.SheetNames.length) showSheet(workbook.SheetNames[0]);
+}
+
+// --- ZIP: browse contents via JSZip, no extraction ------------------------
+async function renderZipPreview(container, blob) {
+  if (!window.JSZip) {
+    container.textContent = "Archive viewer failed to load.";
+    return;
+  }
+  const zip = await JSZip.loadAsync(blob);
+  const list = document.createElement("div");
+  list.className = "zip-list";
+  const entries = Object.values(zip.files).sort((a, b) => a.name.localeCompare(b.name));
+  for (const entry of entries) {
+    const row = document.createElement("div");
+    const depth = (entry.name.match(/\//g) || []).length - (entry.dir ? 1 : 0);
+    row.className = `zip-row${depth > 0 ? ` depth${Math.min(depth, 2)}` : ""}`;
+    const icon = document.createElement("span");
+    icon.className = "zi";
+    icon.textContent = entry.dir ? "📂" : "📝";
+    const name = document.createElement("span");
+    name.className = "zn";
+    name.textContent = entry.name.replace(/\/$/, "").split("/").pop() + (entry.dir ? "/" : "");
+    const size = document.createElement("span");
+    size.className = "zs";
+    if (!entry.dir) {
+      const raw = await entry.async("uint8array");
+      size.textContent = formatBytes(raw.length);
+    }
+    row.append(icon, name, size);
+    list.appendChild(row);
+  }
+  container.appendChild(list);
+}
+
+document.getElementById("back-to-list-btn").addEventListener("click", () => {
+  if (confirmDiscardIfDirty()) closeAllPanels();
+});
 document.getElementById("preview-back-btn").addEventListener("click", closeAllPanels);
 
 document.getElementById("save-file-btn").addEventListener("click", async () => {
@@ -472,6 +830,8 @@ document.getElementById("save-file-btn").addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: state.openFile, content }),
     });
+    savedGeneration = cm.changeGeneration(true);
+    updateDirtyIndicator();
     loadFiles();
   } catch (err) {
     alert(err.message);
@@ -560,7 +920,7 @@ document.getElementById("new-folder-btn").addEventListener("click", async () => 
 // It's a standalone service (MasterHiveSorter) with its own start/stop
 // controls in the System tab; this just opens its UI.
 document.getElementById("sort-inbox-btn").addEventListener("click", () => {
-  window.open("http://localhost:4055", "_blank", "noopener");
+  window.open("https://brain.incendiarynetworks.cc/sorter", "_blank", "noopener");
 });
 
 document.getElementById("upload-btn").addEventListener("click", () => {
