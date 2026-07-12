@@ -1,4 +1,4 @@
-﻿const state = {
+const state = {
   token: localStorage.getItem("panelToken") || "",
   username: localStorage.getItem("panelUsername") || "",
   role: localStorage.getItem("panelRole") || "",
@@ -172,7 +172,7 @@ function showApp() {
   document.getElementById("login").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
   document.getElementById("current-user").textContent = state.role
-    ? `${state.username} Â· ${state.role}`
+    ? `${state.username} · ${state.role}`
     : state.username;
   document.getElementById("tab-btn-system").classList.toggle("hidden", state.role !== "admin");
   refreshStatus();
@@ -213,7 +213,7 @@ document.getElementById("pin-toggle").addEventListener("click", () => {
   const btn = document.getElementById("pin-toggle");
   const showing = pinInput.type === "text";
   pinInput.type = showing ? "password" : "text";
-  btn.textContent = showing ? "ðŸ‘" : "ðŸ™ˆ";
+  btn.textContent = showing ? "👁" : "🙈";
   btn.setAttribute("aria-label", showing ? "Show PIN" : "Hide PIN");
 });
 
@@ -289,7 +289,7 @@ function closeAllPanels() {
 async function loadFiles() {
   document.getElementById("breadcrumb").textContent = `/${state.subpath}`;
   const list = document.getElementById("file-list");
-  list.innerHTML = "<li>Loadingâ€¦</li>";
+  list.innerHTML = "<li>Loading…</li>";
   try {
     const { entries, folderPermissions } = await api(`/api/files?subpath=${encodeURIComponent(state.subpath)}`);
     state.folderPermissions = effectivePermissions(folderPermissions);
@@ -350,7 +350,7 @@ function renderRow(list, entry) {
   if (entry.type === "file" && permissions.download) {
     const dl = document.createElement("button");
     dl.className = "icon-btn";
-    dl.textContent = "â¬‡";
+    dl.textContent = "⬇";
     dl.title = "Download";
     dl.addEventListener("click", (e) => { e.stopPropagation(); downloadFile(full); });
     actions.appendChild(dl);
@@ -359,7 +359,7 @@ function renderRow(list, entry) {
   if (permissions.move) {
     const mv = document.createElement("button");
     mv.className = "icon-btn";
-    mv.textContent = "â†¦";
+    mv.textContent = "↦";
     mv.title = "Move / rename";
     mv.addEventListener("click", (e) => { e.stopPropagation(); openMovePicker(full); });
     actions.appendChild(mv);
@@ -369,7 +369,7 @@ function renderRow(list, entry) {
   if (permissions.delete) {
     const del = document.createElement("button");
     del.className = "icon-btn danger";
-    del.textContent = "ðŸ—‘";
+    del.textContent = "🗑";
     del.title = "Move to trash";
     del.addEventListener("click", (e) => { e.stopPropagation(); trashPath(full); });
     actions.appendChild(del);
@@ -612,11 +612,11 @@ async function openPreview(filepath, entry) {
   document.getElementById("preview-delete-btn").classList.toggle("hidden", !state.currentPermissions.delete);
   if (!kind) {
     infoEl.textContent =
-      entry.size != null ? `${formatBytes(entry.size)} â€” not previewable, use Download.` : "Not previewable.";
+      entry.size != null ? `${formatBytes(entry.size)} — not previewable, use Download.` : "Not previewable.";
     return;
   }
 
-  infoEl.textContent = "Loading previewâ€¦";
+  infoEl.textContent = "Loading preview…";
   try {
     const resp = await fetch(`/api/preview?path=${encodeURIComponent(filepath)}`, {
       headers: { Authorization: `Bearer ${state.token}` },
@@ -645,10 +645,10 @@ async function openPreview(filepath, entry) {
       infoEl.textContent = entry.size != null ? formatBytes(entry.size) : "";
     } else if (kind === "pdf") {
       await renderPdfPreview(mediaEl, await blob.arrayBuffer());
-      infoEl.textContent = entry.size != null ? `${formatBytes(entry.size)} Â· view only, download to edit` : "";
+      infoEl.textContent = entry.size != null ? `${formatBytes(entry.size)} · view only, download to edit` : "";
     } else if (kind === "docx") {
       await renderDocxPreview(mediaEl, await blob.arrayBuffer());
-      infoEl.textContent = entry.size != null ? `${formatBytes(entry.size)} Â· view only, download to edit` : "";
+      infoEl.textContent = entry.size != null ? `${formatBytes(entry.size)} · view only, download to edit` : "";
     } else if (kind === "sheet") {
       await renderSheetPreview(mediaEl, blob, entry.name);
       infoEl.textContent = entry.size != null ? formatBytes(entry.size) : "";
@@ -688,10 +688,10 @@ async function renderPdfPreview(container, arrayBuffer) {
   const controls = document.createElement("div");
   controls.className = "pdf-controls";
   let zoom = 1.1;
-  const prevBtn = Object.assign(document.createElement("button"), { textContent: "â€¹" });
+  const prevBtn = Object.assign(document.createElement("button"), { textContent: "‹" });
   const pageLabel = document.createElement("span");
-  const nextBtn = Object.assign(document.createElement("button"), { textContent: "â€º" });
-  const zoomOutBtn = Object.assign(document.createElement("button"), { textContent: "â€“" });
+  const nextBtn = Object.assign(document.createElement("button"), { textContent: "›" });
+  const zoomOutBtn = Object.assign(document.createElement("button"), { textContent: "–" });
   const zoomLabel = document.createElement("span");
   const zoomInBtn = Object.assign(document.createElement("button"), { textContent: "+" });
   controls.append(prevBtn, pageLabel, nextBtn, zoomOutBtn, zoomLabel, zoomInBtn);
@@ -747,7 +747,7 @@ async function renderDocxPreview(container, arrayBuffer) {
   }
   const banner = document.createElement("div");
   banner.className = "docx-banner";
-  banner.textContent = "View only â€” download and edit in Word, then re-upload.";
+  banner.textContent = "View only — download and edit in Word, then re-upload.";
   const page = document.createElement("div");
   page.className = "docx-page";
   try {
@@ -833,7 +833,7 @@ async function renderZipPreview(container, blob) {
     row.className = `zip-row${depth > 0 ? ` depth${Math.min(depth, 2)}` : ""}`;
     const icon = document.createElement("span");
     icon.className = "zi";
-    icon.textContent = entry.dir ? "ðŸ“‚" : "ðŸ“";
+    icon.textContent = entry.dir ? "📂" : "📝";
     const name = document.createElement("span");
     name.className = "zn";
     name.textContent = entry.name.replace(/\/$/, "").split("/").pop() + (entry.dir ? "/" : "");
@@ -908,11 +908,11 @@ function renderMovePickerBreadcrumbs() {
   const wrap = document.getElementById("move-picker-breadcrumbs");
   wrap.innerHTML = "";
   const parts = movePicker.folder ? movePicker.folder.split("/") : [];
-  const root = Object.assign(document.createElement("button"), { type: "button", textContent: "ðŸ  Hive" });
+  const root = Object.assign(document.createElement("button"), { type: "button", textContent: "🏠 Hive" });
   root.addEventListener("click", () => loadMovePickerFolder(""));
   wrap.appendChild(root);
   parts.forEach((part, index) => {
-    wrap.appendChild(Object.assign(document.createElement("span"), { textContent: "â€º" }));
+    wrap.appendChild(Object.assign(document.createElement("span"), { textContent: "›" }));
     const button = Object.assign(document.createElement("button"), { type: "button", textContent: part });
     button.addEventListener("click", () => loadMovePickerFolder(parts.slice(0, index + 1).join("/")));
     wrap.appendChild(button);
@@ -930,7 +930,7 @@ function renderMovePickerFolders() {
   }
   folders.forEach((entry) => {
     const li = document.createElement("li");
-    const button = Object.assign(document.createElement("button"), { type: "button", textContent: `ðŸ“ ${entry.name}` });
+    const button = Object.assign(document.createElement("button"), { type: "button", textContent: `📁 ${entry.name}` });
     button.addEventListener("click", () => loadMovePickerFolder(movePicker.folder ? `${movePicker.folder}/${entry.name}` : entry.name));
     li.appendChild(button);
     list.appendChild(li);
@@ -940,7 +940,7 @@ function renderMovePickerFolders() {
 async function loadMovePickerFolder(folder) {
   movePicker.folder = folder;
   document.getElementById("move-picker-error").textContent = "";
-  document.getElementById("move-picker-folders").innerHTML = '<li class="empty">Loading foldersâ€¦</li>';
+  document.getElementById("move-picker-folders").innerHTML = '<li class="empty">Loading folders…</li>';
   renderMovePickerBreadcrumbs();
   updateMovePickerDestination();
   try {
@@ -1115,7 +1115,7 @@ function sorterRenderItems() {
     listEl.appendChild(li);
   });
   const approved = items.filter((x) => x.approved).length;
-  if (items.length) sorterSetStatus(`${items.length} item(s) in preview â€” ${approved} approved. Nothing moves until you confirm.`);
+  if (items.length) sorterSetStatus(`${items.length} item(s) in preview — ${approved} approved. Nothing moves until you confirm.`);
   document.getElementById("sorter-approve-all").checked = items.length > 0 && approved === items.length;
 }
 
@@ -1125,7 +1125,7 @@ function sorterRenderDetail() {
   document.getElementById("sorter-detail").classList.toggle("hidden", !item);
   if (!item) return;
   document.getElementById("sorter-detail-name").textContent = item.name;
-  document.getElementById("sorter-detail-reason").textContent = [item.classification, item.reason].filter(Boolean).join(" â€” ");
+  document.getElementById("sorter-detail-reason").textContent = [item.classification, item.reason].filter(Boolean).join(" — ");
   document.getElementById("sorter-detail-approve").checked = !!item.approved;
   document.getElementById("sorter-detail-dest").value = item.selectedDestination || "";
   const folderEl = document.getElementById("sorter-folders");
@@ -1170,13 +1170,13 @@ async function sorterLoad() {
 document.getElementById("sorter-refresh-btn").addEventListener("click", sorterLoad);
 
 document.getElementById("sorter-start-btn").addEventListener("click", async () => {
-  sorterSetStatus("Scanning inboxâ€¦");
+  sorterSetStatus("Scanning inbox…");
   try {
     sorter.session = await sorterApi("/startsorter", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
     sorter.selected = sorterItems().length ? 0 : -1;
     sorterRenderItems();
     sorterRenderDetail();
-    if (!sorterItems().length) sorterSetStatus("Inbox is empty â€” nothing to sort.");
+    if (!sorterItems().length) sorterSetStatus("Inbox is empty — nothing to sort.");
   } catch (err) {
     sorterSetStatus(err.message);
   }
@@ -1196,7 +1196,7 @@ document.getElementById("sorter-stop-btn").addEventListener("click", async () =>
 
 document.getElementById("sorter-confirm-btn").addEventListener("click", async () => {
   const items = sorterItems();
-  if (!items.length) return alert("Nothing to confirm â€” load a preview first.");
+  if (!items.length) return alert("Nothing to confirm — load a preview first.");
   const approved = items.filter((x) => x.approved);
   if (!approved.length) return alert("No items approved. Tick the ones you want moved.");
   if (!confirm(`Move ${approved.length} approved item(s) to their destinations?`)) return;
@@ -1264,7 +1264,7 @@ function renderUploadQueue() {
   for (const item of uploadState.items) {
     const li = document.createElement("li");
     li.className = `upload-item ${item.status || "queued"}`;
-    li.innerHTML = `<div class="upload-item-row"><span class="upload-item-name"></span><span class="upload-item-size"></span><button class="upload-remove" type="button" aria-label="Remove">âœ•</button></div><div class="upload-progress"><span></span></div><div class="upload-item-status"></div>`;
+    li.innerHTML = '<div class="upload-item-row"><span class="upload-item-name"></span><span class="upload-item-size"></span><button class="upload-remove" type="button" aria-label="Remove">X</button></div><div class="upload-progress"><span></span></div><div class="upload-item-status"></div>';
     li.querySelector(".upload-item-name").textContent = item.file.name;
     li.querySelector(".upload-item-size").textContent = uploadFormatBytes(item.file.size);
     li.querySelector(".upload-progress span").style.width = `${item.progress || 0}%`;
@@ -1276,7 +1276,7 @@ function renderUploadQueue() {
   const total = uploadState.items.reduce((sum, item) => sum + item.file.size, 0);
   const done = uploadState.items.filter((item) => item.status === "done").length;
   const failed = uploadState.items.filter((item) => item.status === "failed").length;
-  document.getElementById("upload-summary").textContent = uploadState.items.length ? `${uploadState.items.length} file(s) â€¢ ${uploadFormatBytes(total)}${done ? ` â€¢ ${done} done` : ""}${failed ? ` â€¢ ${failed} failed` : ""}` : "No files selected";
+  document.getElementById("upload-summary").textContent = uploadState.items.length ? `${uploadState.items.length} file(s) - ${uploadFormatBytes(total)}${done ? ` - ${done} done` : ""}${failed ? ` - ${failed} failed` : ""}` : "No files selected";
   document.getElementById("upload-start-btn").disabled = uploadState.running || !uploadState.items.some((item) => item.status !== "done");
 }
 
@@ -1303,7 +1303,7 @@ function uploadOne(item) {
       renderUploadQueue(); resolve();
     };
     xhr.onerror = () => { item.status = "failed"; item.message = "Network error"; renderUploadQueue(); resolve(); };
-    item.status = "uploading"; item.message = "Uploadingâ€¦"; renderUploadQueue(); xhr.send(item.file);
+    item.status = "uploading"; item.message = "Uploading..."; renderUploadQueue(); xhr.send(item.file);
   });
 }
 
@@ -1319,7 +1319,7 @@ document.getElementById("upload-start-btn").addEventListener("click", async () =
   const overwrite = document.getElementById("upload-overwrite").checked;
   const existing = new Set([...document.querySelectorAll("#file-list .row-name")].map((el) => el.textContent.trim()));
   const conflicts = uploadState.items.filter((item) => item.status !== "done" && existing.has(item.file.name));
-  if (conflicts.length && !overwrite) { alert(`${conflicts.length} file(s) already exist here. Enable â€œReplace files with the same nameâ€ to continue.`); return; }
+  if (conflicts.length && !overwrite) { alert(`${conflicts.length} file(s) already exist here. Enable Replace files with the same name to continue.`); return; }
   if (conflicts.length && overwrite && !confirm(`Replace ${conflicts.length} existing file(s)?`)) return;
   uploadState.running = true; renderUploadQueue();
   for (const item of uploadState.items.filter((item) => item.status !== "done")) await uploadOne(item);
@@ -1558,7 +1558,7 @@ async function loadUsers() {
       const actionTd = document.createElement("td");
       const del = document.createElement("button");
       del.className = "icon-btn danger";
-      del.textContent = "ðŸ—‘";
+      del.textContent = "🗑";
       del.title = "Delete user";
       del.addEventListener("click", () => deleteUser(u.username));
       actionTd.appendChild(del);
@@ -1627,7 +1627,7 @@ document.getElementById("empty-trash-btn").addEventListener("click", async () =>
     messageEl.textContent = resp.deletedCount
       ? `Deleted ${resp.deletedCount} trash entr${resp.deletedCount === 1 ? "y" : "ies"}.`
       : "_trash is already empty.";
-    if (state.subpath === "_trash" || state.subpath === "ðŸ—‘ Trash") loadFiles();
+    if (state.subpath === "_trash" || state.subpath === "🗑 Trash") loadFiles();
   } catch (err) {
     messageEl.textContent = err.message;
   }
@@ -1680,7 +1680,7 @@ document.getElementById("setup-pin-toggle").addEventListener("click", () => {
   const btn = document.getElementById("setup-pin-toggle");
   const showing = pinInput.type === "text";
   pinInput.type = showing ? "password" : "text";
-  btn.textContent = showing ? "ðŸ‘" : "ðŸ™ˆ";
+  btn.textContent = showing ? "👁" : "🙈";
   btn.setAttribute("aria-label", showing ? "Show PIN" : "Hide PIN");
 });
 
@@ -1690,8 +1690,8 @@ document.getElementById("setup-oauth-toggle").addEventListener("click", () => {
   const showing = !fields.classList.contains("hidden");
   fields.classList.toggle("hidden");
   btn.textContent = showing
-    ? "â–¸ Advanced: OAuth login for Claude/ChatGPT (optional)"
-    : "â–¾ Advanced: OAuth login for Claude/ChatGPT (optional)";
+    ? "▸ Advanced: OAuth login for Claude/ChatGPT (optional)"
+    : "▾ Advanced: OAuth login for Claude/ChatGPT (optional)";
 });
 
 let setupLoginCreds = null;
@@ -1791,4 +1791,3 @@ setInterval(() => {
   refreshStatus();
   if (state.token) checkSorterAvailable(); // tab tracks the service coming and going
 }, 30000);
-
