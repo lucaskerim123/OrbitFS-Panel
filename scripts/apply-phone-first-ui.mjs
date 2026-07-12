@@ -22,3 +22,4 @@ const mobileCss = `\n@media (max-width: 620px) {\n  .startup-settings-actions { 
 fs.appendFileSync("public/startup-settings.css", mobileCss);
 
 console.log("Applied phone-first panel fixes.");
+// Workflow trigger marker: 2026-07-13
