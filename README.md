@@ -19,8 +19,10 @@ It is the operator UI for the shared Hive server and covers:
   - ZIP: browse contents (name/size, nested) without downloading first
   - All of the above are view-only where the format can't be safely
     edited in-browser (PDF, DOCX) — download, edit locally, re-upload
-- Per-file admin permission overrides (🔒 on a file row hides it from
-  non-admin users)
+- Granular per-file and per-folder user permissions for view/read, write,
+  download, move/rename, delete/trash, and create/upload. Folder rules inherit
+  downward, specific file/subfolder rules override them, and Admin always has
+  every action.
 - System tab: infrastructure telemetry (Hive/tunnel/panel/sorter health,
   disk usage, ChatGPT↔Claude connection flows), power controls for each
   service, and admin management (users, file permissions, trash, connected
