@@ -541,6 +541,15 @@ app.get("/api/file-permissions", requireAdmin, async (req, res) => {
   }
 });
 
+app.get("/api/file-permissions/effective", requireAdmin, async (req, res) => {
+  if (!req.query.path && req.query.path !== "") return res.status(400).json({ error: "path required" });
+  try {
+    res.json({ path: normalizeFilePath(req.query.path), permissions: await permissionsForPath("user", req.query.path) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post("/api/file-permissions", requireAdmin, express.json(), async (req, res) => {
   const { path: filepath, permissions } = req.body || {};
   if (!filepath && filepath !== "") return res.status(400).json({ error: "path required" });
@@ -899,4 +908,3 @@ app.listen(PORT, () => {
     cloudflaredDir: CLOUDFLARED_DIR,
   });
 });
-
