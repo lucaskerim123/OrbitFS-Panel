@@ -1,0 +1,190 @@
+.sys-panel {
+  max-width: 1500px;
+  margin-inline: auto;
+}
+
+.sys-header {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.65rem;
+}
+
+.sys-zone {
+  margin-bottom: 0.85rem;
+}
+
+.sys-zone-label {
+  margin-bottom: 0.35rem;
+}
+
+/* Status stays large and visually dominant. */
+.sys-zone-telemetry > .card {
+  padding: 1rem;
+}
+
+.sys-zone-telemetry .topology {
+  margin-block: 0.75rem;
+}
+
+.sys-zone-telemetry .infra-grid,
+.sys-zone-telemetry .flow-grid {
+  gap: 0.55rem;
+}
+
+.sys-zone-telemetry .infra-item,
+.sys-zone-telemetry .flow-card {
+  padding: 0.65rem;
+}
+
+/* Everything below status becomes a compact section stack. */
+.sys-zone-controls,
+.sys-zone-admin,
+.sys-zone-diagnostics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.sys-zone-controls > .sys-zone-label,
+.sys-zone-admin > .sys-zone-label,
+.sys-zone-diagnostics > .sys-zone-label {
+  grid-column: 1 / -1;
+}
+
+.sys-zone-controls > details.card,
+.sys-zone-admin > details.card,
+.sys-zone-diagnostics > details.card,
+.sys-zone-controls > .card,
+.sys-zone-admin > .card,
+.sys-zone-diagnostics > .card {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.sys-panel details.card > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.7rem 0.8rem;
+  font-family: var(--sys-mono);
+  font-size: 0.8rem;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--sys-surface);
+}
+
+.sys-panel details.card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sys-panel details.card > summary::after {
+  content: "+";
+  color: var(--sys-dim);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.sys-panel details.card[open] > summary::after {
+  content: "−";
+}
+
+.sys-panel details.card[open] > summary {
+  border-bottom: 1px solid var(--sys-line);
+}
+
+.sys-panel details.card > summary ~ * {
+  margin-left: 0.8rem;
+  margin-right: 0.8rem;
+}
+
+.sys-panel details.card > summary + * {
+  margin-top: 0.7rem;
+}
+
+.sys-panel details.card > *:last-child {
+  margin-bottom: 0.8rem;
+}
+
+.sys-panel .breaker-row {
+  padding: 0.5rem 0;
+  gap: 0.55rem;
+}
+
+.sys-panel .breaker-name {
+  font-size: 0.8rem;
+}
+
+.sys-panel .btn-group {
+  gap: 0.3rem;
+}
+
+.sys-panel .btn-group button,
+.sys-panel .control-btn {
+  min-height: 30px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.74rem;
+}
+
+.sys-panel .user-form {
+  gap: 0.45rem;
+}
+
+.sys-panel .user-form input,
+.sys-panel .user-form select,
+.sys-panel .user-form button {
+  min-height: 34px;
+  padding: 0.45rem 0.55rem;
+}
+
+.sys-panel .table-scroll {
+  max-height: 260px;
+}
+
+.sys-panel table {
+  font-size: 0.76rem;
+}
+
+.sys-panel th,
+.sys-panel td {
+  padding: 0.4rem 0.5rem;
+}
+
+.sys-panel .log-view {
+  max-height: 220px;
+  font-size: 0.72rem;
+}
+
+.sys-panel .compact-log {
+  max-height: 150px;
+}
+
+.sys-panel .muted-text {
+  font-size: 0.74rem;
+}
+
+@media (max-width: 900px) {
+  .sys-zone-controls,
+  .sys-zone-admin,
+  .sys-zone-diagnostics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .sys-panel {
+    margin: -0.75rem;
+    padding: 0.75rem;
+  }
+
+  .sys-zone-telemetry > .card {
+    padding: 0.75rem;
+  }
+
+  .sys-zone-telemetry .flow-grid,
+  .sys-zone-telemetry .infra-grid {
+    grid-template-columns: 1fr;
+  }
+}
