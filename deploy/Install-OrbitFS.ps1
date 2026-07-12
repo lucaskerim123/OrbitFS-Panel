@@ -94,6 +94,11 @@ function Ensure-File([string]$FilePath, [string]$Content) {
 }
 
 function Invoke-Git([string[]]$GitArgs, [string]$WorkDir) {
+  # WorkDir must be absolute by the time this runs - Resolve-CodeDir below
+  # guarantees that. Cloning happens FROM WorkDir with an absolute -Dest
+  # passed straight to git, so nothing gets re-resolved against the new cwd
+  # (that double-resolution is what used to nest paths like test\server\test\server
+  # when -CodeDir was given as a relative path).
   $prevLoc = Get-Location
   Set-Location $WorkDir
   try {
@@ -105,6 +110,8 @@ function Invoke-Git([string[]]$GitArgs, [string]$WorkDir) {
 }
 
 function Get-OrUpdateRepo([string]$Url, [string]$Dest) {
+  # $Dest is guaranteed absolute (see Resolve-CodeDir) - safe to pass as-is
+  # regardless of what directory git ends up running from.
   if (Test-Path -LiteralPath (Join-Path $Dest ".git")) {
     Write-Skip "$Dest already a git checkout, pulling latest"
     Invoke-Git -GitArgs @("pull", "--ff-only") -WorkDir $Dest
@@ -112,9 +119,21 @@ function Get-OrUpdateRepo([string]$Url, [string]$Dest) {
   } elseif (Test-Path -LiteralPath $Dest) {
     throw "$Dest already exists and isn't a git repo. Move it aside or choose a different -CodeDir."
   } else {
-    Invoke-Git -GitArgs @("clone", $Url, $Dest) -WorkDir (Split-Path -Parent $Dest)
+    $parent = Split-Path -Parent $Dest
+    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+    Invoke-Git -GitArgs @("clone", $Url, $Dest) -WorkDir $parent
     Write-Ok "cloned $Url to $Dest"
   }
+}
+
+function Resolve-OrCreateAbsolutePath([string]$Path) {
+  # Turns any relative/mixed path into an absolute one BEFORE it's used for
+  # cloning or file generation, so every downstream step - which may cd
+  # around (git clone) or run from a different invocation directory next
+  # time - keeps working off the same real location instead of silently
+  # resolving against whatever the current directory happens to be.
+  if (-not (Test-Path -LiteralPath $Path)) { New-Item -ItemType Directory -Path $Path -Force | Out-Null }
+  return (Resolve-Path -LiteralPath $Path).Path
 }
 
 # --- 0. Prerequisites --------------------------------------------------------
@@ -141,6 +160,14 @@ if (-not $HiveDataRoot) {
   $HiveDataRoot = Read-PathWithDefault "FireStorm data directory" (Join-Path $CodeDir "Project FireStorm\The Master Hive")
 }
 
+# Resolve to an absolute path immediately, whatever form the user typed
+# (relative, trailing slash, mixed / and \) - every downstream step assumes
+# $CodeDir is absolute, since git clone changes the current directory and a
+# still-relative path there would silently re-resolve against the wrong
+# location (this bit a relative "test\server" -CodeDir previously, nesting
+# the clone two folders deeper than intended).
+$CodeDir = Resolve-OrCreateAbsolutePath $CodeDir
+
 $HiveServerDir = Join-Path $CodeDir "orbitfs-mcp"
 $PanelDir = Join-Path $CodeDir "orbitfs-panel"
 
@@ -166,6 +193,7 @@ if ($SkipClone) {
 # --- 3. FireStorm folder skeleton --------------------------------------------
 Write-Step "Creating FireStorm data folder skeleton at $HiveDataRoot"
 Ensure-Dir $HiveDataRoot
+$HiveDataRoot = (Resolve-Path -LiteralPath $HiveDataRoot).Path
 
 $protectedRoots = @("_system", "_sorter", "_trash", "0. Core", "1. Legal", "2. Wellbeing", "_media")
 foreach ($folder in $protectedRoots) { Ensure-Dir (Join-Path $HiveDataRoot $folder) }
