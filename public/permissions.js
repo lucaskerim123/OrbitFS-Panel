@@ -179,11 +179,15 @@ openPreview = async function openPreviewWithPermissionButton(filepath, entry) {
 
 if (isAdminUser()) loadPermissions();
 
-const docxViewerStyle = document.createElement("link");
-docxViewerStyle.rel = "stylesheet";
-docxViewerStyle.href = "docx-viewer.css";
-document.head.appendChild(docxViewerStyle);
-const docxViewerScript = document.createElement("script");
-docxViewerScript.src = "docx-viewer.js";
-docxViewerScript.async = false;
-document.body.appendChild(docxViewerScript);
+for (const href of ["docx-viewer.css", "storage-status.css"]) {
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = href;
+  document.head.appendChild(link);
+}
+for (const src of ["docx-viewer.js", "storage-status.js"]) {
+  const script = document.createElement("script");
+  script.src = src;
+  script.async = false;
+  document.body.appendChild(script);
+}
