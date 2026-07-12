@@ -1,0 +1,86 @@
+.docx-viewer-shell {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #d9dde5;
+}
+
+.docx-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.docx-viewer-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.docx-viewer-toolbar select {
+  min-width: 150px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.4rem 0.55rem;
+}
+
+.docx-viewer-status {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.docx-viewer-viewport {
+  max-height: 72vh;
+  overflow: auto;
+  padding: 1rem;
+  background: #cfd4dd;
+}
+
+.docx-loading {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  color: #4a5568;
+}
+
+.docx-word-body {
+  min-width: max-content;
+}
+
+.docx-word-body .hive-docx-wrapper {
+  background: #cfd4dd;
+  padding: 0 !important;
+}
+
+.docx-word-body section.hive-docx {
+  margin: 0 auto 1rem !important;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
+}
+
+.docx-viewer-viewport .docx-page {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+@media (max-width: 759px) {
+  .docx-viewer-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .docx-viewer-status {
+    text-align: left;
+  }
+  .docx-viewer-viewport {
+    padding: 0.5rem;
+    max-height: 68vh;
+  }
+}
