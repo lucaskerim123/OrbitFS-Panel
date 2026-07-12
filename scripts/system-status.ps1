@@ -1,10 +1,10 @@
-param(
-  [string]$PanelServiceName = $(if ($env:PANEL_SERVICE_NAME) { $env:PANEL_SERVICE_NAME } else { "MasterBrainPanel" }),
-  [string]$HiveServiceName = $(if ($env:HIVE_SERVICE_NAME) { $env:HIVE_SERVICE_NAME } else { "MasterHiveServer" }),
-  [string]$HiveDir = $(if ($env:HIVE_SERVER_DIR) { $env:HIVE_SERVER_DIR } else { "C:\mcp-hive-server" }),
-  [string]$CloudflaredServiceName = $(if ($env:CLOUDFLARED_SERVICE_NAME) { $env:CLOUDFLARED_SERVICE_NAME } else { "MasterHiveTunnel" }),
+﻿param(
+  [string]$PanelServiceName = $(if ($env:PANEL_SERVICE_NAME) { $env:PANEL_SERVICE_NAME } else { "OrbitFSPanel" }),
+  [string]$HiveServiceName = $(if ($env:HIVE_SERVICE_NAME) { $env:HIVE_SERVICE_NAME } else { "OrbitFSMcpServer" }),
+  [string]$HiveDir = $(if ($env:HIVE_SERVER_DIR) { $env:HIVE_SERVER_DIR } else { "F:\orbitfs-mcp-server" }),
+  [string]$CloudflaredServiceName = $(if ($env:CLOUDFLARED_SERVICE_NAME) { $env:CLOUDFLARED_SERVICE_NAME } else { "OrbitFSTunnel" }),
   [string]$CloudflaredDir = $(if ($env:CLOUDFLARED_DIR) { $env:CLOUDFLARED_DIR } else { "C:\cloudflared" }),
-  [string]$SorterServiceName = $(if ($env:SORTER_SERVICE_NAME) { $env:SORTER_SERVICE_NAME } else { "MasterHiveSorter" })
+  [string]$SorterServiceName = $(if ($env:SORTER_SERVICE_NAME) { $env:SORTER_SERVICE_NAME } else { "OrbitFSSorter" })
 )
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -82,3 +82,4 @@ try {
 }
 
 $result | ConvertTo-Json -Depth 5 -Compress
+

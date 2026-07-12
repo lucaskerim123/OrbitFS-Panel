@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   The one script to run on a brand new machine that has nothing on it yet.
   Clones both repos onto C:\, then builds the shared file-store folder and
@@ -6,9 +6,9 @@
 
 .DESCRIPTION
   Three steps:
-    1. Clone (or, if already present, `git pull`) mcp-hive-server to
-       C:\mcp-hive-server.
-    2. Clone (or pull) the-master-brain to C:\the-master-brain.
+    1. Clone (or, if already present, `git pull`) orbitfs-mcp-server to
+       F:\orbitfs-mcp-server.
+    2. Clone (or pull) the panel repo to F:\orbitfs.
     3. Hand off to deploy\Install-BaseStructure.ps1, which creates the
        Project FireStorm folder tree and generates .env for both repos
        with a matching HIVE_API_KEY, so the panel is already pointed at
@@ -20,7 +20,7 @@
 
 .PARAMETER InstallDrive
   Where both repos get installed. Defaults to C:\, giving
-  C:\mcp-hive-server and C:\the-master-brain.
+  F:\orbitfs-mcp-server and F:\orbitfs.
 
 .PARAMETER HiveRoot
   Where the shared FireStorm file store lives. This is the one thing
@@ -91,20 +91,20 @@ foreach ($cmd in @("git", "node", "npm")) {
 }
 Write-Ok "git, node, npm all found"
 
-$HiveServerDir = Join-Path $InstallDrive "mcp-hive-server"
-$PanelDir = Join-Path $InstallDrive "the-master-brain"
+$HiveServerDir = Join-Path $InstallDrive "orbitfs-mcp-server"
+$PanelDir = Join-Path $InstallDrive "orbitfs"
 if (-not $HiveRoot) { $HiveRoot = Join-Path $InstallDrive "Project FireStorm\The Master Hive" }
 
-Write-Step "Getting mcp-hive-server onto this machine"
+Write-Step "Getting orbitfs-mcp-server onto this machine"
 Get-OrUpdateRepo -Url $HiveRepoUrl -Dest $HiveServerDir
 
-Write-Step "Getting the-master-brain onto this machine"
+Write-Step "Getting orbitfs onto this machine"
 Get-OrUpdateRepo -Url $PanelRepoUrl -Dest $PanelDir
 
 Write-Step "Building the FireStorm folder tree and linking the panel to the server"
 $baseInstaller = Join-Path $PanelDir "deploy\Install-BaseStructure.ps1"
 if (-not (Test-Path -LiteralPath $baseInstaller)) {
-  throw "$baseInstaller not found - the-master-brain checkout looks incomplete."
+  throw "$baseInstaller not found - orbitfs checkout looks incomplete."
 }
 & $baseInstaller -HiveServerDir $HiveServerDir -PanelDir $PanelDir -HiveRoot $HiveRoot
 
@@ -113,3 +113,4 @@ Write-Host "Server code: $HiveServerDir"
 Write-Host "Panel code:  $PanelDir"
 Write-Host "File store:  $HiveRoot"
 Write-Host "`nFollow the 'Next steps' printed above (set PUBLIC_BASE_URL, create your first login, start both)."
+

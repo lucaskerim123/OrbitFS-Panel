@@ -1,4 +1,4 @@
-# Getting Started (plain-language walkthrough)
+﻿# Getting Started (plain-language walkthrough)
 
 This is the no-assumptions guide to getting the Hive server and the webpanel
 running on a brand new Windows machine (a fresh VPS, a new PC, whatever).
@@ -7,9 +7,9 @@ README. This version spells out every step.
 
 There are always **two repos** involved:
 
-- `mcp-hive-server` - the actual server. Talks to Claude/ChatGPT (MCP) and
+- `orbitfs-mcp-server` - the actual server. Talks to Claude/ChatGPT (MCP) and
   stores/serves your files. Nothing works without this running.
-- `the-master-brain` - this repo. A phone/browser-friendly control panel
+- `orbitfs` - this repo. A phone/browser-friendly control panel
   that talks to the Hive server over the network. Optional, but it's how
   you browse files and restart things without RDP-ing into the box.
 
@@ -32,13 +32,13 @@ You need:
 ## 1. Get both repos onto the machine
 
 Pick a parent folder and clone both repos as **siblings** (this matters -
-the install script in step 3 looks for `mcp-hive-server` next to
-`the-master-brain` by default):
+the install script in step 3 looks for `orbitfs-mcp-server` next to
+`orbitfs` by default):
 
 ```powershell
 cd C:\
-git clone <mcp-hive-server-repo-url> mcp-hive-server
-git clone <the-master-brain-repo-url> the-master-brain
+git clone <orbitfs-mcp-server-repo-url> orbitfs-mcp-server
+git clone <orbitfs-repo-url> orbitfs
 ```
 
 If you can't put them side by side, that's fine too - you'll just pass
@@ -51,14 +51,14 @@ folders the Hive server expects, generates `.env` files for both repos
 with a fresh API key, and runs `npm install` in both.
 
 ```powershell
-cd C:\the-master-brain\deploy
+cd C:\orbitfs\deploy
 .\Install-BaseStructure.ps1
 ```
 
 If your repos aren't siblings, tell it where they are:
 
 ```powershell
-.\Install-BaseStructure.ps1 -HiveServerDir "D:\apps\mcp-hive-server" -PanelDir "D:\apps\the-master-brain"
+.\Install-BaseStructure.ps1 -HiveServerDir "D:\apps\orbitfs-mcp-server" -PanelDir "D:\apps\orbitfs"
 ```
 
 It's safe to run more than once - it never overwrites a `.env` file or
@@ -69,7 +69,7 @@ steps 3-6 below.
 
 ## 3. Fill in the two things the script can't guess
 
-Open `C:\mcp-hive-server\.env` in a text editor and set:
+Open `F:\orbitfs-mcp-server\.env` in a text editor and set:
 
 - `PUBLIC_BASE_URL` - the URL this server will be reachable at from the
   internet (your Cloudflare tunnel domain, or `http://localhost:3939` if
@@ -89,7 +89,7 @@ bearer key works fine on its own.
 ## 4. Create your first panel login
 
 ```powershell
-cd C:\the-master-brain
+cd C:\orbitfs
 node scripts/add-user.mjs myusername 1234
 ```
 
@@ -102,13 +102,13 @@ Two separate terminal windows, one per server:
 
 ```powershell
 # Terminal 1
-cd C:\mcp-hive-server
+cd F:\orbitfs-mcp-server
 npm start
 ```
 
 ```powershell
 # Terminal 2
-cd C:\the-master-brain
+cd C:\orbitfs
 npm start
 ```
 
@@ -132,7 +132,7 @@ and ChatGPT can reach `/mcp`. This setup uses a
 1. Install `cloudflared` on the machine.
 2. Create a tunnel and point a DNS record at it, following Cloudflare's
    own tunnel setup docs.
-3. Set `PUBLIC_BASE_URL` in `mcp-hive-server\.env` to that domain.
+3. Set `PUBLIC_BASE_URL` in `orbitfs-mcp-server\.env` to that domain.
 
 ## 8. (Optional) Run both as Windows services
 
@@ -140,19 +140,19 @@ Running `npm start` in a terminal window dies when you close the window or
 log out. For a real deployment, run both as services so they survive
 reboots and stay up unattended.
 
-`the-master-brain\deploy\Setup-Hive-Services.ps1` uses
+`orbitfs\deploy\Setup-Hive-Services.ps1` uses
 [NSSM](https://nssm.cc/) to install the Hive server and the Cloudflare
 tunnel as Windows services. Read the script's parameters first (paths to
 `nssm.exe`, `cloudflared.exe`, your tunnel name) - the defaults match the
 original VPS layout, not necessarily yours:
 
 ```powershell
-cd C:\the-master-brain\deploy
+cd C:\orbitfs\deploy
 .\Setup-Hive-Services.ps1
 ```
 
 For the panel itself, install it as a service the same way with NSSM
-(point it at `node.exe` with `server.js` in `the-master-brain`), or use
+(point it at `node.exe` with `server.js` in `orbitfs`), or use
 `deploy\Setup-IIS.ps1` to put it behind IIS as a reverse proxy.
 
 ## 9. (Optional) The "hard stop" button
@@ -164,9 +164,9 @@ machine (`Stop-Computer -Force`). It's off by default. To enable it:
    ```powershell
    Stop-Computer -ComputerName localhost -Force
    ```
-2. Set `PANEL_HARDSTOP_SCRIPT_PATH` in `the-master-brain\.env` to that
+2. Set `PANEL_HARDSTOP_SCRIPT_PATH` in `orbitfs\.env` to that
    script's path.
-3. Set `PANEL_HARDSTOP_PASSWORD` in `the-master-brain\.env` to a real
+3. Set `PANEL_HARDSTOP_PASSWORD` in `orbitfs\.env` to a real
    password.
 
 Leave both blank if you don't want this feature - the button will just
@@ -177,11 +177,11 @@ refuse to run.
 - **`node` not recognized** - Node.js isn't installed or isn't on PATH.
   Reinstall from nodejs.org and open a new terminal.
 - **Hive server won't start / crashes immediately** - check
-  `mcp-hive-server\.env` has `HIVE_ROOT`, `HIVE_API_KEY`, `PORT`,
+  `orbitfs-mcp-server\.env` has `HIVE_ROOT`, `HIVE_API_KEY`, `PORT`,
   `PUBLIC_BASE_URL`, and `SESSION_SECRET` all set. Check
-  `mcp-hive-server\err.log` for the actual error.
+  `orbitfs-mcp-server\err.log` for the actual error.
 - **Panel loads but can't reach the Hive server** - check `HIVE_URL` and
-  `HIVE_API_KEY` in `the-master-brain\.env` match the Hive server's own
+  `HIVE_API_KEY` in `orbitfs\.env` match the Hive server's own
   `PORT` and `HIVE_API_KEY`.
 - **"Path is required" or file errors from the Hive server** - the
   `HIVE_ROOT` folder or one of its subfolders is missing. Re-run
@@ -191,3 +191,4 @@ refuse to run.
   actually reachable from the internet (tunnel/DNS working), and that
   you're using the right auth method (bearer key vs Cloudflare Access
   OAuth) on the client side.
+

@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory = $true)]
   [ValidateSet("hive", "tunnel", "panel", "sorter")]
   [string]$Target,
@@ -6,17 +6,17 @@ param(
   [ValidateSet("start", "stop", "restart")]
   [string]$Action = "restart",
 
-  [string]$PanelServiceName = $(if ($env:PANEL_SERVICE_NAME) { $env:PANEL_SERVICE_NAME } else { "MasterBrainPanel" }),
+  [string]$PanelServiceName = $(if ($env:PANEL_SERVICE_NAME) { $env:PANEL_SERVICE_NAME } else { "OrbitFSPanel" }),
 
-  [string]$HiveServiceName = $(if ($env:HIVE_SERVICE_NAME) { $env:HIVE_SERVICE_NAME } else { "MasterHiveServer" }),
+  [string]$HiveServiceName = $(if ($env:HIVE_SERVICE_NAME) { $env:HIVE_SERVICE_NAME } else { "OrbitFSMcpServer" }),
 
-  [string]$HiveDir = $(if ($env:HIVE_SERVER_DIR) { $env:HIVE_SERVER_DIR } else { "C:\mcp-hive-server" }),
+  [string]$HiveDir = $(if ($env:HIVE_SERVER_DIR) { $env:HIVE_SERVER_DIR } else { "F:\orbitfs-mcp-server" }),
 
-  [string]$CloudflaredServiceName = $(if ($env:CLOUDFLARED_SERVICE_NAME) { $env:CLOUDFLARED_SERVICE_NAME } else { "MasterHiveTunnel" }),
+  [string]$CloudflaredServiceName = $(if ($env:CLOUDFLARED_SERVICE_NAME) { $env:CLOUDFLARED_SERVICE_NAME } else { "OrbitFSTunnel" }),
 
   [string]$CloudflaredDir = $(if ($env:CLOUDFLARED_DIR) { $env:CLOUDFLARED_DIR } else { "C:\cloudflared" }),
 
-  [string]$SorterServiceName = $(if ($env:SORTER_SERVICE_NAME) { $env:SORTER_SERVICE_NAME } else { "MasterHiveSorter" })
+  [string]$SorterServiceName = $(if ($env:SORTER_SERVICE_NAME) { $env:SORTER_SERVICE_NAME } else { "OrbitFSSorter" })
 )
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -28,6 +28,14 @@ $HiveErrLog = Join-Path $HiveDir "err.log"
 $HivePingUrl = if ($env:HIVE_URL) { "$($env:HIVE_URL.TrimEnd('/'))/api/ping" } else { "http://localhost:3939/api/ping" }
 $HiveShutdownUrl = if ($env:HIVE_URL) { "$($env:HIVE_URL.TrimEnd('/'))/api/admin/shutdown" } else { "http://localhost:3939/api/admin/shutdown" }
 $HiveApiKey = if ($env:HIVE_API_KEY) { $env:HIVE_API_KEY } else { "" }
+$PanelDir = Split-Path -Parent $PSScriptRoot
+$PanelServerScript = Join-Path $PanelDir "server.js"
+$PanelOutLog = Join-Path $PanelDir "service-out.log"
+$PanelErrLog = Join-Path $PanelDir "service-err.log"
+$SorterDir = if ($env:SORTER_DIR) { $env:SORTER_DIR } else { Join-Path $HiveDir "orbitfs-sorter" }
+$SorterServerScript = Join-Path $SorterDir "server.js"
+$SorterOutLog = Join-Path $SorterDir "out.log"
+$SorterErrLog = Join-Path $SorterDir "err.log"
 $CloudflaredExe = if ($env:CLOUDFLARED_EXE) { $env:CLOUDFLARED_EXE } else { Join-Path $CloudflaredDir "cloudflared.exe" }
 $CloudflaredConfig = if ($env:CLOUDFLARED_CONFIG) { $env:CLOUDFLARED_CONFIG } else { Join-Path $HOME ".cloudflared\config.yml" }
 $CloudflaredTunnelName = if ($env:CLOUDFLARED_TUNNEL_NAME) { $env:CLOUDFLARED_TUNNEL_NAME } else { "master-hive" }
@@ -48,6 +56,82 @@ function Test-ServiceExists {
   )
 
   [bool](Get-Service -Name $Name -ErrorAction SilentlyContinue)
+}
+
+function Wait-ForServiceStatus {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Name,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("Running", "Stopped")]
+    [string]$DesiredStatus,
+
+    [int]$TimeoutSeconds = 15
+  )
+
+  for ($i = 0; $i -lt $TimeoutSeconds; $i++) {
+    $service = Get-Service -Name $Name -ErrorAction SilentlyContinue
+    if (-not $service) {
+      if ($DesiredStatus -eq "Stopped") {
+        return
+      }
+      break
+    }
+
+    if ($service.Status.ToString() -eq $DesiredStatus) {
+      return
+    }
+
+    Start-Sleep -Seconds 1
+  }
+
+  throw "Service '$Name' did not reach state '$DesiredStatus' within $TimeoutSeconds seconds."
+}
+
+function Stop-ManagedService {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  if (-not (Test-ServiceExists -Name $Name)) {
+    return $false
+  }
+
+  Stop-Service -Name $Name -Force -ErrorAction Stop
+  Wait-ForServiceStatus -Name $Name -DesiredStatus "Stopped"
+  return $true
+}
+
+function Start-ManagedService {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  if (-not (Test-ServiceExists -Name $Name)) {
+    return $false
+  }
+
+  Start-Service -Name $Name -ErrorAction Stop
+  Wait-ForServiceStatus -Name $Name -DesiredStatus "Running"
+  return $true
+}
+
+function Restart-ManagedService {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  if (-not (Test-ServiceExists -Name $Name)) {
+    return $false
+  }
+
+  Restart-Service -Name $Name -Force -ErrorAction Stop
+  Wait-ForServiceStatus -Name $Name -DesiredStatus "Running"
+  return $true
 }
 
 function Get-HiveProcesses {
@@ -94,6 +178,47 @@ function Get-HiveCommandPattern {
   return "*" + ($HiveServerScript -replace "\\", "\\") + "*"
 }
 
+function Get-CommandPattern {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ScriptPath
+  )
+
+  "*" + ($ScriptPath -replace "\\", "\\") + "*"
+}
+
+function Get-NodeProcessesByScriptPath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ScriptPath
+  )
+
+  try {
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction Stop |
+      Where-Object { $_.CommandLine -like (Get-CommandPattern -ScriptPath $ScriptPath) }
+  } catch {
+    @()
+  }
+}
+
+function Stop-NodeProcessesByScriptPath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ScriptPath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Label
+  )
+
+  foreach ($proc in @(Get-NodeProcessesByScriptPath -ScriptPath $ScriptPath)) {
+    & 'C:\Windows\System32\taskkill.exe' /PID $proc.ProcessId /T /F | Out-Null
+  }
+
+  if (@(Get-NodeProcessesByScriptPath -ScriptPath $ScriptPath).Count -gt 0) {
+    throw "$Label stop requested but matching node processes are still running."
+  }
+}
+
 function Start-BackgroundCommand {
   param(
     [Parameter(Mandatory = $true)]
@@ -136,8 +261,7 @@ function Start-BackgroundCommand {
 }
 
 function Stop-HiveProcess {
-  if (Test-ServiceExists -Name $HiveServiceName) {
-    Stop-Service -Name $HiveServiceName -Force -ErrorAction Stop
+  if (Stop-ManagedService -Name $HiveServiceName) {
     for ($i = 0; $i -lt 12; $i++) {
       if (-not (Test-HiveHttp)) { return }
       Start-Sleep -Seconds 1
@@ -174,8 +298,7 @@ function Stop-HiveProcess {
 }
 
 function Start-HiveProcess {
-  if (Test-ServiceExists -Name $HiveServiceName) {
-    Start-Service -Name $HiveServiceName -ErrorAction Stop
+  if (Start-ManagedService -Name $HiveServiceName) {
     for ($i = 0; $i -lt 20; $i++) {
       Start-Sleep -Seconds 1
       if (Test-HiveHttp) {
@@ -225,16 +348,14 @@ function Start-HiveProcess {
 }
 
 function Stop-TunnelProcess {
-  if (Test-ServiceExists -Name $CloudflaredServiceName) {
-    Stop-Service -Name $CloudflaredServiceName -Force -ErrorAction Stop
+  if (Stop-ManagedService -Name $CloudflaredServiceName) {
     return
   }
   Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force
 }
 
 function Start-TunnelProcess {
-  if (Test-ServiceExists -Name $CloudflaredServiceName) {
-    Start-Service -Name $CloudflaredServiceName -ErrorAction Stop
+  if (Start-ManagedService -Name $CloudflaredServiceName) {
     return
   }
   $running = Get-Process cloudflared -ErrorAction SilentlyContinue
@@ -246,6 +367,56 @@ function Start-TunnelProcess {
       -StdoutPath (Join-Path $CloudflaredDir "tunnel_out.log") `
       -StderrPath (Join-Path $CloudflaredDir "tunnel_err.log")
   }
+}
+
+function Stop-PanelProcess {
+  if (Stop-ManagedService -Name $PanelServiceName) {
+    return
+  }
+
+  Stop-NodeProcessesByScriptPath -ScriptPath $PanelServerScript -Label "Panel"
+}
+
+function Start-PanelProcess {
+  if (Start-ManagedService -Name $PanelServiceName) {
+    return
+  }
+
+  if (-not (Test-Path -LiteralPath $PanelServerScript)) {
+    throw "Panel server entry file not found: $PanelServerScript"
+  }
+
+  $null = Start-BackgroundCommand `
+    -Executable "node" `
+    -Arguments @($PanelServerScript) `
+    -WorkingDirectory $PanelDir `
+    -StdoutPath $PanelOutLog `
+    -StderrPath $PanelErrLog
+}
+
+function Stop-SorterProcess {
+  if (Stop-ManagedService -Name $SorterServiceName) {
+    return
+  }
+
+  Stop-NodeProcessesByScriptPath -ScriptPath $SorterServerScript -Label "Sorter"
+}
+
+function Start-SorterProcess {
+  if (Start-ManagedService -Name $SorterServiceName) {
+    return
+  }
+
+  if (-not (Test-Path -LiteralPath $SorterServerScript)) {
+    throw "Sorter server entry file not found: $SorterServerScript"
+  }
+
+  $null = Start-BackgroundCommand `
+    -Executable "node" `
+    -Arguments @($SorterServerScript) `
+    -WorkingDirectory $SorterDir `
+    -StdoutPath $SorterOutLog `
+    -StderrPath $SorterErrLog
 }
 
 # panel stop/restart are called detached from server.js after it has already
@@ -261,13 +432,14 @@ switch ("$Target.$Action") {
   "tunnel.stop"    { Stop-TunnelProcess }
   "tunnel.restart" { Stop-TunnelProcess; Start-Sleep -Seconds 1; Start-TunnelProcess }
 
-  "panel.start"    { Assert-ServiceExists -Name $PanelServiceName; Start-Service -Name $PanelServiceName -ErrorAction Stop }
-  "panel.stop"     { Assert-ServiceExists -Name $PanelServiceName; Start-Sleep -Seconds 1; Stop-Service -Name $PanelServiceName -Force -ErrorAction Stop }
-  "panel.restart"  { Assert-ServiceExists -Name $PanelServiceName; Start-Sleep -Seconds 1; Restart-Service -Name $PanelServiceName -Force -ErrorAction Stop }
+  "panel.start"    { Start-PanelProcess }
+  "panel.stop"     { Start-Sleep -Seconds 1; Stop-PanelProcess }
+  "panel.restart"  { Stop-PanelProcess; Start-Sleep -Seconds 1; Start-PanelProcess }
 
-  "sorter.start"   { Assert-ServiceExists -Name $SorterServiceName; Start-Service -Name $SorterServiceName -ErrorAction Stop }
-  "sorter.stop"    { Assert-ServiceExists -Name $SorterServiceName; Stop-Service -Name $SorterServiceName -Force -ErrorAction Stop }
-  "sorter.restart" { Assert-ServiceExists -Name $SorterServiceName; Restart-Service -Name $SorterServiceName -Force -ErrorAction Stop }
+  "sorter.start"   { Start-SorterProcess }
+  "sorter.stop"    { Stop-SorterProcess }
+  "sorter.restart" { Stop-SorterProcess; Start-Sleep -Seconds 1; Start-SorterProcess }
 }
 
 Write-Output '{"ok":true}'
+

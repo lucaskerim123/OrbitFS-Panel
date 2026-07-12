@@ -1,7 +1,7 @@
-{
-  "name": "the-master-brain",
+﻿{
+  "name": "orbitfs",
   "version": "2.0.0",
-  "description": "Mobile-first admin panel for the Master Hive file server - full file control plus service monitoring/restart, so there's no reason to RDP into the VPS.",
+  "description": "Mobile-first admin panel for the OrbitFS MCP server - full file control plus service monitoring/restart, so there's no reason to RDP into the VPS.",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -13,3 +13,4 @@
     "express": "^5.2.1"
   }
 }
+

@@ -1,7 +1,7 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  Deploys The Master Brain panel behind IIS on this Windows Server/VPS.
+  Deploys OrbitFS panel behind IIS on this Windows Server/VPS.
 
 .DESCRIPTION
   Automates the "Running on IIS" steps from README.md:
@@ -18,8 +18,8 @@
   just restarts the service with the new code.
 
 .PARAMETER AppDir
-  Path to the cloned the-master-brain repo (with node_modules installed and
-  .env / config.json already created — see README.md's manual setup steps
+  Path to the cloned orbitfs repo (with node_modules installed and
+  .env / config.json already created â€” see README.md's manual setup steps
   1-5, this script only automates step 6 onward).
 
 .PARAMETER PanelPort
@@ -38,16 +38,16 @@
   instead of accepting all Host headers on SitePort.
 
 .EXAMPLE
-  .\Setup-IIS.ps1 -AppDir C:\the-master-brain -PanelPort 4000 -HostHeader brain.example.com
+  .\Setup-IIS.ps1 -AppDir C:\orbitfs -PanelPort 4000 -HostHeader brain.example.com
 #>
 
 [CmdletBinding()]
 param(
-  [string]$AppDir = "C:\mcp-hive-server",
-  [string]$ServiceName = "MasterBrainPanel",
+  [string]$AppDir = "F:\orbitfs",
+  [string]$ServiceName = "OrbitFSPanel",
   [int]$PanelPort = 4000,
-  [string]$SiteName = "MasterBrainPanel",
-  [string]$SitePath = "C:\inetpub\master-brain-proxy",
+  [string]$SiteName = "OrbitFSPanel",
+  [string]$SitePath = "C:\inetpub\orbitfs-proxy",
   [int]$SitePort = 8080,
   [string]$HostHeader = "",
   [string]$NssmDir = "C:\nssm"
@@ -85,7 +85,7 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 Write-Ok "Node.js found: $(node --version)"
 
 if (-not (Test-Path (Join-Path $AppDir "server.js"))) {
-  throw "AppDir '$AppDir' doesn't look like the-master-brain (server.js not found). Clone the repo there first."
+  throw "AppDir '$AppDir' doesn't look like orbitfs (server.js not found). Clone the repo there first."
 }
 if (-not (Test-Path (Join-Path $AppDir "node_modules"))) {
   throw "'$AppDir\node_modules' is missing. Run 'npm install' in $AppDir first."
@@ -93,7 +93,7 @@ if (-not (Test-Path (Join-Path $AppDir "node_modules"))) {
 if (-not (Test-Path (Join-Path $AppDir ".env"))) {
   throw "'$AppDir\.env' is missing. Copy .env.example to .env and fill it in first (see README.md)."
 }
-Write-Ok "the-master-brain found at $AppDir with dependencies and .env in place"
+Write-Ok "orbitfs found at $AppDir with dependencies and .env in place"
 
 # --- 1. NSSM (Windows service wrapper) --------------------------------------
 Write-Step "Ensuring NSSM is available"
@@ -258,11 +258,11 @@ Start-Website -Name $SiteName -ErrorAction SilentlyContinue
 Write-Step "Done"
 Write-Host @"
 
-The Master Brain panel is now:
+OrbitFS panel is now:
   - Running as Windows service '$ServiceName' (node server.js in $AppDir, port $PanelPort)
   - Reverse-proxied by IIS site '$SiteName' on port $SitePort$(if ($HostHeader) { " for host '$HostHeader'" })
 
-Next steps (manual, on purpose — these need real credentials/DNS):
+Next steps (manual, on purpose â€” these need real credentials/DNS):
   1. Point DNS for your domain at this VPS's public IP, if you used -HostHeader.
   2. Bind HTTPS: IIS Manager -> Sites -> $SiteName -> Bindings -> Add https,
      with a real certificate (win-acme, https://www.win-acme.com, is the
@@ -275,3 +275,4 @@ Useful commands:
   Restart-Service $ServiceName        # after a git pull + npm install
   Get-Content "$AppDir\service-err.log" -Tail 50   # if the service won't start
 "@ -ForegroundColor Cyan
+

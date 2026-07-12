@@ -1,9 +1,9 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 [CmdletBinding()]
 param(
-  [string]$HiveAppDir = "C:\mcp-hive-server",
-  [string]$HiveServiceName = "MasterHiveServer",
-  [string]$TunnelServiceName = "MasterHiveTunnel",
+  [string]$HiveAppDir = "F:\orbitfs-mcp-server",
+  [string]$HiveServiceName = "OrbitFSMcpServer",
+  [string]$TunnelServiceName = "OrbitFSTunnel",
   [string]$CloudflaredDir = "C:\cloudflared",
   [string]$CloudflaredConfig = "C:\Users\Lucas\.cloudflared\config.yml",
   [string]$CloudflaredTunnelName = "master-hive",
@@ -86,3 +86,4 @@ Write-Ok "Tunnel service running"
 Write-Step "Done"
 Write-Host "Hive service: $HiveServiceName"
 Write-Host "Tunnel service: $TunnelServiceName"
+

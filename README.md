@@ -1,4 +1,4 @@
-﻿# The Master Brain
+﻿# The OrbitFS
 
 Mobile-first admin panel for the Master Hive file server.
 
@@ -24,31 +24,31 @@ It is the operator UI for the shared Hive server and covers:
   disk usage, ChatGPT↔Claude connection flows), power controls for each
   service, and admin management (users, file permissions, trash, connected
   MCP clients)
-- The Sorter — a separate optional addon (`hive-addon-sorter`) that
+- OrbitFS Sorter — a separate optional addon (`orbitfs-sorter`) that
   previews AI-free, rule-based destination suggestions for files dropped in
   `_sorter`, and only moves them once you approve and confirm. Opens from
-  the Files tab's Sort button; has its own "← Back to Master Brain" link
-- Home button (the "Master Brain" title) jumps back to the Files tab root
+  the Files tab's Sort button; has its own "← Back to OrbitFS" link
+- Home button (the "OrbitFS" title) jumps back to the Files tab root
   from anywhere; re-clicking the active Files tab does the same
 
 ## What it talks to
 
-- `mcp-hive-server` over REST (`/api/*`)
+- `orbitfs-mcp-server` over REST (`/api/*`)
 - The same server's MCP endpoint for Claude and ChatGPT clients
 - The shared FireStorm file root at `C:\Project FireStorm\The Master Hive`
-- `hive-addon-sorter` (optional, its own service) for the Sort feature
+- `orbitfs-sorter` (optional, its own service) for the Sort feature
 
 ## Setup on a new machine
 
 New machine, nothing installed yet? Run `deploy/Install-BaseStructure.ps1`
 - it creates the shared Hive file folders, generates `.env` for this repo
-and for `mcp-hive-server`, and runs `npm install` for both. Full
+and for `orbitfs-mcp-server`, and runs `npm install` for both. Full
 walkthrough in [GETTING_STARTED.md](GETTING_STARTED.md).
 
 Short version, once both repos are cloned:
 
 1. Install Node.js.
-2. Clone this repo (and `mcp-hive-server`, as a sibling folder).
+2. Clone this repo (and `orbitfs-mcp-server`, as a sibling folder).
 3. Run `npm install`.
 4. Copy `.env.example` to `.env`.
 5. Set `HIVE_URL` to the Hive server, usually `http://localhost:3939`.
@@ -72,3 +72,4 @@ Short version, once both repos are cloned:
 
 The `deploy/Setup-IIS.ps1` script can install and wire the panel as a service behind IIS.
 The System tab can also restart the panel, Hive server, and tunnel on Windows.
+

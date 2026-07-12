@@ -1,12 +1,12 @@
-<#
+﻿<#
 .SYNOPSIS
   One-shot bootstrap for a fresh machine: creates the shared Hive folder
   skeleton, generates .env files for both repos, and runs npm install.
 
 .DESCRIPTION
   Run this AFTER you've cloned both repos onto the new machine:
-    - mcp-hive-server   (the MCP/REST server)
-    - the-master-brain  (this repo, the webpanel)
+    - orbitfs-mcp-server   (the MCP/REST server)
+    - orbitfs  (this repo, the webpanel)
 
   It is safe to re-run: existing folders, files, and .env values are never
   overwritten. Missing pieces are filled in.
@@ -17,23 +17,23 @@
   after this script.
 
 .PARAMETER HiveServerDir
-  Path to the mcp-hive-server repo. Defaults to a sibling "mcp-hive-server"
+  Path to the orbitfs-mcp-server repo. Defaults to a sibling "orbitfs-mcp-server"
   folder next to this repo's parent directory.
 
 .PARAMETER PanelDir
-  Path to this repo (the-master-brain). Defaults to the parent of the
+  Path to this repo (orbitfs). Defaults to the parent of the
   deploy/ folder this script lives in.
 
 .PARAMETER HiveRoot
   Path to the shared FireStorm file root the Hive server will serve.
-  Defaults to the value already in mcp-hive-server\.env if one exists,
+  Defaults to the value already in orbitfs-mcp-server\.env if one exists,
   otherwise "C:\Project FireStorm\The Master Hive".
 
 .EXAMPLE
   .\Install-BaseStructure.ps1
 
 .EXAMPLE
-  .\Install-BaseStructure.ps1 -HiveServerDir "D:\apps\mcp-hive-server" -HiveRoot "D:\FireStorm"
+  .\Install-BaseStructure.ps1 -HiveServerDir "D:\apps\orbitfs-mcp-server" -HiveRoot "D:\FireStorm"
 #>
 [CmdletBinding()]
 param(
@@ -84,7 +84,7 @@ function Ensure-File([string]$FilePath, [string]$Content) {
 $DeployDir = $PSScriptRoot
 if (-not $PanelDir) { $PanelDir = Split-Path -Parent $DeployDir }
 if (-not $HiveServerDir) {
-  $candidate = Join-Path (Split-Path -Parent $PanelDir) "mcp-hive-server"
+  $candidate = Join-Path (Split-Path -Parent $PanelDir) "orbitfs-mcp-server"
   $HiveServerDir = $candidate
 }
 
@@ -97,10 +97,10 @@ try {
 }
 
 if (-not (Test-Path -LiteralPath $PanelDir)) {
-  throw "Panel repo not found at $PanelDir. Clone the-master-brain there first, or pass -PanelDir."
+  throw "Panel repo not found at $PanelDir. Clone orbitfs there first, or pass -PanelDir."
 }
 if (-not (Test-Path -LiteralPath $HiveServerDir)) {
-  throw "Hive server repo not found at $HiveServerDir. Clone mcp-hive-server there first, or pass -HiveServerDir."
+  throw "Hive server repo not found at $HiveServerDir. Clone orbitfs-mcp-server there first, or pass -HiveServerDir."
 }
 Write-Ok "Panel repo: $PanelDir"
 Write-Ok "Hive server repo: $HiveServerDir"
@@ -287,9 +287,9 @@ Write-Step "Creating log folders"
 Ensure-Dir (Join-Path $HiveServerDir "logs")
 Ensure-Dir (Join-Path $PanelDir "logs")
 
-# --- .env for mcp-hive-server ---
+# --- .env for orbitfs-mcp-server ---
 
-Write-Step "Setting up mcp-hive-server\.env"
+Write-Step "Setting up orbitfs-mcp-server\.env"
 $hiveApiKey = $null
 if (Test-Path -LiteralPath $hiveEnvPath) {
   Write-Skip ".env already exists, leaving it as-is"
@@ -310,9 +310,9 @@ if (Test-Path -LiteralPath $hiveEnvPath) {
   Write-Warn2 "PUBLIC_BASE_URL still needs to be set by hand once you know your tunnel/domain"
 }
 
-# --- .env for the-master-brain ---
+# --- .env for orbitfs ---
 
-Write-Step "Setting up the-master-brain\.env"
+Write-Step "Setting up orbitfs\.env"
 $panelEnvPath = Join-Path $PanelDir ".env"
 if (Test-Path -LiteralPath $panelEnvPath) {
   Write-Skip ".env already exists, leaving it as-is"
@@ -336,15 +336,15 @@ if (Test-Path -LiteralPath $panelEnvPath) {
 
 # --- npm install ---
 
-Write-Step "Installing dependencies (mcp-hive-server)"
+Write-Step "Installing dependencies (orbitfs-mcp-server)"
 Push-Location $HiveServerDir
 try { npm install } finally { Pop-Location }
-Write-Ok "mcp-hive-server dependencies installed"
+Write-Ok "orbitfs-mcp-server dependencies installed"
 
-Write-Step "Installing dependencies (the-master-brain)"
+Write-Step "Installing dependencies (orbitfs)"
 Push-Location $PanelDir
 try { npm install } finally { Pop-Location }
-Write-Ok "the-master-brain dependencies installed"
+Write-Ok "orbitfs dependencies installed"
 
 # --- Done ---
 
@@ -368,3 +368,4 @@ Next steps:
 See GETTING_STARTED.md for the full walkthrough, including the Cloudflare
 tunnel and running both as Windows services.
 "@
+
