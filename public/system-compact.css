@@ -179,6 +179,33 @@
     padding: 0.75rem;
   }
 
+  .sys-panel details.card > summary {
+    min-height: 48px;
+    padding: 0.8rem;
+    font-size: 0.84rem;
+  }
+
+  .sys-panel .btn-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .sys-panel .btn-group button,
+  .sys-panel .control-btn,
+  .sys-panel .user-form input,
+  .sys-panel .user-form select,
+  .sys-panel .user-form button {
+    min-height: 46px;
+    font-size: 0.82rem;
+  }
+
+  .sys-panel input,
+  .sys-panel select,
+  .sys-panel textarea {
+    font-size: 16px;
+  }
+
   .sys-zone-telemetry > .card {
     padding: 0.75rem;
   }
