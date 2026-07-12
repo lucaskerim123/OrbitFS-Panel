@@ -45,11 +45,12 @@ function Get-SorterDir {
   return $default
 }
 
+$SorterApiKey = $null
+$SorterPingUrl = $null
 $SorterDir = Get-SorterDir
 $SorterServerScript = Join-Path $SorterDir "server.js"
 $SorterOutLog = Join-Path $SorterDir "out.log"
 $SorterErrLog = Join-Path $SorterDir "err.log"
-$SorterApiKey = if ($env:HIVE_API_KEY) { $env:HIVE_API_KEY } else { "" }
 $CloudflaredExe = if ($env:CLOUDFLARED_EXE) { $env:CLOUDFLARED_EXE } else { Join-Path $CloudflaredDir "cloudflared.exe" }
 $CloudflaredConfig = if ($env:CLOUDFLARED_CONFIG) { $env:CLOUDFLARED_CONFIG } else { Join-Path $HOME ".cloudflared\config.yml" }
 $CloudflaredTunnelName = if ($env:CLOUDFLARED_TUNNEL_NAME) { $env:CLOUDFLARED_TUNNEL_NAME } else { "master-hive" }
@@ -201,11 +202,29 @@ function Test-HiveHttp {
 }
 
 function Get-SorterPort {
+  $candidates = New-Object System.Collections.Generic.List[int]
+
+  $configPort = 4055
+  try {
+    $configPath = Join-Path $SorterDir "config.json"
+    if (Test-Path -LiteralPath $configPath) {
+      $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+      $port = [int]$config.port
+      if ($port -gt 0) {
+        $configPort = $port
+        if (-not $candidates.Contains($port)) { $candidates.Add($port) }
+      }
+    }
+  } catch {
+  }
+
+  if (-not $candidates.Contains($configPort)) { $candidates.Add($configPort) }
+
   $portFile = Join-Path $SorterDir ".sorter-port"
   if (Test-Path -LiteralPath $portFile) {
     try {
       $port = [int]((Get-Content -LiteralPath $portFile -Raw).Trim())
-      if ($port -gt 0) { return $port }
+      if ($port -gt 0 -and -not $candidates.Contains($port)) { $candidates.Add($port) }
     } catch {
     }
   }
@@ -213,26 +232,61 @@ function Get-SorterPort {
   try {
     if ($env:SORTER_URL) {
       $port = [int](([uri]$env:SORTER_URL).Port)
-      if ($port -gt 0) { return $port }
+      if ($port -gt 0 -and -not $candidates.Contains($port)) { $candidates.Add($port) }
     }
   } catch {
   }
 
-  try {
-    $configPath = Join-Path $SorterDir "config.json"
-    if (Test-Path -LiteralPath $configPath) {
-      $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
-      $port = [int]$config.port
-      if ($port -gt 0) { return $port }
-    }
-  } catch {
+  for ($offset = 0; $offset -lt 10; $offset++) {
+    $port = $configPort + $offset
+    if ($port -gt 0 -and -not $candidates.Contains($port)) { $candidates.Add($port) }
   }
 
-  return 4055
+  foreach ($candidate in $candidates) {
+    if (Test-SorterPort -Port $candidate) {
+      return $candidate
+    }
+  }
+
+  return $configPort
 }
 
 function Get-SorterPingUrl {
   return "http://localhost:$(Get-SorterPort)/api/status"
+}
+
+function Test-SorterPort {
+  param(
+    [Parameter(Mandatory = $true)]
+    [int]$Port
+  )
+
+  try {
+    $apiKey = Get-SorterApiKey
+    $headers = if ($apiKey) { @{ Authorization = "Bearer $apiKey" } } else { @{} }
+    $resp = Invoke-WebRequest -Uri "http://localhost:$Port/api/status" -Method GET -Headers $headers -TimeoutSec 2 -UseBasicParsing
+    return ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 300)
+  } catch {
+    return $false
+  }
+}
+
+function Get-SorterApiKey {
+  if ($env:HIVE_API_KEY) { return $env:HIVE_API_KEY }
+
+  $envPath = Join-Path $SorterDir ".env"
+  if (Test-Path -LiteralPath $envPath) {
+    try {
+      foreach ($line in Get-Content -LiteralPath $envPath -ErrorAction Stop) {
+        if ($line -match '^\s*HIVE_API_KEY\s*=\s*(.+?)\s*$') {
+          return $matches[1]
+        }
+      }
+    } catch {
+    }
+  }
+
+  return ""
 }
 
 function Get-HiveCommandPattern {
@@ -260,6 +314,33 @@ function Get-NodeProcessesByScriptPath {
   } catch {
     @()
   }
+}
+
+function Get-NodeProcessesByPort {
+  param(
+    [Parameter(Mandatory = $true)]
+    [int]$Port
+  )
+
+  $ids = New-Object System.Collections.Generic.List[int]
+  try {
+    $needle = [regex]::Escape(":$Port")
+    $lines = & 'C:\Windows\System32\netstat.exe' -ano | Select-String $needle
+    foreach ($line in $lines) {
+      if ($line.Line -match 'LISTENING\s+(\d+)\s*$') {
+        $parsedPid = 0
+        if ([int]::TryParse($matches[1], [ref]$parsedPid)) {
+          $proc = Get-Process -Id $parsedPid -ErrorAction SilentlyContinue
+          if ($proc -and $proc.ProcessName -eq "node") {
+            $ids.Add($parsedPid)
+          }
+        }
+      }
+    }
+  } catch {
+  }
+
+  $ids | Select-Object -Unique
 }
 
 function Stop-NodeProcessesByScriptPath {
@@ -324,9 +405,7 @@ function Start-BackgroundCommand {
 function Test-SorterHttp {
   try {
     $SorterPingUrl = Get-SorterPingUrl
-    $headers = if ($SorterApiKey) { @{ Authorization = "Bearer $SorterApiKey" } } else { @{} }
-    $resp = Invoke-WebRequest -Uri $SorterPingUrl -Method GET -Headers $headers -TimeoutSec 3 -UseBasicParsing
-    return ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 300)
+    return (Test-SorterPort -Port ([uri]$SorterPingUrl).Port)
   } catch {
     return $false
   }
@@ -483,6 +562,8 @@ function Start-PanelProcess {
 }
 
 function Stop-SorterProcess {
+  $sorterPort = Get-SorterPort
+
   if (Stop-ManagedService -Name $SorterServiceName) {
     for ($i = 0; $i -lt 8; $i++) {
       if (-not (Test-SorterHttp)) {
@@ -490,6 +571,17 @@ function Stop-SorterProcess {
       }
       Start-Sleep -Seconds 1
     }
+  }
+
+  foreach ($proc in @(Get-NodeProcessesByPort -Port $sorterPort)) {
+    & 'C:\Windows\System32\taskkill.exe' /PID $proc /T /F | Out-Null
+  }
+
+  for ($i = 0; $i -lt 8; $i++) {
+    if (-not (Test-SorterHttp)) {
+      return
+    }
+    Start-Sleep -Seconds 1
   }
 
   Stop-NodeProcessesByScriptPath -ScriptPath $SorterServerScript -Label "Sorter"
@@ -501,10 +593,14 @@ function Stop-SorterProcess {
     Start-Sleep -Seconds 1
   }
 
-  throw "Sorter stop requested but $SorterPingUrl is still responding."
+  throw "Sorter stop requested but $(Get-SorterPingUrl) is still responding."
 }
 
 function Start-SorterProcess {
+  if (Test-SorterHttp) {
+    return
+  }
+
   if (Start-ManagedService -Name $SorterServiceName) {
     for ($i = 0; $i -lt 12; $i++) {
       Start-Sleep -Seconds 1
@@ -534,7 +630,7 @@ function Start-SorterProcess {
 
   $stderr = if (Test-Path -LiteralPath $SorterErrLog) { (Get-Content $SorterErrLog -Tail 40 -ErrorAction SilentlyContinue) -join "`n" } else { "" }
   $stdout = if (Test-Path -LiteralPath $SorterOutLog) { (Get-Content $SorterOutLog -Tail 20 -ErrorAction SilentlyContinue) -join "`n" } else { "" }
-  $message = "Sorter process started but /api/status did not come up at $SorterPingUrl."
+  $message = "Sorter process started but /api/status did not come up at $(Get-SorterPingUrl)."
   if ($stderr) { $message += " stderr: $stderr" }
   elseif ($stdout) { $message += " stdout: $stdout" }
   throw $message

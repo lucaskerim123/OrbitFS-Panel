@@ -199,28 +199,75 @@ app.get("/api/status", async (req, res) => {
 });
 
 // --- Sorter integration ----------------------------------------------------
-// The addon sorter runs as its own localhost service and auto-picks a port
-// (written to <SORTER_DIR>/.sorter-port on startup). The panel proxies its
-// API under /api/sorter/* so the Sorter tab works same-origin behind panel
-// auth - the browser never talks to the sorter's port or needs its key.
+// The addon sorter runs as its own localhost service and auto-picks a port.
+// The panel probes the live sorter port before proxying so it does not rely on
+// a stale .sorter-port file or a hardcoded fallback.
 
-function sorterPort() {
+function getSorterApiKey() {
+  return process.env.HIVE_API_KEY || "";
+}
+
+function sorterPortCandidates() {
+  const ports = [];
+  const add = (value) => {
+    const port = Number(value);
+    if (Number.isInteger(port) && port > 0 && !ports.includes(port)) ports.push(port);
+  };
+
+  let configPort = 4055;
+  try {
+    const config = JSON.parse(fsSync.readFileSync(path.join(SORTER_DIR, "config.json"), "utf8"));
+    const port = Number(config.port);
+    if (Number.isInteger(port) && port > 0) configPort = port;
+  } catch {
+  }
+
+  add(configPort);
+
   try {
     const p = Number(fsSync.readFileSync(path.join(SORTER_DIR, ".sorter-port"), "utf8").trim());
-    if (Number.isInteger(p) && p > 0) return p;
+    add(p);
   } catch {}
+
   try {
-    return Number(new URL(SORTER_URL).port) || 4055;
+    add(new URL(SORTER_URL).port);
+  } catch {}
+
+  for (let i = 0; i < 10; i += 1) add(configPort + i);
+
+  return ports;
+}
+
+async function testSorterPort(port) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1200);
+  try {
+    const headers = getSorterApiKey() ? { Authorization: `Bearer ${getSorterApiKey()}` } : {};
+    const resp = await fetch(`http://localhost:${port}/api/status`, {
+      signal: controller.signal,
+      headers,
+    });
+    return resp.ok;
   } catch {
-    return 4055;
+    return false;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+async function resolveSorterPort() {
+  const candidates = sorterPortCandidates();
+  for (const port of candidates) {
+    if (await testSorterPort(port)) return port;
+  }
+  return candidates[0] || 4055;
 }
 
 async function sorterOnline(port) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 1500);
   try {
-    const headers = process.env.HIVE_API_KEY ? { Authorization: `Bearer ${process.env.HIVE_API_KEY}` } : {};
+    const headers = getSorterApiKey() ? { Authorization: `Bearer ${getSorterApiKey()}` } : {};
     const resp = await fetch(`http://localhost:${port}/api/status`, {
       signal: controller.signal,
       headers,
@@ -239,15 +286,20 @@ async function sorterOnline(port) {
 app.get("/api/sorter-available", async (req, res) => {
   const enabled = process.env.SORTER_ENABLED !== "false";
   const installed = enabled && fsSync.existsSync(SORTER_DIR);
-  const online = installed && (await sorterOnline(sorterPort()));
-  res.json({ available: installed, online, url: SORTER_URL });
+  const port = installed ? await resolveSorterPort() : null;
+  const online = installed && (await sorterOnline(port || 0));
+  res.json({ available: installed, online, url: port ? `http://localhost:${port}` : SORTER_URL });
 });
 
 app.use("/api/sorter", express.raw({ type: "*/*", limit: "2mb" }), async (req, res) => {
   try {
-    const resp = await fetch(`http://localhost:${sorterPort()}/api${req.url}`, {
+    const port = await resolveSorterPort();
+    const headers = { "Content-Type": req.get("content-type") || "application/json" };
+    const apiKey = getSorterApiKey();
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    const resp = await fetch(`http://localhost:${port}/api${req.url}`, {
       method: req.method,
-      headers: { "Content-Type": req.get("content-type") || "application/json" },
+      headers,
       body: ["GET", "HEAD"].includes(req.method) || !req.body?.length ? undefined : req.body,
     });
     const text = await resp.text();
@@ -509,7 +561,8 @@ async function readDiskUsage(basePath) {
 
 async function buildCloudSystemStatus() {
   const hiveOk = await hive.ping();
-  const sorterRunning = fsSync.existsSync(SORTER_DIR) && (await sorterOnline(sorterPort()));
+  const sorterPort = fsSync.existsSync(SORTER_DIR) ? await resolveSorterPort() : 0;
+  const sorterRunning = fsSync.existsSync(SORTER_DIR) && (await sorterOnline(sorterPort));
   const disk = await readDiskUsage(process.env.HIVE_ROOT || localHiveRoot || WORKSPACE_ROOT);
   return {
     panel: {
@@ -536,7 +589,7 @@ async function buildCloudSystemStatus() {
       exists: fsSync.existsSync(SORTER_DIR),
       running: sorterRunning,
       status: sorterRunning ? "Running" : "Stopped",
-      url: `http://127.0.0.1:${sorterPort()}`,
+      url: sorterPort ? `http://127.0.0.1:${sorterPort}` : SORTER_URL,
     },
     disk,
     cloudMode: true,
