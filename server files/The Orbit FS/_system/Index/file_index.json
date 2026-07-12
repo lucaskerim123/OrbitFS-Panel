@@ -1,0 +1,564 @@
+{
+  "project": "Project FireStorm - The Master Hive",
+  "root": "C:\\Project FireStorm\\The Master Hive",
+  "generated_utc": "2026-07-10T11:19:02.207178+00:00",
+  "archive_excluded": true,
+  "total_files": 34,
+  "counts_by_system": {
+    "system": 15,
+    "core": 8,
+    "legal": 10,
+    "master_hive_root": 1
+  },
+  "load_first_folders": [
+    "0. Core"
+  ],
+  "latest_files": [
+    {
+      "path": "_system/chatgpt_mcp_instructions.md",
+      "name": "chatgpt_mcp_instructions.md",
+      "extension": ".md",
+      "size_bytes": 3145,
+      "modified_utc": "2026-07-10T11:18:57.540683+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/00_MASTER_STARTUP.md",
+      "name": "00_MASTER_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 1220,
+      "modified_utc": "2026-07-10T11:18:43.023439+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/02_MENTAL_HEALTH_SYSTEM_STARTUP.md",
+      "name": "02_MENTAL_HEALTH_SYSTEM_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 4623,
+      "modified_utc": "2026-07-10T11:18:31.971804+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/01_COURT_SYSTEM_STARTUP.md",
+      "name": "01_COURT_SYSTEM_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 5260,
+      "modified_utc": "2026-07-10T11:18:21.313358+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Rules/load_order.md",
+      "name": "load_order.md",
+      "extension": ".md",
+      "size_bytes": 1245,
+      "modified_utc": "2026-07-10T11:18:06.340167+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Rules/project_rules.md",
+      "name": "project_rules.md",
+      "extension": ".md",
+      "size_bytes": 2052,
+      "modified_utc": "2026-07-10T11:17:56.195243+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Rules/saving_rules.md",
+      "name": "saving_rules.md",
+      "extension": ".md",
+      "size_bytes": 2780,
+      "modified_utc": "2026-07-10T11:17:47.613218+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/03_MEDIA_STARTUP.md",
+      "name": "03_MEDIA_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 493,
+      "modified_utc": "2026-07-10T11:14:50.828578+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Rules/commands.md",
+      "name": "commands.md",
+      "extension": ".md",
+      "size_bytes": 5217,
+      "modified_utc": "2026-07-10T11:13:09.922603+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/project_rules.md",
+      "name": "project_rules.md",
+      "extension": ".md",
+      "size_bytes": 1729,
+      "modified_utc": "2026-07-10T11:01:47.195838+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/load_order.md",
+      "name": "load_order.md",
+      "extension": ".md",
+      "size_bytes": 1222,
+      "modified_utc": "2026-07-10T11:01:47.190824+00:00",
+      "system": "system"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Relationship_Timeline.md",
+      "name": "Master_Relationship_Timeline.md",
+      "extension": ".md",
+      "size_bytes": 37,
+      "modified_utc": "2026-07-10T11:00:44.058549+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v3.md",
+      "name": "Master_Incident_Log_v3.md",
+      "extension": ".md",
+      "size_bytes": 31,
+      "modified_utc": "2026-07-10T11:00:44.053565+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v2.md",
+      "name": "Master_Incident_Log_v2.md",
+      "extension": ".md",
+      "size_bytes": 31,
+      "modified_utc": "2026-07-10T11:00:44.019617+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v1.md",
+      "name": "Master_Incident_Log_v1.md",
+      "extension": ".md",
+      "size_bytes": 31,
+      "modified_utc": "2026-07-10T11:00:44.013421+00:00",
+      "system": "core"
+    },
+    {
+      "path": "1. Legal/Maintenance/path_update_notes.md",
+      "name": "path_update_notes.md",
+      "extension": ".md",
+      "size_bytes": 138,
+      "modified_utc": "2026-07-08T20:46:28.077539+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Maintenance/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 72,
+      "modified_utc": "2026-07-08T19:48:26.796192+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Imports/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 66,
+      "modified_utc": "2026-07-08T19:46:04.215074+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Reference Files/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 111,
+      "modified_utc": "2026-07-08T19:46:00.716360+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Documents/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 90,
+      "modified_utc": "2026-07-08T19:45:57.476462+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Key Dates/November - TikTok/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 94,
+      "modified_utc": "2026-07-08T19:45:53.802938+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Key Dates/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 93,
+      "modified_utc": "2026-07-08T19:45:49.897874+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/1. Addons/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 71,
+      "modified_utc": "2026-07-08T19:45:41.204002+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/0. Intake - Needs Review/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 167,
+      "modified_utc": "2026-07-08T19:45:37.439260+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 201,
+      "modified_utc": "2026-07-08T19:45:33.015582+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "0. Core/Master Logs/Mental_Health_Profiles_Core.docx",
+      "name": "Mental_Health_Profiles_Core.docx",
+      "extension": ".docx",
+      "size_bytes": 27432,
+      "modified_utc": "2026-07-08T19:25:12.818000+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Relationship_Timeline.docx",
+      "name": "Master_Relationship_Timeline.docx",
+      "extension": ".docx",
+      "size_bytes": 14545,
+      "modified_utc": "2026-07-08T19:24:46.772000+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v2.docx",
+      "name": "Master_Incident_Log_v2.docx",
+      "extension": ".docx",
+      "size_bytes": 17393,
+      "modified_utc": "2026-07-08T19:24:04.130000+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v1.docx",
+      "name": "Master_Incident_Log_v1.docx",
+      "extension": ".docx",
+      "size_bytes": 24656,
+      "modified_utc": "2026-07-08T19:23:15.093000+00:00",
+      "system": "core"
+    },
+    {
+      "path": "_sorter/pops_funeral_raw_entry_2026-07-04.txt",
+      "name": "pops_funeral_raw_entry_2026-07-04.txt",
+      "extension": ".txt",
+      "size_bytes": 4945,
+      "modified_utc": "2026-07-08T17:53:07.422476+00:00",
+      "system": "master_hive_root"
+    },
+    {
+      "path": "_system/Old System files /Case_Workflow_Startup_OLD.md",
+      "name": "Case_Workflow_Startup_OLD.md",
+      "extension": ".md",
+      "size_bytes": 9360,
+      "modified_utc": "2026-07-07T21:28:11.415182+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Old System files /Case_Workflow_Startup.md",
+      "name": "Case_Workflow_Startup.md",
+      "extension": ".md",
+      "size_bytes": 12758,
+      "modified_utc": "2026-07-07T21:28:10.675658+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/claude_mcp_instructions.md",
+      "name": "claude_mcp_instructions.md",
+      "extension": ".md",
+      "size_bytes": 16,
+      "modified_utc": "2026-07-07T20:43:28.412943+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/01_CASE_WORKFLOW_STARTUP.md",
+      "name": "01_CASE_WORKFLOW_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 5276,
+      "modified_utc": "2026-07-07T11:57:23.432335+00:00",
+      "system": "system"
+    }
+  ],
+  "all_files": [
+    {
+      "path": "_system/chatgpt_mcp_instructions.md",
+      "name": "chatgpt_mcp_instructions.md",
+      "extension": ".md",
+      "size_bytes": 3145,
+      "modified_utc": "2026-07-10T11:18:57.540683+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/00_MASTER_STARTUP.md",
+      "name": "00_MASTER_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 1220,
+      "modified_utc": "2026-07-10T11:18:43.023439+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/02_MENTAL_HEALTH_SYSTEM_STARTUP.md",
+      "name": "02_MENTAL_HEALTH_SYSTEM_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 4623,
+      "modified_utc": "2026-07-10T11:18:31.971804+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/01_COURT_SYSTEM_STARTUP.md",
+      "name": "01_COURT_SYSTEM_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 5260,
+      "modified_utc": "2026-07-10T11:18:21.313358+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Rules/load_order.md",
+      "name": "load_order.md",
+      "extension": ".md",
+      "size_bytes": 1245,
+      "modified_utc": "2026-07-10T11:18:06.340167+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Rules/project_rules.md",
+      "name": "project_rules.md",
+      "extension": ".md",
+      "size_bytes": 2052,
+      "modified_utc": "2026-07-10T11:17:56.195243+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Rules/saving_rules.md",
+      "name": "saving_rules.md",
+      "extension": ".md",
+      "size_bytes": 2780,
+      "modified_utc": "2026-07-10T11:17:47.613218+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/03_MEDIA_STARTUP.md",
+      "name": "03_MEDIA_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 493,
+      "modified_utc": "2026-07-10T11:14:50.828578+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Rules/commands.md",
+      "name": "commands.md",
+      "extension": ".md",
+      "size_bytes": 5217,
+      "modified_utc": "2026-07-10T11:13:09.922603+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/project_rules.md",
+      "name": "project_rules.md",
+      "extension": ".md",
+      "size_bytes": 1729,
+      "modified_utc": "2026-07-10T11:01:47.195838+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/load_order.md",
+      "name": "load_order.md",
+      "extension": ".md",
+      "size_bytes": 1222,
+      "modified_utc": "2026-07-10T11:01:47.190824+00:00",
+      "system": "system"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Relationship_Timeline.md",
+      "name": "Master_Relationship_Timeline.md",
+      "extension": ".md",
+      "size_bytes": 37,
+      "modified_utc": "2026-07-10T11:00:44.058549+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v3.md",
+      "name": "Master_Incident_Log_v3.md",
+      "extension": ".md",
+      "size_bytes": 31,
+      "modified_utc": "2026-07-10T11:00:44.053565+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v2.md",
+      "name": "Master_Incident_Log_v2.md",
+      "extension": ".md",
+      "size_bytes": 31,
+      "modified_utc": "2026-07-10T11:00:44.019617+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v1.md",
+      "name": "Master_Incident_Log_v1.md",
+      "extension": ".md",
+      "size_bytes": 31,
+      "modified_utc": "2026-07-10T11:00:44.013421+00:00",
+      "system": "core"
+    },
+    {
+      "path": "1. Legal/Maintenance/path_update_notes.md",
+      "name": "path_update_notes.md",
+      "extension": ".md",
+      "size_bytes": 138,
+      "modified_utc": "2026-07-08T20:46:28.077539+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Maintenance/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 72,
+      "modified_utc": "2026-07-08T19:48:26.796192+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Imports/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 66,
+      "modified_utc": "2026-07-08T19:46:04.215074+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Reference Files/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 111,
+      "modified_utc": "2026-07-08T19:46:00.716360+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Documents/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 90,
+      "modified_utc": "2026-07-08T19:45:57.476462+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Key Dates/November - TikTok/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 94,
+      "modified_utc": "2026-07-08T19:45:53.802938+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/Key Dates/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 93,
+      "modified_utc": "2026-07-08T19:45:49.897874+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/1. Addons/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 71,
+      "modified_utc": "2026-07-08T19:45:41.204002+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/0. Intake - Needs Review/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 167,
+      "modified_utc": "2026-07-08T19:45:37.439260+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "1. Legal/_folder_notes.md",
+      "name": "_folder_notes.md",
+      "extension": ".md",
+      "size_bytes": 201,
+      "modified_utc": "2026-07-08T19:45:33.015582+00:00",
+      "system": "legal"
+    },
+    {
+      "path": "0. Core/Master Logs/Mental_Health_Profiles_Core.docx",
+      "name": "Mental_Health_Profiles_Core.docx",
+      "extension": ".docx",
+      "size_bytes": 27432,
+      "modified_utc": "2026-07-08T19:25:12.818000+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Relationship_Timeline.docx",
+      "name": "Master_Relationship_Timeline.docx",
+      "extension": ".docx",
+      "size_bytes": 14545,
+      "modified_utc": "2026-07-08T19:24:46.772000+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v2.docx",
+      "name": "Master_Incident_Log_v2.docx",
+      "extension": ".docx",
+      "size_bytes": 17393,
+      "modified_utc": "2026-07-08T19:24:04.130000+00:00",
+      "system": "core"
+    },
+    {
+      "path": "0. Core/Master Logs/Master_Incident_Log_v1.docx",
+      "name": "Master_Incident_Log_v1.docx",
+      "extension": ".docx",
+      "size_bytes": 24656,
+      "modified_utc": "2026-07-08T19:23:15.093000+00:00",
+      "system": "core"
+    },
+    {
+      "path": "_sorter/pops_funeral_raw_entry_2026-07-04.txt",
+      "name": "pops_funeral_raw_entry_2026-07-04.txt",
+      "extension": ".txt",
+      "size_bytes": 4945,
+      "modified_utc": "2026-07-08T17:53:07.422476+00:00",
+      "system": "master_hive_root"
+    },
+    {
+      "path": "_system/Old System files /Case_Workflow_Startup_OLD.md",
+      "name": "Case_Workflow_Startup_OLD.md",
+      "extension": ".md",
+      "size_bytes": 9360,
+      "modified_utc": "2026-07-07T21:28:11.415182+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Old System files /Case_Workflow_Startup.md",
+      "name": "Case_Workflow_Startup.md",
+      "extension": ".md",
+      "size_bytes": 12758,
+      "modified_utc": "2026-07-07T21:28:10.675658+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/claude_mcp_instructions.md",
+      "name": "claude_mcp_instructions.md",
+      "extension": ".md",
+      "size_bytes": 16,
+      "modified_utc": "2026-07-07T20:43:28.412943+00:00",
+      "system": "system"
+    },
+    {
+      "path": "_system/Startup/01_CASE_WORKFLOW_STARTUP.md",
+      "name": "01_CASE_WORKFLOW_STARTUP.md",
+      "extension": ".md",
+      "size_bytes": 5276,
+      "modified_utc": "2026-07-07T11:57:23.432335+00:00",
+      "system": "system"
+    }
+  ]
+}
