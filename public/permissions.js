@@ -146,9 +146,9 @@ function addPermissionButton(container, filepath, permissions) {
   container.appendChild(btn);
 }
 
-const permissionBaseRenderRow = renderRow;
+const baseRenderRow = renderRow;
 renderRow = function renderRowWithPermissions(list, entry) {
-  permissionBaseRenderRow(list, entry);
+  baseRenderRow(list, entry);
   if (!isAdminUser()) return;
   const li = list.lastElementChild;
   const actions = li?.querySelector(".row-actions");
@@ -156,41 +156,25 @@ renderRow = function renderRowWithPermissions(list, entry) {
   addPermissionButton(actions, full, entry.permissions);
 };
 
-const permissionBaseLoadSystem = loadSystem;
+const baseLoadSystem = loadSystem;
 loadSystem = async function loadSystemWithPermissions() {
-  await permissionBaseLoadSystem();
+  await baseLoadSystem();
   await loadPermissions();
 };
 
 document.getElementById("editor-permission-btn")?.addEventListener("click", () => state.openFile && openPermissionEditor(state.openFile));
 document.getElementById("preview-permission-btn")?.addEventListener("click", () => state.previewFile && openPermissionEditor(state.previewFile));
 
-const permissionBaseOpenFile = openFile;
+const baseOpenFile = openFile;
 openFile = async function openFileWithPermissionButton(filepath) {
-  await permissionBaseOpenFile(filepath);
+  await baseOpenFile(filepath);
   document.getElementById("editor-permission-btn")?.classList.toggle("hidden", !isAdminUser());
 };
 
-const permissionBaseOpenPreview = openPreview;
+const baseOpenPreview = openPreview;
 openPreview = async function openPreviewWithPermissionButton(filepath, entry) {
-  await permissionBaseOpenPreview(filepath, entry);
+  await baseOpenPreview(filepath, entry);
   document.getElementById("preview-permission-btn")?.classList.toggle("hidden", !isAdminUser());
 };
 
 if (isAdminUser()) loadPermissions();
-
-// Optional workspace layer: dashboard, upload, context management, file tree and AI draft actions.
-const workspaceStyle = document.createElement("link");
-workspaceStyle.rel = "stylesheet";
-workspaceStyle.href = "workspace.css";
-document.head.appendChild(workspaceStyle);
-const workspaceScript = document.createElement("script");
-workspaceScript.src = "workspace.js";
-workspaceScript.async = false;
-workspaceScript.addEventListener("load", () => {
-  const fixes = document.createElement("script");
-  fixes.src = "workspace-fixes.js";
-  fixes.async = false;
-  document.body.appendChild(fixes);
-});
-document.body.appendChild(workspaceScript);
