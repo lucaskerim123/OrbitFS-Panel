@@ -93,6 +93,35 @@ function Ensure-File([string]$FilePath, [string]$Content) {
   else { Set-Content -LiteralPath $FilePath -Value $Content -Encoding UTF8; Write-Ok "created $FilePath" }
 }
 
+function Copy-MissingTree([string]$SourceRoot, [string]$DestRoot) {
+  if (-not (Test-Path -LiteralPath $SourceRoot)) {
+    Write-Skip "$SourceRoot not found - skipping bundled content copy"
+    return
+  }
+  Get-ChildItem -LiteralPath $SourceRoot -Recurse -Force | ForEach-Object {
+    $relative = $_.FullName.Substring($SourceRoot.Length).TrimStart('\')
+    if (-not $relative) { return }
+    $dest = Join-Path $DestRoot $relative
+    if ($_.PSIsContainer) {
+      if (-not (Test-Path -LiteralPath $dest)) {
+        New-Item -ItemType Directory -Path $dest -Force | Out-Null
+        Write-Ok "created $dest"
+      }
+      return
+    }
+    if (-not (Test-Path -LiteralPath $dest)) {
+      $parent = Split-Path -Parent $dest
+      if ($parent -and -not (Test-Path -LiteralPath $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+      }
+      Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
+      Write-Ok "seeded $dest"
+    } else {
+      Write-Skip "$dest already exists"
+    }
+  }
+}
+
 function Invoke-Git([string[]]$GitArgs, [string]$WorkDir) {
   # WorkDir must be absolute by the time this runs - Resolve-CodeDir below
   # guarantees that. Cloning happens FROM WorkDir with an absolute -Dest
@@ -215,7 +244,11 @@ Ensure-Dir (Join-Path $systemDir "Startup")
 Ensure-Dir (Join-Path $systemDir "Rules")
 Ensure-Dir (Join-Path $systemDir "Index")
 
-$note = "<!-- placeholder created by Install-OrbitFS.ps1 - replace with real content -->`n"
+$bundledHiveRoot = Join-Path $PanelDir "server files\The Orbit FS"
+Write-Step "Seeding bundled Hive content from $bundledHiveRoot"
+Copy-MissingTree -SourceRoot $bundledHiveRoot -DestRoot $HiveDataRoot
+
+$note = "<!-- placeholder created by Install-OrbitFS.ps1 because bundled _system content was missing -->`n"
 Ensure-File (Join-Path $systemDir "Startup\00_MASTER_STARTUP.md") "$note# Master Startup`n"
 Ensure-File (Join-Path $systemDir "Startup\01_COURT_SYSTEM_STARTUP.md") "$note# Court System Startup`n"
 Ensure-File (Join-Path $systemDir "Startup\02_MENTAL_HEALTH_SYSTEM_STARTUP.md") "$note# Mental Health System Startup`n"

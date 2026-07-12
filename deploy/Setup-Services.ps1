@@ -117,8 +117,8 @@ if (-not $CodeDir) {
   $CodeDir = Read-PathWithDefault "Where is OrbitFS installed (the folder holding orbitfs-mcp and orbitfs-panel)?" "F:\"
 }
 $HiveServerDir = Join-Path $CodeDir "orbitfs-mcp"
-$SorterDir = Join-Path $PanelDir "plugins\OrbitFS Sorter"
 $PanelDir = Join-Path $CodeDir "orbitfs-panel"
+$SorterDir = Join-Path $PanelDir "plugins\OrbitFS Sorter"
 
 foreach ($check in @(
   @{ Path = $HiveServerDir; Label = "MCP server" },

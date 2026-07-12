@@ -46,8 +46,9 @@ cd orbitfs-panel\deploy
 ## 2. Run the installer - it asks where you want everything
 
 This is the one script that sets everything up: clones the MCP server repo,
-creates the shared file folders it expects, generates `.env` for both repos
-with a fresh API key, and runs `npm install` in both.
+creates the shared file folders it expects, seeds the bundled `_system`
+startup/rules/instructions content that ships with the panel repo, generates
+`.env` for both repos with a fresh API key, and runs `npm install` in both.
 
 ```powershell
 .\Install-OrbitFS.ps1
