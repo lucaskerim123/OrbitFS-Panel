@@ -216,7 +216,11 @@ async function sorterOnline(port) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 1500);
   try {
-    const resp = await fetch(`http://localhost:${port}/api/status`, { signal: controller.signal });
+    const headers = process.env.HIVE_API_KEY ? { Authorization: `Bearer ${process.env.HIVE_API_KEY}` } : {};
+    const resp = await fetch(`http://localhost:${port}/api/status`, {
+      signal: controller.signal,
+      headers,
+    });
     return resp.ok;
   } catch {
     return false;
