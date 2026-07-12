@@ -146,9 +146,9 @@ function addPermissionButton(container, filepath, permissions) {
   container.appendChild(btn);
 }
 
-const baseRenderRow = renderRow;
+const permissionBaseRenderRow = renderRow;
 renderRow = function renderRowWithPermissions(list, entry) {
-  baseRenderRow(list, entry);
+  permissionBaseRenderRow(list, entry);
   if (!isAdminUser()) return;
   const li = list.lastElementChild;
   const actions = li?.querySelector(".row-actions");
@@ -156,24 +156,24 @@ renderRow = function renderRowWithPermissions(list, entry) {
   addPermissionButton(actions, full, entry.permissions);
 };
 
-const baseLoadSystem = loadSystem;
+const permissionBaseLoadSystem = loadSystem;
 loadSystem = async function loadSystemWithPermissions() {
-  await baseLoadSystem();
+  await permissionBaseLoadSystem();
   await loadPermissions();
 };
 
 document.getElementById("editor-permission-btn")?.addEventListener("click", () => state.openFile && openPermissionEditor(state.openFile));
 document.getElementById("preview-permission-btn")?.addEventListener("click", () => state.previewFile && openPermissionEditor(state.previewFile));
 
-const baseOpenFile = openFile;
+const permissionBaseOpenFile = openFile;
 openFile = async function openFileWithPermissionButton(filepath) {
-  await baseOpenFile(filepath);
+  await permissionBaseOpenFile(filepath);
   document.getElementById("editor-permission-btn")?.classList.toggle("hidden", !isAdminUser());
 };
 
-const baseOpenPreview = openPreview;
+const permissionBaseOpenPreview = openPreview;
 openPreview = async function openPreviewWithPermissionButton(filepath, entry) {
-  await baseOpenPreview(filepath, entry);
+  await permissionBaseOpenPreview(filepath, entry);
   document.getElementById("preview-permission-btn")?.classList.toggle("hidden", !isAdminUser());
 };
 
@@ -187,4 +187,10 @@ document.head.appendChild(workspaceStyle);
 const workspaceScript = document.createElement("script");
 workspaceScript.src = "workspace.js";
 workspaceScript.async = false;
+workspaceScript.addEventListener("load", () => {
+  const fixes = document.createElement("script");
+  fixes.src = "workspace-fixes.js";
+  fixes.async = false;
+  document.body.appendChild(fixes);
+});
 document.body.appendChild(workspaceScript);
