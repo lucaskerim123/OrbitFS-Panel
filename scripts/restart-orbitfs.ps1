@@ -63,7 +63,7 @@ function Stop-PortListeners {
 
             $process = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
             $processName = if ($process) { $process.ProcessName } else { "unknown" }
-            Write-Host "Killing stale listener on port $port: PID $pidValue ($processName)"
+            Write-Host "Killing stale listener on port ${port}: PID $pidValue ($processName)"
             Stop-Process -Id $pidValue -Force -ErrorAction SilentlyContinue
         }
     }
