@@ -349,7 +349,7 @@ function renderRow(list, entry) {
   mv.className = "icon-btn";
   mv.textContent = "↦";
   mv.title = "Move / rename";
-  mv.addEventListener("click", (e) => { e.stopPropagation(); movePrompt(full); });
+  mv.addEventListener("click", (e) => { e.stopPropagation(); openMovePicker(full); });
   actions.appendChild(mv);
   if (isProtectedRootFolderPath(full, entry.type)) actions.querySelector(".icon-btn")?.remove();
 
@@ -848,8 +848,8 @@ document.getElementById("save-file-btn").addEventListener("click", async () => {
 document.getElementById("editor-download-btn").addEventListener("click", () => state.openFile && downloadFile(state.openFile));
 document.getElementById("delete-file-btn").addEventListener("click", () => state.openFile && trashPath(state.openFile, closeAllPanels));
 document.getElementById("preview-delete-btn").addEventListener("click", () => state.previewFile && trashPath(state.previewFile, closeAllPanels));
-document.getElementById("move-file-btn").addEventListener("click", () => state.openFile && movePrompt(state.openFile, closeAllPanels));
-document.getElementById("preview-move-btn").addEventListener("click", () => state.previewFile && movePrompt(state.previewFile, closeAllPanels));
+document.getElementById("move-file-btn").addEventListener("click", () => state.openFile && openMovePicker(state.openFile, closeAllPanels));
+document.getElementById("preview-move-btn").addEventListener("click", () => state.previewFile && openMovePicker(state.previewFile, closeAllPanels));
 document.getElementById("preview-download-btn").addEventListener("click", () => state.previewFile && downloadFile(state.previewFile));
 
 async function trashPath(filepath, onDone) {
@@ -867,21 +867,119 @@ async function trashPath(filepath, onDone) {
   }
 }
 
-async function movePrompt(filepath, onDone) {
-  const dest = prompt("Move / rename to:", filepath);
-  if (!dest || dest === filepath) return;
+const movePicker = { source: "", folder: "", onDone: null, folders: [] };
+
+function movePickerDestination() {
+  const name = document.getElementById("move-picker-name").value.trim();
+  return movePicker.folder ? `${movePicker.folder}/${name}` : name;
+}
+
+function updateMovePickerDestination() {
+  document.getElementById("move-picker-destination").textContent = `/${movePickerDestination()}`;
+}
+
+function renderMovePickerBreadcrumbs() {
+  const wrap = document.getElementById("move-picker-breadcrumbs");
+  wrap.innerHTML = "";
+  const parts = movePicker.folder ? movePicker.folder.split("/") : [];
+  const root = Object.assign(document.createElement("button"), { type: "button", textContent: "🏠 Hive" });
+  root.addEventListener("click", () => loadMovePickerFolder(""));
+  wrap.appendChild(root);
+  parts.forEach((part, index) => {
+    wrap.appendChild(Object.assign(document.createElement("span"), { textContent: "›" }));
+    const button = Object.assign(document.createElement("button"), { type: "button", textContent: part });
+    button.addEventListener("click", () => loadMovePickerFolder(parts.slice(0, index + 1).join("/")));
+    wrap.appendChild(button);
+  });
+}
+
+function renderMovePickerFolders() {
+  const list = document.getElementById("move-picker-folders");
+  const query = document.getElementById("move-picker-filter").value.trim().toLowerCase();
+  const folders = movePicker.folders.filter((entry) => !query || entry.name.toLowerCase().includes(query));
+  list.innerHTML = "";
+  if (!folders.length) {
+    list.appendChild(Object.assign(document.createElement("li"), { className: "empty", textContent: query ? "No matching folders." : "No folders here." }));
+    return;
+  }
+  folders.forEach((entry) => {
+    const li = document.createElement("li");
+    const button = Object.assign(document.createElement("button"), { type: "button", textContent: `📁 ${entry.name}` });
+    button.addEventListener("click", () => loadMovePickerFolder(movePicker.folder ? `${movePicker.folder}/${entry.name}` : entry.name));
+    li.appendChild(button);
+    list.appendChild(li);
+  });
+}
+
+async function loadMovePickerFolder(folder) {
+  movePicker.folder = folder;
+  document.getElementById("move-picker-error").textContent = "";
+  document.getElementById("move-picker-folders").innerHTML = '<li class="empty">Loading folders…</li>';
+  renderMovePickerBreadcrumbs();
+  updateMovePickerDestination();
+  try {
+    const { entries } = await api(`/api/files?subpath=${encodeURIComponent(folder)}`);
+    movePicker.folders = entries.filter((entry) => entry.type === "dir").sort((a, b) => a.name.localeCompare(b.name));
+    renderMovePickerFolders();
+  } catch (err) {
+    movePicker.folders = [];
+    document.getElementById("move-picker-error").textContent = err.message;
+    renderMovePickerFolders();
+  }
+}
+
+function closeMovePicker() {
+  document.getElementById("move-picker-overlay").classList.add("hidden");
+  movePicker.source = "";
+  movePicker.onDone = null;
+}
+
+function openMovePicker(filepath, onDone) {
+  const parts = filepath.split("/");
+  const name = parts.pop();
+  movePicker.source = filepath;
+  movePicker.onDone = onDone || null;
+  document.getElementById("move-picker-source").textContent = `Moving: ${name}`;
+  document.getElementById("move-picker-name").value = name;
+  document.getElementById("move-picker-filter").value = "";
+  document.getElementById("move-picker-overlay").classList.remove("hidden");
+  loadMovePickerFolder(parts.join("/"));
+}
+
+document.getElementById("move-picker-up").addEventListener("click", () => {
+  if (!movePicker.folder) return;
+  loadMovePickerFolder(movePicker.folder.split("/").slice(0, -1).join("/"));
+});
+document.getElementById("move-picker-filter").addEventListener("input", renderMovePickerFolders);
+document.getElementById("move-picker-name").addEventListener("input", updateMovePickerDestination);
+document.getElementById("move-picker-cancel").addEventListener("click", closeMovePicker);
+document.getElementById("move-picker-overlay").addEventListener("click", (event) => {
+  if (event.target.id === "move-picker-overlay") closeMovePicker();
+});
+document.getElementById("move-picker-confirm").addEventListener("click", async () => {
+  const destination = movePickerDestination();
+  const error = document.getElementById("move-picker-error");
+  if (!destination) return void (error.textContent = "Enter a file or folder name.");
+  if (destination === movePicker.source) return closeMovePicker();
+  const button = document.getElementById("move-picker-confirm");
+  button.disabled = true;
+  error.textContent = "";
   try {
     await api("/api/move", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from: filepath, to: dest }),
+      body: JSON.stringify({ from: movePicker.source, to: destination }),
     });
+    const onDone = movePicker.onDone;
+    closeMovePicker();
     onDone?.();
     loadFiles();
   } catch (err) {
-    alert(err.message);
+    error.textContent = err.message;
+  } finally {
+    button.disabled = false;
   }
-}
+});
 
 async function downloadFile(filepath) {
   try {
