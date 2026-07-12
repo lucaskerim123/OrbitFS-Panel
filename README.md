@@ -33,27 +33,28 @@ It is the operator UI for the shared Hive server and covers:
 
 ## What it talks to
 
-- `orbitfs-mcp-server` over REST (`/api/*`)
+- `orbitfs-mcp` over REST (`/api/*`)
 - The same server's MCP endpoint for Claude and ChatGPT clients
-- The shared FireStorm file root at `C:\Project FireStorm\The Master Hive`
-- `orbitfs-sorter` (optional, its own service) for the Sort feature
+- The shared FireStorm file root, wherever you chose to put it
+- The sorter (optional, its own service) for the Sort feature
 
 ## Setup on a new machine
 
-New machine, nothing installed yet? Run `deploy/Install-BaseStructure.ps1`
-- it creates the shared Hive file folders, generates `.env` for this repo
-and for `orbitfs-mcp-server`, and runs `npm install` for both. Full
-walkthrough in [GETTING_STARTED.md](GETTING_STARTED.md).
+New machine, nothing installed yet? Run `deploy/Install-OrbitFS.ps1`
+- it asks where you want the code and the data folder (or takes
+`-CodeDir`/`-HiveDataRoot` params), clones `orbitfs-mcp` for you, creates
+the shared file folders, generates `.env` for both repos, and runs
+`npm install` for both. Full walkthrough in
+[GETTING_STARTED.md](GETTING_STARTED.md).
 
-Short version, once both repos are cloned:
+Short version:
 
-1. Install Node.js.
-2. Clone this repo (and `orbitfs-mcp-server`, as a sibling folder).
-3. Run `npm install`.
-4. Copy `.env.example` to `.env`.
-5. Set `HIVE_URL` to the Hive server, usually `http://localhost:3939`.
-6. Set `HIVE_API_KEY` to the same value used by the Hive server.
-7. Create the first user with `node scripts/add-user.mjs <username> <pin>`.
+1. Install Node.js and Git.
+2. Clone this repo.
+3. Run `cd deploy; .\Install-OrbitFS.ps1` and answer the two location
+   prompts (or pass `-CodeDir`/`-HiveDataRoot`).
+4. Set `PUBLIC_BASE_URL` in the generated `orbitfs-mcp\.env`.
+5. Create the first user with `node scripts/add-user.mjs <username> <pin>`.
 8. Start the panel with `npm start`.
 
 ## Roles
@@ -70,6 +71,8 @@ Short version, once both repos are cloned:
 
 ## Windows service / reverse proxy
 
-The `deploy/Setup-IIS.ps1` script can install and wire the panel as a service behind IIS.
-The System tab can also restart the panel, Hive server, and tunnel on Windows.
+The `deploy/Setup-Services.ps1` script installs the panel, MCP server, sorter,
+and Cloudflare tunnel as Windows services (NSSM), and wires the panel behind
+an IIS reverse proxy - see [GETTING_STARTED.md](GETTING_STARTED.md).
+The System tab can also restart the panel, MCP server, and tunnel on Windows.
 

@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs/promises";
 import fsSync from "fs";
-import { execFile, spawn, exec } from "child_process";
+import { execFile, spawn } from "child_process";
 import { Readable } from "stream";
 import { makeHiveClient } from "./hive-client.js";
 import { verifyLogin, validateSession, invalidateSession, listUsers, upsertUser, removeUser } from "./auth.js";
@@ -238,7 +238,7 @@ app.use("/api/sorter", express.raw({ type: "*/*", limit: "2mb" }), async (req, r
 });
 
 // --- Files -------------------------------------------------------------
-// Thin passthrough to the Hive node's own REST API (see mcp-hive-server),
+// Thin passthrough to the OrbitFS MCP node's own REST API (see orbitfs-mcp),
 // except upload/download which stream raw bytes rather than round-tripping
 // through JSON, so this handles any file type/size sanely.
 // File permissions are intentionally basic: default user access, with optional

@@ -23,7 +23,7 @@ const HIVE_SUBFOLDER_NAME = "The Master Hive";
 // doesn't exist yet, starts from `templatePath` (usually .env.example).
 // Existing keys not in `overrides` are left untouched; keys in `overrides`
 // replace the existing line, or are appended if missing entirely. Mirrors
-// deploy/Install-BaseStructure.ps1's approach so both the CLI and UI paths
+// deploy/Install-OrbitFS.ps1's approach so both the CLI and UI paths
 // produce the same shape of .env.
 async function upsertEnvFile(envPath, templatePath, overrides) {
   let content;
