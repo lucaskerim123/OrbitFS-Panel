@@ -421,10 +421,10 @@
 
         <details class="card" open>
           <summary>File permissions</summary>
-          <p class="muted-text">Default is User. Add an Admin override to hide a file/folder from normal users.</p>
+          <p class="muted-text">Customize what users can do per file or folder. Folder rules inherit downward; a more specific rule overrides them. Admin always has every action.</p>
           <div class="table-scroll">
             <table id="permissions-table">
-              <thead><tr><th>Path</th><th>Role</th><th></th></tr></thead>
+              <thead><tr><th>Path</th><th>User actions</th><th></th></tr></thead>
               <tbody id="permissions-body"></tbody>
             </table>
           </div>
