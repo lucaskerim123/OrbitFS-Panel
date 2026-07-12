@@ -858,6 +858,23 @@ table.data-table tr:hover td { background: var(--bg); }
 .sort-modal-row.new-folder .sort-dest-badge { color: var(--accent); font-size: 0.75rem; white-space: nowrap; }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.75rem; }
+
+.move-picker-box { max-width: 560px; }
+.move-picker-source { margin: 0.25rem 0 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+.move-picker-breadcrumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; margin-bottom: 0.65rem; }
+.move-picker-breadcrumbs button { padding: 0.3rem 0.45rem; font-size: 0.78rem; }
+.move-picker-breadcrumbs span { color: var(--muted); }
+.move-picker-toolbar { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; margin-bottom: 0.65rem; }
+.move-picker-folders { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); max-height: 38vh; overflow-y: auto; background: var(--bg); }
+.move-picker-folders li { border-bottom: 1px solid var(--border); }
+.move-picker-folders li:last-child { border-bottom: 0; }
+.move-picker-folders button { width: 100%; border: 0; border-radius: 0; background: transparent; text-align: left; padding: 0.7rem 0.8rem; }
+.move-picker-folders button:hover { background: var(--panel); }
+.move-picker-folders .empty { padding: 0.8rem; color: var(--muted); }
+.move-picker-name-label { display: block; margin-top: 0.8rem; margin-bottom: 0.3rem; font-size: 0.8rem; color: var(--muted); }
+.move-picker-name-label + input { width: 100%; }
+.move-picker-destination { margin: 0.65rem 0 0; font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+.move-picker-destination strong { color: var(--text); }
 /* --- Sorter tab ------------------------------------------------------------ */
 /* Mirrors the Files tab components: .file-list-style cards, same row metrics
    (0.55/0.7rem padding, border-bottom separators, var(--bg) hover), global
