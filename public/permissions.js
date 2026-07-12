@@ -178,3 +178,9 @@ openPreview = async function openPreviewWithPermissionButton(filepath, entry) {
 };
 
 if (isAdminUser()) loadPermissions();
+
+// Optional workspace layer: dashboard, upload, context management, file tree and AI draft actions.
+const workspaceScript = document.createElement("script");
+workspaceScript.src = "workspace.js";
+workspaceScript.async = false;
+document.body.appendChild(workspaceScript);
