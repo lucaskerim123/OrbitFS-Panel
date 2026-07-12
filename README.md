@@ -5,6 +5,7 @@ Mobile-first admin panel for the Master Hive file server.
 It is the operator UI for the shared Hive server and covers:
 
 - File browsing, upload, download, move, rename, and sort operations
+  - Move/rename uses a visual folder browser with breadcrumbs and folder filtering; no destination path typing required
 - A full-featured file viewer/editor:
   - Code and text files: syntax-highlighted CodeMirror editor with an
     Edit/Read toggle (Read mode is the same highlighted buffer, locked),
@@ -83,4 +84,3 @@ The `deploy/Setup-Services.ps1` script installs the panel, MCP server, sorter,
 and Cloudflare tunnel as Windows services (NSSM), and wires the panel behind
 an IIS reverse proxy - see [GETTING_STARTED.md](GETTING_STARTED.md).
 The System tab can also restart the panel, MCP server, and tunnel on Windows.
-
