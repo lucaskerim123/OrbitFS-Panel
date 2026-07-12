@@ -1,5 +1,15 @@
 {
   "rules": [
-    { "path": "2. Wellbeing/Pure Vent Mode", "role": "admin" }
+    {
+      "path": "2. Wellbeing/Pure Vent Mode",
+      "permissions": {
+        "read": false,
+        "write": false,
+        "download": false,
+        "move": false,
+        "delete": false,
+        "create": false
+      }
+    }
   ]
 }
