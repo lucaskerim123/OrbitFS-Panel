@@ -19,3 +19,4 @@ jobs:
           node --check public/app.js
           node --check public/permissions.js
           node --check public/workspace.js
+          node --check public/workspace-fixes.js
