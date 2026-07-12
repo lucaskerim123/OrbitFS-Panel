@@ -1,5 +1,22 @@
+const FILE_PERMISSION_ACTIONS = ["read", "write", "download", "move", "delete", "create"];
+const FILE_PERMISSION_LABELS = {
+  read: "View / read",
+  write: "Edit / write",
+  download: "Download",
+  move: "Move / rename",
+  delete: "Delete / trash",
+  create: "Create / upload",
+};
+
 function isAdminUser() {
   return state.role === "admin";
+}
+
+function permissionSummary(permissions = {}) {
+  const allowed = FILE_PERMISSION_ACTIONS.filter((action) => permissions[action]);
+  if (allowed.length === FILE_PERMISSION_ACTIONS.length) return "All user actions";
+  if (!allowed.length) return "Admin only";
+  return allowed.map((action) => FILE_PERMISSION_LABELS[action]).join(", ");
 }
 
 async function loadPermissions() {
@@ -13,61 +30,110 @@ async function loadPermissions() {
       const tr = document.createElement("tr");
       const pathTd = document.createElement("td");
       pathTd.textContent = rule.path || "/";
-      const roleTd = document.createElement("td");
-      roleTd.innerHTML = `<span class="permission-badge ${rule.role}">${rule.role}</span>`;
+      const permissionTd = document.createElement("td");
+      permissionTd.className = "permission-summary-cell";
+      permissionTd.textContent = permissionSummary(rule.permissions);
       const actionTd = document.createElement("td");
-      const clear = document.createElement("button");
-      clear.className = "icon-btn";
-      clear.textContent = "↺";
-      clear.title = "Reset to user";
+      const edit = Object.assign(document.createElement("button"), { className: "icon-btn", textContent: "⚙", title: "Edit permissions" });
+      edit.addEventListener("click", () => openPermissionEditor(rule.path, rule.permissions));
+      const clear = Object.assign(document.createElement("button"), { className: "icon-btn", textContent: "↺", title: "Restore inherited permissions" });
       clear.addEventListener("click", async () => {
-        if (!confirm(`Reset '${rule.path || "/"}' to User access?`)) return;
+        if (!confirm(`Remove the custom permission rule for '${rule.path || "/"}' and inherit from its parent?`)) return;
         await api(`/api/file-permissions?path=${encodeURIComponent(rule.path)}`, { method: "DELETE" });
         await loadPermissions();
         await loadFiles();
       });
-      actionTd.appendChild(clear);
-      tr.append(pathTd, roleTd, actionTd);
+      actionTd.append(edit, clear);
+      tr.append(pathTd, permissionTd, actionTd);
       body.appendChild(tr);
     });
-    if (!rules.length) body.innerHTML = `<tr><td colspan="3">(no overrides - users can access all files)</td></tr>`;
+    if (!rules.length) body.innerHTML = `<tr><td colspan="3">(no overrides — users can perform all actions)</td></tr>`;
   } catch (err) {
     console.error(err);
   }
 }
 
-async function setPermissionPrompt(filepath) {
+function ensurePermissionEditor() {
+  let overlay = document.getElementById("permission-editor-overlay");
+  if (overlay) return overlay;
+  overlay = document.createElement("div");
+  overlay.id = "permission-editor-overlay";
+  overlay.className = "modal-overlay hidden";
+  overlay.innerHTML = `
+    <div class="modal-box permission-editor-box" role="dialog" aria-modal="true" aria-labelledby="permission-editor-title">
+      <h2 id="permission-editor-title">User permissions</h2>
+      <p id="permission-editor-path" class="muted-text"></p>
+      <p class="muted-text">Folder permissions automatically apply to everything inside unless a more specific file or subfolder rule overrides them. Admin always has every action.</p>
+      <div id="permission-editor-actions" class="permission-action-grid"></div>
+      <p id="permission-editor-error" class="error"></p>
+      <div class="modal-actions">
+        <button type="button" id="permission-preset-read">Read only</button>
+        <button type="button" id="permission-preset-none">Admin only</button>
+        <button type="button" id="permission-editor-cancel">Cancel</button>
+        <button type="button" id="permission-editor-save" class="primary">Save permissions</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (event) => { if (event.target === overlay) overlay.classList.add("hidden"); });
+  overlay.querySelector("#permission-editor-cancel").addEventListener("click", () => overlay.classList.add("hidden"));
+  overlay.querySelector("#permission-preset-read").addEventListener("click", () => setEditorChecks({ read: true }));
+  overlay.querySelector("#permission-preset-none").addEventListener("click", () => setEditorChecks({}));
+  overlay.querySelector("#permission-editor-save").addEventListener("click", savePermissionEditor);
+  return overlay;
+}
+
+function setEditorChecks(allowed = {}) {
+  FILE_PERMISSION_ACTIONS.forEach((action) => {
+    const input = document.getElementById(`permission-action-${action}`);
+    if (input) input.checked = !!allowed[action];
+  });
+}
+
+function openPermissionEditor(filepath, current = null) {
   if (!isAdminUser()) return;
-  const choice = prompt(`Permission for:\n${filepath}\n\nType 'user' or 'admin':`, "admin");
-  if (!choice) return;
-  const role = choice.trim().toLowerCase();
-  if (!["user", "admin"].includes(role)) {
-    alert("Use 'user' or 'admin'.");
-    return;
-  }
+  const overlay = ensurePermissionEditor();
+  overlay.dataset.path = filepath;
+  overlay.querySelector("#permission-editor-path").textContent = filepath || "/ (Hive root)";
+  const actions = overlay.querySelector("#permission-editor-actions");
+  actions.innerHTML = "";
+  FILE_PERMISSION_ACTIONS.forEach((action) => {
+    const label = document.createElement("label");
+    label.className = "permission-action-row";
+    const input = Object.assign(document.createElement("input"), { type: "checkbox", id: `permission-action-${action}` });
+    input.checked = current ? !!current[action] : true;
+    label.append(input, document.createTextNode(FILE_PERMISSION_LABELS[action]));
+    actions.appendChild(label);
+  });
+  overlay.querySelector("#permission-editor-error").textContent = "";
+  overlay.classList.remove("hidden");
+}
+
+async function savePermissionEditor() {
+  const overlay = ensurePermissionEditor();
+  const permissions = Object.fromEntries(FILE_PERMISSION_ACTIONS.map((action) => [action, document.getElementById(`permission-action-${action}`).checked]));
+  const error = overlay.querySelector("#permission-editor-error");
   try {
     await api("/api/file-permissions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: filepath, role }),
+      body: JSON.stringify({ path: overlay.dataset.path || "", permissions }),
     });
+    overlay.classList.add("hidden");
     await loadPermissions();
     await loadFiles();
   } catch (err) {
-    alert(err.message);
+    error.textContent = err.message;
   }
+}
+
+function setPermissionPrompt(filepath) {
+  openPermissionEditor(filepath);
 }
 
 function addPermissionButton(container, filepath) {
   if (!isAdminUser() || !container) return;
-  const btn = document.createElement("button");
-  btn.className = "icon-btn";
-  btn.textContent = "🔒";
-  btn.title = "Set permission";
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    setPermissionPrompt(filepath);
-  });
+  const btn = Object.assign(document.createElement("button"), { className: "icon-btn", textContent: "🔐", title: "Customize user permissions" });
+  btn.addEventListener("click", (event) => { event.stopPropagation(); openPermissionEditor(filepath); });
   container.appendChild(btn);
 }
 
@@ -78,14 +144,6 @@ renderRow = function renderRowWithPermissions(list, entry) {
   const li = list.lastElementChild;
   const actions = li?.querySelector(".row-actions");
   const full = state.subpath ? `${state.subpath}/${entry.name}` : entry.name;
-
-  if (entry.permission) {
-    const badge = document.createElement("span");
-    badge.className = `permission-badge ${entry.permission}`;
-    badge.textContent = entry.permission;
-    li.querySelector(".row-name")?.appendChild(badge);
-  }
-
   addPermissionButton(actions, full);
 };
 
@@ -95,13 +153,8 @@ loadSystem = async function loadSystemWithPermissions() {
   await loadPermissions();
 };
 
-document.getElementById("editor-permission-btn")?.addEventListener("click", () => {
-  if (state.openFile) setPermissionPrompt(state.openFile);
-});
-
-document.getElementById("preview-permission-btn")?.addEventListener("click", () => {
-  if (state.previewFile) setPermissionPrompt(state.previewFile);
-});
+document.getElementById("editor-permission-btn")?.addEventListener("click", () => state.openFile && openPermissionEditor(state.openFile));
+document.getElementById("preview-permission-btn")?.addEventListener("click", () => state.previewFile && openPermissionEditor(state.previewFile));
 
 const baseOpenFile = openFile;
 openFile = async function openFileWithPermissionButton(filepath) {
