@@ -10,6 +10,10 @@
     ".pdf": {
       "2. Wellbeing/Letters - Documents": 1,
       "2. Wellbeing/Sessions": 1
+    },
+    ".docx": {
+      "0. Core/Profiles/Master Profiles": 6,
+      "0. Core/Master Logs": 5
     }
   },
   "tokenFolders": {
@@ -64,6 +68,68 @@
     },
     "report": {
       "2. Wellbeing/Sessions": 1
+    },
+    "bronte": {
+      "0. Core/Profiles/Master Profiles": 1
+    },
+    "jacobson": {
+      "0. Core/Profiles/Master Profiles": 1
+    },
+    "master": {
+      "0. Core/Profiles/Master Profiles": 6,
+      "0. Core/Master Logs": 4
+    },
+    "profile": {
+      "0. Core/Profiles/Master Profiles": 6
+    },
+    "docx": {
+      "0. Core/Profiles/Master Profiles": 6,
+      "0. Core/Master Logs": 5
+    },
+    "greenaway": {
+      "0. Core/Profiles/Master Profiles": 1
+    },
+    "woods": {
+      "0. Core/Profiles/Master Profiles": 1
+    },
+    "kerim": {
+      "0. Core/Profiles/Master Profiles": 1
+    },
+    "sam": {
+      "0. Core/Profiles/Master Profiles": 1
+    },
+    "peters": {
+      "0. Core/Profiles/Master Profiles": 1
+    },
+    "shane": {
+      "0. Core/Profiles/Master Profiles": 1
+    },
+    "carter": {
+      "0. Core/Profiles/Master Profiles": 1
+    },
+    "incident": {
+      "0. Core/Master Logs": 3
+    },
+    "log": {
+      "0. Core/Master Logs": 3
+    },
+    "relationship": {
+      "0. Core/Master Logs": 1
+    },
+    "timeline": {
+      "0. Core/Master Logs": 1
+    },
+    "mental": {
+      "0. Core/Master Logs": 1
+    },
+    "health": {
+      "0. Core/Master Logs": 1
+    },
+    "profiles": {
+      "0. Core/Master Logs": 1
+    },
+    "core": {
+      "0. Core/Master Logs": 1
     }
   }
 }
