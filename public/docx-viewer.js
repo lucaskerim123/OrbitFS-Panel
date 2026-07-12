@@ -1,4 +1,18 @@
 (() => {
+  for (const href of ["system-compact.css", "startup-settings.css"]) {
+    if (document.querySelector(`link[href="${href}"]`)) continue;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    document.head.appendChild(link);
+  }
+  if (!document.querySelector('script[src="startup-settings.js"]')) {
+    const settingsScript = document.createElement("script");
+    settingsScript.src = "startup-settings.js";
+    settingsScript.async = false;
+    document.body.appendChild(settingsScript);
+  }
+
   const DOCX_PREVIEW_SRC = "https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.js";
   let docxPreviewPromise = null;
 
@@ -52,7 +66,6 @@
   window.renderDocxPreview = async function renderDocxPreview(container, arrayBuffer) {
     const shell = document.createElement("div");
     shell.className = "docx-viewer-shell";
-
     const toolbar = document.createElement("div");
     toolbar.className = "docx-viewer-toolbar";
     const label = document.createElement("label");
@@ -63,7 +76,6 @@
     status.className = "docx-viewer-status";
     label.appendChild(mode);
     toolbar.append(label, status);
-
     const viewport = document.createElement("div");
     viewport.className = "docx-viewer-viewport";
     shell.append(toolbar, viewport);
