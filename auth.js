@@ -1,56 +1,11 @@
-import fs from "fs/promises";
-import crypto from "crypto";
+﻿import crypto from "crypto";
+import { query } from "./db.js";
 
-const USERS_PATH = process.env.USERS_PATH || "./users.json";
-const SESSIONS_PATH = process.env.SESSIONS_PATH || "./sessions.json";
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 const DUMMY_SALT = "0".repeat(32);
-
-// Persisted to disk so a service restart/redeploy doesn't force everyone to
-// log back in - same pattern as the Hive server's oauth_state.json.
-const sessions = new Map(); // token -> { username, role, expiresAt }
-const failedAttempts = new Map(); // normalized username -> { count, lockedUntil } (intentionally NOT persisted - a restart clearing lockouts is fine)
-
-async function loadSessionsFromDisk() {
-  try {
-    const raw = JSON.parse(await fs.readFile(SESSIONS_PATH, "utf-8"));
-    const now = Date.now();
-    for (const [token, session] of Object.entries(raw)) {
-      if (session.expiresAt > now) sessions.set(token, session);
-    }
-  } catch {
-    // no sessions.json yet, or it's corrupt - start fresh rather than crash
-  }
-}
-await loadSessionsFromDisk();
-
-let saveQueued = false;
-async function persistSessions() {
-  if (saveQueued) return;
-  saveQueued = true;
-  queueMicrotask(async () => {
-    saveQueued = false;
-    try {
-      await fs.writeFile(SESSIONS_PATH, JSON.stringify(Object.fromEntries(sessions)), "utf-8");
-    } catch (err) {
-      console.error("Failed to persist sessions:", err.message);
-    }
-  });
-}
-
-async function loadUsers() {
-  try {
-    return JSON.parse(await fs.readFile(USERS_PATH, "utf-8"));
-  } catch {
-    return [];
-  }
-}
-
-async function saveUsers(users) {
-  await fs.writeFile(USERS_PATH, JSON.stringify(users, null, 2), "utf-8");
-}
+const failedAttempts = new Map();
 
 function scryptHash(pin, salt) {
   return crypto.scryptSync(pin, salt, 64).toString("hex");
@@ -61,109 +16,86 @@ export function hashPin(pin) {
   return { salt, hash: scryptHash(pin, salt) };
 }
 
-function roleOf(user) {
-  return user?.role === "admin" ? "admin" : "user";
-}
+function roleOf(user) { return user?.role === "admin" ? "admin" : "user"; }
+function tokenHash(token) { return crypto.createHash("sha256").update(token).digest("hex"); }
 
-// Always runs the same scrypt cost whether or not the username exists, so a
-// timing difference can't be used to enumerate valid usernames.
 export async function verifyLogin(username, pin) {
-  // Case-insensitive on purpose: mobile keyboards auto-capitalize the first
-  // letter of text inputs by default, which would otherwise silently turn a
-  // correct PIN into "Invalid username or PIN".
-  const normalized = (username || "").trim().toLowerCase();
+  const normalized = String(username || "").trim().toLowerCase();
   const attempt = failedAttempts.get(normalized);
-  if (attempt?.lockedUntil && attempt.lockedUntil > Date.now()) {
-    throw new Error("Account temporarily locked, try again later");
-  }
+  if (attempt?.lockedUntil > Date.now()) throw new Error("Account temporarily locked, try again later");
 
-  const users = await loadUsers();
-  const user = users.find((u) => u.username.toLowerCase() === normalized);
-  const computed = scryptHash(pin, user ? user.salt : DUMMY_SALT);
-  const target = user ? user.hash : computed;
-  const match = user && crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(target, "hex"));
-
+  const result = await query("SELECT * FROM users WHERE lower(username)=lower($1) LIMIT 1", [normalized]);
+  const user = result.rows[0];
+  const computed = scryptHash(pin, user?.pin_salt || DUMMY_SALT);
+  const target = user?.pin_hash || computed;
+  const match = !!user && user.status === "active" && crypto.timingSafeEqual(Buffer.from(computed,"hex"),Buffer.from(target,"hex"));
   if (!match) {
-    const fails = (attempt?.count || 0) + 1;
-    failedAttempts.set(normalized, {
-      count: fails,
-      lockedUntil: fails >= MAX_FAILED_ATTEMPTS ? Date.now() + LOCKOUT_MS : undefined,
-    });
+    const count = (attempt?.count || 0) + 1;
+    failedAttempts.set(normalized, { count, lockedUntil: count >= MAX_FAILED_ATTEMPTS ? Date.now() + LOCKOUT_MS : 0 });
     return null;
   }
 
   failedAttempts.delete(normalized);
   const token = crypto.randomBytes(32).toString("hex");
-  const role = roleOf(user);
-  sessions.set(token, { username: user.username, role, expiresAt: Date.now() + SESSION_TTL_MS });
-  persistSessions();
-  return { token, username: user.username, role };
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  await query(
+    "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,$3)",
+    [tokenHash(token), user.id, expiresAt]
+  );
+  return { token, username: user.username, role: roleOf(user) };
 }
 
-export function validateSession(token) {
-  const session = sessions.get(token);
-  if (!session) return null;
-  if (session.expiresAt < Date.now()) {
-    sessions.delete(token);
-    persistSessions();
+export async function validateSession(token) {
+  const result = await query(
+    `SELECT s.user_id,s.expires_at,u.username,u.role,u.status
+     FROM sessions s JOIN users u ON u.id=s.user_id
+     WHERE s.token_hash=$1 LIMIT 1`, [tokenHash(token)]
+  );
+  const session = result.rows[0];
+  if (!session || session.status !== "active" || new Date(session.expires_at) < new Date()) {
+    if (session) await query("DELETE FROM sessions WHERE token_hash=$1", [tokenHash(token)]);
     return null;
   }
-  return session;
+  await query("UPDATE sessions SET last_seen_at=now() WHERE token_hash=$1", [tokenHash(token)]);
+  return { username: session.username, role: roleOf(session), userId: session.user_id, expiresAt: session.expires_at };
 }
 
-export function invalidateSession(token) {
-  sessions.delete(token);
-  persistSessions();
+export async function invalidateSession(token) {
+  await query("DELETE FROM sessions WHERE token_hash=$1", [tokenHash(token)]);
 }
-
-// --- User management (admin panel) ------------------------------------
-
 export async function listUsers() {
-  const users = await loadUsers();
-  return users.map((u) => ({ username: u.username, role: roleOf(u) }));
+  const result = await query("SELECT username,role,status,email,avatar_url FROM users ORDER BY username");
+  return result.rows;
 }
 
 export async function upsertUser(username, pin, role) {
-  const normalized = (username || "").trim().toLowerCase();
+  const normalized = String(username || "").trim().toLowerCase();
   if (!normalized) throw new Error("Username required");
-  if (!/^\d{4,10}$/.test(pin || "")) throw new Error("PIN must be 4-10 digits");
-
-  const users = await loadUsers();
+  if (!/^\d{4,6}$/.test(pin || "")) throw new Error("PIN must be 4-6 digits");
   const { salt, hash } = hashPin(pin);
-  const filtered = users.filter((u) => u.username.toLowerCase() !== normalized);
-  filtered.push({ username: normalized, salt, hash, role: role === "admin" ? "admin" : "user" });
-  await saveUsers(filtered);
+  await query(
+    `INSERT INTO users(username,pin_salt,pin_hash,role,status)
+     VALUES($1,$2,$3,$4,'active')
+     ON CONFLICT(username) DO UPDATE SET pin_salt=EXCLUDED.pin_salt,pin_hash=EXCLUDED.pin_hash,role=EXCLUDED.role,status='active',updated_at=now()`,
+    [normalized, salt, hash, role === "admin" ? "admin" : "user"]
+  );
 }
 
 export async function removeUser(username) {
-  const normalized = (username || "").trim().toLowerCase();
-  const users = await loadUsers();
-  const target = users.find((u) => u.username.toLowerCase() === normalized);
-  if (!target) throw new Error("User not found");
-
-  const remainingAdmins = users.filter(
-    (u) => roleOf(u) === "admin" && u.username.toLowerCase() !== normalized
-  );
-  if (roleOf(target) === "admin" && remainingAdmins.length === 0) {
-    throw new Error("Can't delete the last admin account");
+  const normalized = String(username || "").trim().toLowerCase();
+  const target = await query("SELECT id,role FROM users WHERE lower(username)=lower($1)", [normalized]);
+  if (!target.rows[0]) throw new Error("User not found");
+  if (target.rows[0].role === "admin") {
+    const admins = await query("SELECT count(*)::int AS count FROM users WHERE role='admin' AND status='active'");
+    if (admins.rows[0].count <= 1) throw new Error("Can't delete the last admin account");
   }
-
-  await saveUsers(users.filter((u) => u.username.toLowerCase() !== normalized));
-  // Any of their active sessions should stop working immediately.
-  let changed = false;
-  for (const [token, session] of sessions) {
-    if (session.username.toLowerCase() === normalized) {
-      sessions.delete(token);
-      changed = true;
-    }
-  }
-  if (changed) persistSessions();
+  await query("DELETE FROM users WHERE id=$1", [target.rows[0].id]);
 }
-
-// --- Full reset (used when wiping all accounts) ------------------------
 
 export async function replaceAllUsers(newUsers) {
-  await saveUsers(newUsers);
-  sessions.clear();
-  persistSessions();
+  await query("DELETE FROM users");
+  for (const user of newUsers) {
+    await query("INSERT INTO users(username,pin_salt,pin_hash,role,status) VALUES($1,$2,$3,$4,'active')", [user.username,user.salt,user.hash,user.role === 'admin' ? 'admin' : 'user']);
+  }
 }
+

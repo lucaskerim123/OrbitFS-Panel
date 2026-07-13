@@ -1,4 +1,4 @@
-﻿import dotenv from "dotenv";
+import dotenv from "dotenv";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -88,7 +88,7 @@ function requestContext(req) {
   };
 }
 
-function sessionOf(req) {
+async function sessionOf(req) {
   const auth = req.headers["authorization"];
   if (!auth || !auth.startsWith("Bearer ")) return null;
   return validateSession(auth.slice(7));
@@ -128,9 +128,9 @@ app.post("/api/login", express.json(), async (req, res) => {
   }
 });
 
-app.post("/api/logout", (req, res) => {
+app.post("/api/logout", async (req, res) => {
   const auth = req.headers["authorization"];
-  if (auth?.startsWith("Bearer ")) invalidateSession(auth.slice(7));
+  if (auth?.startsWith("Bearer ")) await invalidateSession(auth.slice(7));
   res.json({ ok: true });
 });
 
@@ -171,10 +171,10 @@ app.post("/api/setup", express.json(), async (req, res) => {
   }
 });
 
-app.use("/api", (req, res, next) => {
+app.use("/api", async (req, res, next) => {
   res.set("Cache-Control", "no-store");
   if (req.path === "/login" || req.path === "/logout") return next();
-  const session = sessionOf(req);
+  const session = await sessionOf(req);
   if (!session) return res.status(401).json({ error: "Unauthorized" });
   req.username = session.username;
   req.role = session.role;

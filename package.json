@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "orbitfs",
   "version": "2.0.0",
   "description": "Mobile-first admin panel for the OrbitFS MCP server - full file control plus service monitoring/restart, so there's no reason to RDP into the VPS.",
@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "pg": "^8.22.0"
   }
 }
-
