@@ -16,7 +16,7 @@ echo   2. Install / repair background task
 echo   3. Start background task now
 echo   4. Stop background task
 echo   5. Restart background task
-echo   6. Show status / relink URL
+echo   6. Show status / relink URL / session ID
 echo   7. Show logs
 echo   8. Uninstall background task
 echo   9. Open log folder
@@ -69,16 +69,11 @@ echo.
 echo This runs the required interactive command:
 echo npx @wonderwhy-er/desktop-commander@latest remote
 echo.
-echo Use the browser/add-device page it opens to link the VPS.
-echo Leave this window open while linking.
+echo The output is logged and the session_id is saved if found.
 echo.
-echo Press CTRL+C after it is linked if it keeps running here.
-echo Then reopen this menu and press 2 to install the background task.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\remote-desktop-commander-first-link.ps1"
 echo.
-pause
-npx @wonderwhy-er/desktop-commander@latest remote
-echo.
-echo Command ended. Press any key to return to the menu.
+echo First-link command ended. Press any key to return to the menu.
 pause >nul
 goto menu
 
@@ -97,6 +92,16 @@ call :runps restart
 :status
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\remote-desktop-commander-task.ps1" -Action verify
 echo.
+if exist "%~dp0runtime\remote-desktop-commander-task\current-session-id.txt" (
+  echo Current saved session ID:
+  type "%~dp0runtime\remote-desktop-commander-task\current-session-id.txt"
+  echo.
+)
+if exist "%~dp0runtime\remote-desktop-commander-task\current-add-device-url.txt" (
+  echo Current saved add-device URL:
+  type "%~dp0runtime\remote-desktop-commander-task\current-add-device-url.txt"
+  echo.
+)
 echo Press any key to return to the menu.
 pause >nul
 goto menu
@@ -113,14 +118,18 @@ echo.
 set "LOGDIR=%~dp0runtime\remote-desktop-commander-task\logs"
 if not exist "%LOGDIR%" (
   echo No log folder yet.
-  echo Run option 2 after first link.
+  echo Run option 1 first.
   echo.
   pause
   goto menu
 )
-echo LOG:
+echo FIRST LINK LOG:
 echo ------------------------------------------------------------
-powershell.exe -NoProfile -Command "if (Test-Path '%LOGDIR%\remote-desktop-commander.log') { Get-Content '%LOGDIR%\remote-desktop-commander.log' -Tail 80 } else { 'No normal log yet.' }"
+powershell.exe -NoProfile -Command "if (Test-Path '%LOGDIR%\first-link.log') { Get-Content '%LOGDIR%\first-link.log' -Tail 80 } else { 'No first-link log yet.' }"
+echo.
+echo BACKGROUND LOG:
+echo ------------------------------------------------------------
+powershell.exe -NoProfile -Command "if (Test-Path '%LOGDIR%\remote-desktop-commander.log') { Get-Content '%LOGDIR%\remote-desktop-commander.log' -Tail 80 } else { 'No background log yet.' }"
 echo.
 echo ERROR LOG:
 echo ------------------------------------------------------------
