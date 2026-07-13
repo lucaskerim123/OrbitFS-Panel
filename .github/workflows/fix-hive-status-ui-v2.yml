@@ -1,0 +1,82 @@
+name: Fix Hive status UI v2
+
+on:
+  push:
+    paths:
+      - .github/workflows/fix-hive-status-ui-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Patch files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('public/index.html'); s=p.read_text(encoding='utf-8')
+          s=s.replace('ChatGPT ↔ Claude connection monitor','Hive connections')
+          s=s.replace('<span>Disk (C:)</span>','<span id="hive-drive-label">Hive files drive</span>')
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('public/app.js'); s=p.read_text(encoding='utf-8')
+          needle='if (diskSummaryEl) diskSummaryEl.textContent = `${s.disk.freeGB} GB free`;'
+          addition='''if (diskSummaryEl) diskSummaryEl.textContent = `${s.disk.freeGB} GB free`;
+    const driveLabelEl = document.getElementById("hive-drive-label");
+    if (driveLabelEl) driveLabelEl.textContent = s.disk.label || "Hive files drive";
+    const primaryCard = document.querySelector(".primary-system-card");
+    primaryCard?.classList.toggle("hive-online", hiveRunning);
+    primaryCard?.classList.toggle("hive-offline", !hiveRunning);
+    const topology = document.querySelector(".topology");
+    topology?.classList.toggle("hive-online", hiveRunning);
+    topology?.classList.toggle("hive-offline", !hiveRunning);'''
+          if 'driveLabelEl' not in s:
+              if needle not in s: raise SystemExit('app marker missing')
+              s=s.replace(needle,addition,1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('public/style.css'); s=p.read_text(encoding='utf-8')
+          if '/* Hive health state */' not in s:
+              s += '''
+
+/* Hive health state */
+.primary-system-card.hive-online{border-color:color-mix(in srgb,var(--ok) 72%,var(--sys-line));box-shadow:0 0 18px color-mix(in srgb,var(--ok) 26%,transparent)}
+.primary-system-card.hive-offline{border-color:color-mix(in srgb,var(--danger) 75%,var(--sys-line));box-shadow:0 0 18px color-mix(in srgb,var(--danger) 30%,transparent)}
+.topology.hive-online .topology-node-hub{color:var(--ok);border-color:var(--ok);box-shadow:0 0 9px color-mix(in srgb,var(--ok) 70%,transparent)}
+.topology.hive-online .topology-pulse{background:var(--ok);box-shadow:0 0 9px color-mix(in srgb,var(--ok) 70%,transparent)}
+.topology.hive-offline .topology-node-hub{color:var(--danger);border-color:var(--danger);box-shadow:0 0 9px color-mix(in srgb,var(--danger) 72%,transparent)}
+.topology.hive-offline .topology-pulse{background:var(--danger);box-shadow:0 0 9px color-mix(in srgb,var(--danger) 72%,transparent);animation:none;left:50%;opacity:1}
+.sys-zone .pill.down{box-shadow:0 0 8px color-mix(in srgb,var(--danger) 48%,transparent)}
+'''
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('server.js'); s=p.read_text(encoding='utf-8')
+          if 'label: `Hive files drive (' not in s:
+              s=s.replace('usedGB: toGb(used),','usedGB: toGb(used),\n      label: `Hive files drive (${path.parse(basePath).root || basePath})`,',1)
+              s=s.replace('return { totalGB: 0, freeGB: 0, usedGB: 0 };','return { totalGB: 0, freeGB: 0, usedGB: 0, label: "Hive files drive" };',1)
+          if 'status.disk = await readDiskUsage(' not in s:
+              s=s.replace('const status = JSON.parse(out);\n    const hiveOk = await hive.ping();','const status = JSON.parse(out);\n    status.disk = await readDiskUsage(process.env.HIVE_ROOT || localHiveRoot || HIVE_SERVER_DIR || WORKSPACE_ROOT);\n    const hiveOk = await hive.ping();',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Verify
+        run: |
+          node --check server.js
+          node --check public/app.js
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js public/index.html public/app.js public/style.css
+          git diff --cached --quiet || git commit -m "Rename Hive connections and add live status glow"
+          git push
