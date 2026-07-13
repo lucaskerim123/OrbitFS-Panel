@@ -2,7 +2,7 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 
-title OrbitFS Remote Desktop Commander Menu
+title OrbitFS Remote Desktop Commander
 color 0A
 
 :menu
@@ -11,27 +11,32 @@ echo ============================================================
 echo   OrbitFS Remote Desktop Commander
 echo ============================================================
 echo.
-echo   1. Install / repair background task
-echo   2. Start now
-echo   3. Stop
-echo   4. Restart
-echo   5. Show status
-echo   6. Show logs
-echo   7. Uninstall background task
-echo   8. Open log folder
-echo   9. Exit
+echo   1. FIRST LINK / RELINK - run remote setup now
+echo   2. Install / repair background task
+echo   3. Start background task now
+echo   4. Stop background task
+echo   5. Restart background task
+echo   6. Show status / relink URL
+echo   7. Show logs
+echo   8. Uninstall background task
+echo   9. Open log folder
+echo   0. Exit
+echo.
+echo First install: press 1 first. After linked, press 2.
+echo After VPS restart: use 6 for status or 5 to restart.
 echo.
 set /p choice=Pick a number then press ENTER: 
 
-if "%choice%"=="1" goto install
-if "%choice%"=="2" goto start
-if "%choice%"=="3" goto stop
-if "%choice%"=="4" goto restart
-if "%choice%"=="5" goto status
-if "%choice%"=="6" goto logs
-if "%choice%"=="7" goto uninstall
-if "%choice%"=="8" goto openlogs
-if "%choice%"=="9" exit /b 0
+if "%choice%"=="1" goto firstlink
+if "%choice%"=="2" goto install
+if "%choice%"=="3" goto start
+if "%choice%"=="4" goto stop
+if "%choice%"=="5" goto restart
+if "%choice%"=="6" goto status
+if "%choice%"=="7" goto logs
+if "%choice%"=="8" goto uninstall
+if "%choice%"=="9" goto openlogs
+if "%choice%"=="0" exit /b 0
 goto menu
 
 :admincheck
@@ -55,6 +60,28 @@ echo Finished. Press any key to return to the menu.
 pause >nul
 goto menu
 
+:firstlink
+cls
+echo ============================================================
+echo   First link / relink
+echo ============================================================
+echo.
+echo This runs the required interactive command:
+echo npx @wonderwhy-er/desktop-commander@latest remote
+echo.
+echo Use the browser/add-device page it opens to link the VPS.
+echo Leave this window open while linking.
+echo.
+echo Press CTRL+C after it is linked if it keeps running here.
+echo Then reopen this menu and press 2 to install the background task.
+echo.
+pause
+npx @wonderwhy-er/desktop-commander@latest remote
+echo.
+echo Command ended. Press any key to return to the menu.
+pause >nul
+goto menu
+
 :install
 call :runps install
 
@@ -68,7 +95,7 @@ call :runps stop
 call :runps restart
 
 :status
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\remote-desktop-commander-task.ps1" -Action status
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\remote-desktop-commander-task.ps1" -Action verify
 echo.
 echo Press any key to return to the menu.
 pause >nul
@@ -86,7 +113,7 @@ echo.
 set "LOGDIR=%~dp0runtime\remote-desktop-commander-task\logs"
 if not exist "%LOGDIR%" (
   echo No log folder yet.
-  echo Run option 1 first.
+  echo Run option 2 after first link.
   echo.
   pause
   goto menu
