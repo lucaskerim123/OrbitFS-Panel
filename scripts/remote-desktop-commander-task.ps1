@@ -32,6 +32,36 @@ function Resolve-NpxPath {
   return $cmd.Source
 }
 
+function Get-RecentOutputText {
+  $parts = @()
+  foreach ($path in @((Get-LogPath), (Get-ErrPath))) {
+    if (Test-Path -LiteralPath $path) {
+      $parts += (Get-Content -LiteralPath $path -Tail 140 -ErrorAction SilentlyContinue) -join "`n"
+    }
+  }
+  return ($parts -join "`n")
+}
+
+function Show-RelinkUrl {
+  $text = Get-RecentOutputText
+  $matches = [regex]::Matches($text, 'https://mcp\.desktopcommander\.app/add-device\?session_id=[A-Za-z0-9._~%+-]+')
+  if ($matches.Count -gt 0) {
+    $url = $matches[$matches.Count - 1].Value
+    Write-Host ""
+    Write-Host "RELINK / ADD DEVICE URL"
+    Write-Host "-----------------------"
+    Write-Host $url
+    try {
+      Set-Clipboard -Value $url
+      Write-Host "Copied to clipboard."
+    } catch {
+      Write-Host "Could not copy to clipboard. Copy it manually."
+    }
+    return $true
+  }
+  return $false
+}
+
 function Write-Runner {
   $runtime = Get-RuntimeDir
   New-Item -ItemType Directory -Path $runtime -Force | Out-Null
@@ -90,6 +120,7 @@ function Show-Status {
   Write-Host "Command: npx --yes $Package $Mode"
   Write-Host "Runner: $(Get-RunnerPath)"
   Write-Host "Logs: $(Join-Path (Get-RuntimeDir) 'logs')"
+  [void](Show-RelinkUrl)
 }
 
 function Verify-Task {
@@ -114,11 +145,18 @@ function Verify-Task {
   $runner = Get-RunnerPath
   if (Test-Path -LiteralPath $runner) { Write-Host "OK: Runner exists." } else { Write-Host "FAIL: Runner missing." }
 
+  $hasRelinkUrl = Show-RelinkUrl
+  if (-not $hasRelinkUrl) {
+    Write-Host ""
+    Write-Host "No add-device relink URL found in recent logs yet."
+    Write-Host "If this is the first install, open logs or restart once."
+  }
+
   $log = Get-LogPath
   $err = Get-ErrPath
   if (Test-Path -LiteralPath $log) {
     $logText = (Get-Content -LiteralPath $log -Tail 60 -ErrorAction SilentlyContinue) -join "`n"
-    if ($logText -match "desktop-commander|remote|http|localhost|listening|connected|online|mcp") {
+    if ($logText -match "desktop-commander|remote|http|localhost|listening|connected|online|mcp|add-device") {
       Write-Host "OK: Recent log output detected."
     } elseif ($logText -match "exited") {
       Write-Host "WARN: Runner exited. Check logs below."
