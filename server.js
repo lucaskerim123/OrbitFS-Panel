@@ -11,6 +11,7 @@ import { resolveLocalHiveRoot, makeLocalOps } from "./local-hive-ops.js";
 import { verifyLogin, validateSession, invalidateSession, listUsers, upsertUser, removeUser } from "./auth.js";
 import { canAccessPath, permissionsForPath, filterEntriesForRole, listPermissions, setPermission, clearPermission, normalizeFilePath } from "./permissions.js";
 import { needsSetup, runSetup, tryStartHiveServer } from "./setup.js";
+import { workspaceRouter } from "./workspace-routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, ".env") });
@@ -178,8 +179,11 @@ app.use("/api", async (req, res, next) => {
   if (!session) return res.status(401).json({ error: "Unauthorized" });
   req.username = session.username;
   req.role = session.role;
+  req.userId = session.userId;
   next();
 });
+
+app.use("/api", workspaceRouter());
 
 app.use("/api", (req, res, next) => {
   const started = Date.now();

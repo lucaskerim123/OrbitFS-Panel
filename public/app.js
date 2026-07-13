@@ -1791,3 +1791,14 @@ setInterval(() => {
   refreshStatus();
   if (state.token) checkSorterAvailable(); // tab tracks the service coming and going
 }, 30000);
+
+
+// Multi-workspace UI is isolated from the legacy file browser so Main Workspace
+// and MCP behavior remain unchanged. The module injects its own controls and
+// adds X-Workspace-Id to existing fetch/XHR calls.
+{
+  const workspaceScript = document.createElement("script");
+  workspaceScript.src = "workspace-ui.js";
+  workspaceScript.defer = true;
+  document.body.appendChild(workspaceScript);
+}
