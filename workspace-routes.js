@@ -2,6 +2,7 @@ import express from "express";
 import fs from "fs/promises";
 import path from "path";
 import { Readable } from "stream";
+import { query } from "./db.js";
 import { makeLocalOps } from "./local-hive-ops.js";
 import { beginDownload } from "./download-limits.js";
 import { requestWorkspaceTransfer,listTransferRequests,respondTransferRequest,cancelTransferRequest,listWorkspaceUserDirectory } from "./workspace-transfers.js";
@@ -17,11 +18,29 @@ import {
 
 const FULL = { read:true,write:true,download:true,move:true,delete:true,create:true };
 const READ = { read:true,write:false,download:true,move:false,delete:false,create:false };
+const RESTRICTABLE_TABS = new Set(["sorter"]);
 
 function permissions(workspace, systemRole) {
   if (systemRole === "admin" || ["owner","editor"].includes(workspace.permission)) return FULL;
   if (workspace.permission === "contributor") return { ...FULL, delete:false };
   return READ;
+}
+
+async function tabRestrictionsForUser(userId) {
+  const result = await query("SELECT setting_value FROM system_settings WHERE setting_key=$1 LIMIT 1", [`tab_restrictions:${userId}`]);
+  const value = result.rows[0]?.setting_value;
+  return Array.isArray(value) ? value.filter((tab) => RESTRICTABLE_TABS.has(tab)) : [];
+}
+
+async function saveTabRestrictions(userId, tabs) {
+  const clean = [...new Set((Array.isArray(tabs) ? tabs : []).filter((tab) => RESTRICTABLE_TABS.has(tab)))];
+  await query(
+    `INSERT INTO system_settings(setting_key,setting_value,updated_at)
+     VALUES($1,$2::jsonb,now())
+     ON CONFLICT(setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value,updated_at=now()`,
+    [`tab_restrictions:${userId}`, JSON.stringify(clean)]
+  );
+  return clean;
 }
 
 async function selectedWorkspace(req) {
@@ -37,7 +56,7 @@ async function selectedWorkspace(req) {
 function assertNoTrashPath(req) {
   const values = [req.query?.path,req.query?.subpath,req.body?.path,req.body?.from,req.body?.to];
   for (const value of values) {
-    const clean = String(value || "").replace(/\\/g,"/").replace(/^\/+/,"");
+    const clean = String(value || "").replace(/\\/g,"/").replace(/^\/+/ ,"");
     if (clean === "_trash" || clean.startsWith("_trash/")) throw new Error("Workspace trash is managed automatically");
   }
 }
@@ -72,6 +91,41 @@ async function branched(req, res, next) {
 
 export function workspaceRouter() {
   const router = express.Router();
+
+  router.use(async (req,res,next) => {
+    if (req.role === "admin") return next();
+    const sorterRequest = req.path === "/sorter" || req.path.startsWith("/sorter/") || req.path === "/sort" || req.path.startsWith("/sort/");
+    if (!sorterRequest) return next();
+    try {
+      const restricted = await tabRestrictionsForUser(req.userId);
+      if (restricted.includes("sorter")) return res.status(403).json({ error:"Sorter access is restricted by an administrator", restrictedTab:"sorter" });
+      next();
+    } catch (error) { res.status(500).json({ error:error.message }); }
+  });
+
+  router.get("/tab-restrictions/me", async (req,res) => {
+    try { res.json({ tabs:req.role === "admin" ? [] : await tabRestrictionsForUser(req.userId) }); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.get("/tab-restrictions", async (req,res) => {
+    if(req.role!=="admin") return res.status(403).json({error:"Admin access required"});
+    try {
+      const users=(await query("SELECT id,username,role,status FROM users ORDER BY username")).rows;
+      const rows=[];
+      for(const user of users) rows.push({...user,tabs:user.role==="admin"?[]:await tabRestrictionsForUser(user.id)});
+      res.json({users:rows,restrictableTabs:["sorter"]});
+    } catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.put("/tab-restrictions/:userId", express.json(), async (req,res) => {
+    if(req.role!=="admin") return res.status(403).json({error:"Admin access required"});
+    try {
+      const target=(await query("SELECT id,username,role FROM users WHERE id=$1 LIMIT 1",[req.params.userId])).rows[0];
+      if(!target) throw new Error("User not found");
+      if(target.role==="admin") throw new Error("Admin tabs cannot be restricted");
+      res.json({userId:target.id,username:target.username,tabs:await saveTabRestrictions(target.id,req.body?.tabs)});
+    } catch(error) { res.status(400).json({error:error.message}); }
+  });
+
   router.get("/workspaces", async (req,res) => {
     try {
       await evaluateWorkspaceLifecycle();
@@ -180,6 +234,17 @@ export function workspaceRouter() {
   router.delete("/workspaces/:id", async (req,res) => {
     try { res.json(await deleteWorkspace(req.params.id,req.userId,req.role)); }
     catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.delete("/workspaces/:id/leave", async (req,res) => {
+    try {
+      const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role);
+      if(!workspace) throw new Error("Workspace not found or access denied");
+      if(workspace.is_main) throw new Error("Main Workspace cannot be left");
+      if(String(workspace.owner_id)===String(req.userId) || workspace.permission==="owner") throw new Error("Transfer ownership before leaving this workspace");
+      const removed=await query("DELETE FROM workspace_members WHERE workspace_id=$1 AND user_id=$2 RETURNING user_id",[workspace.id,req.userId]);
+      if(!removed.rowCount) throw new Error("You are not a member of this workspace");
+      res.json({ok:true});
+    } catch(error) { res.status(400).json({error:error.message}); }
   });
   router.get("/workspaces/:id/members", async (req,res) => {
     try { res.json({ members:await listWorkspaceMembers(req.params.id,req.userId,req.role) }); }
