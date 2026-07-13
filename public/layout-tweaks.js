@@ -15,6 +15,7 @@
     loadScriptOnce("drive-upload.js", "data-orbit-drive-upload");
     loadScriptOnce("page-refresh.js", "data-orbit-page-refresh");
     loadScriptOnce("stable-admin-layout.js", "data-orbit-stable-admin-layout");
+    loadScriptOnce("nav-workspace-cleanup.js", "data-orbit-nav-workspace-cleanup");
   }
 
   if (document.readyState === "loading") {
