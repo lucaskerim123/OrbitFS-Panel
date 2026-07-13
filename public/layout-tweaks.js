@@ -17,6 +17,7 @@
     loadScriptOnce("stable-admin-layout.js", "data-orbit-stable-admin-layout");
     loadScriptOnce("nav-workspace-cleanup.js", "data-orbit-nav-workspace-cleanup");
     loadScriptOnce("mobile-sorter-header.js", "data-orbit-mobile-sorter-header");
+    loadScriptOnce("startup-config-cleanup.js", "data-orbit-startup-config-cleanup");
   }
 
   if (document.readyState === "loading") {
