@@ -1531,7 +1531,25 @@ function renderFlowStatus(hiveRunning, oauth, logEntries = []) {
   renderRecentFlowLog(logEntries);
 }
 
+
+let startupConfigCache = null;
+function startupLines(id) { return document.getElementById(id).value.split(/\r?\n/).map((v) => v.trim()).filter(Boolean); }
+function renderStartupConfig() {
+  if (!startupConfigCache) return;
+  const project = document.getElementById("startup-config-project").value;
+  const preset = startupConfigCache.presets?.[project] || {};
+  document.getElementById("startup-files-low").value = (preset.low || []).join("\n");
+  document.getElementById("startup-files-medium").value = (preset.medium || []).join("\n");
+  document.getElementById("startup-files-high").value = (preset.high || []).join("\n");
+}
+async function loadStartupConfig() {
+  if (state.role !== "admin") return;
+  try { startupConfigCache = await api("/api/system/startup-config"); renderStartupConfig(); }
+  catch (err) { const el=document.getElementById("startup-config-message"); if(el) el.textContent=err.message; }
+}
+
 async function loadSystem() {
+  loadStartupConfig();
   let hiveRunning = false;
   try {
     const s = await api("/api/system/status");
@@ -1964,4 +1982,23 @@ document.getElementById("select-all-btn")?.addEventListener("click", () => {
     box.dispatchEvent(new Event("change",{bubbles:true}));
   }
   document.getElementById("select-all-btn").textContent=shouldSelect?"Clear all":"Select all";
+});
+
+document.getElementById("startup-config-project")?.addEventListener("change", renderStartupConfig);
+document.getElementById("startup-config-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const project = document.getElementById("startup-config-project").value;
+  startupConfigCache ||= { presets: { "1. Legal": {}, "2. Wellbeing": {} } };
+  startupConfigCache.presets ||= { "1. Legal": {}, "2. Wellbeing": {} };
+  startupConfigCache.presets[project] = {
+    low: startupLines("startup-files-low"),
+    medium: startupLines("startup-files-medium"),
+    high: startupLines("startup-files-high"),
+  };
+  const message = document.getElementById("startup-config-message");
+  try {
+    startupConfigCache = await api("/api/system/startup-config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(startupConfigCache) });
+    message.textContent = "Startup load presets saved.";
+    renderStartupConfig();
+  } catch (err) { message.textContent = err.message; }
 });

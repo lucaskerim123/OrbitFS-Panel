@@ -412,6 +412,43 @@ app.post("/api/trash/empty", requireAdmin, async (req, res) => {
   }
 });
 
+const STARTUP_CONFIG_PATH = localHiveRoot ? path.join(localHiveRoot, "_system", "Config", "startup-loading.json") : null;
+const STARTUP_CONFIG_DEFAULT = {
+  defaultStrength: "medium",
+  excludeFolders: ["_trash", "archive", "archives", "2. Wellbeing/Pure Vent Mode"],
+  presets: {
+    "1. Legal": { low: [], medium: [], high: [] },
+    "2. Wellbeing": { low: [], medium: [], high: [] },
+  },
+};
+
+app.get("/api/system/startup-config", requireAdmin, async (req, res) => {
+  try {
+    if (!STARTUP_CONFIG_PATH) throw new Error("Local Hive root is unavailable");
+    let config = STARTUP_CONFIG_DEFAULT;
+    try { config = { ...STARTUP_CONFIG_DEFAULT, ...JSON.parse(await fs.readFile(STARTUP_CONFIG_PATH, "utf8")) }; } catch {}
+    delete config.defaultProject;
+    res.json(config);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post("/api/system/startup-config", requireAdmin, express.json(), async (req, res) => {
+  try {
+    if (!STARTUP_CONFIG_PATH) throw new Error("Local Hive root is unavailable");
+    const body = req.body || {};
+    const clean = structuredClone(STARTUP_CONFIG_DEFAULT);
+    clean.defaultStrength = ["low", "medium", "high", "custom"].includes(body.defaultStrength) ? body.defaultStrength : "medium";
+    for (const project of ["1. Legal", "2. Wellbeing"]) {
+      for (const strength of ["low", "medium", "high"]) {
+        clean.presets[project][strength] = [...new Set((body.presets?.[project]?.[strength] || []).map((v) => normalizeFilePath(v)).filter((v) => v && !v.includes("..") && !/^(?:[a-z]:|\\)/i.test(v)))];
+      }
+    }
+    await fs.mkdir(path.dirname(STARTUP_CONFIG_PATH), { recursive: true });
+    await fs.writeFile(STARTUP_CONFIG_PATH, JSON.stringify(clean, null, 2), "utf8");
+    res.json(clean);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 app.get("/api/system/trash-config", requireAdmin, async (req, res) => {
   try {
     res.json(await hive.getTrashConfig());

@@ -407,6 +407,21 @@
         <div class="sys-zone-label"><span class="sys-zone-dot"></span>Controls</div>
 
         <details class="card" open>
+          <summary>Startup Load Control</summary>
+          <p class="muted-text">No default project. Configure the real Hive files loaded by each project preset. One Hive-relative file path per line. Archive remains excluded.</p>
+          <form id="startup-config-form" class="user-form">
+            <label class="field-label">Project</label>
+            <select id="startup-config-project"><option value="1. Legal">1. Legal</option><option value="2. Wellbeing">2. Wellbeing</option></select>
+            <label class="field-label">Low</label><textarea id="startup-files-low" rows="3" placeholder="One Hive-relative file per line"></textarea>
+            <label class="field-label">Medium</label><textarea id="startup-files-medium" rows="5" placeholder="One Hive-relative file per line"></textarea>
+            <label class="field-label">High</label><textarea id="startup-files-high" rows="7" placeholder="One Hive-relative file per line"></textarea>
+            <button type="submit" class="primary">Save load presets</button>
+            <p id="startup-config-message" class="muted-text"></p>
+          </form>
+          <p class="muted-text"><strong>MEGA</strong> remains a separate Startup UI button and loads every readable non-Archive file under <code>0. Core</code>.</p>
+        </details>
+
+        <details class="card" open>
           <summary>Server controls</summary>
           <p id="system-control-message" class="muted-text"></p>
           <div class="breaker-row">
