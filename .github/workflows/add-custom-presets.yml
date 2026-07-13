@@ -1,0 +1,121 @@
+name: Add panel custom presets
+
+on:
+  push:
+    paths:
+      - .github/workflows/add-custom-presets.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Patch panel startup configuration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          server = Path('server.js')
+          text = server.read_text(encoding='utf-8')
+          text = text.replace(
+          '''  excludeFolders: ["_trash", "archive", "archives", "2. Wellbeing/Pure Vent Mode"],
+            presets: {
+              "1. Legal": { low: [], medium: [], high: [] },
+              "2. Wellbeing": { low: [], medium: [], high: [] },
+            },''',
+          '''  excludeFolders: ["_trash", "trash", "archive", "archives", "_sorter", "2. Wellbeing/Pure Vent Mode"],
+            presets: {
+              "1. Legal": { low: [], medium: [], high: [], custom1: [], custom2: [] },
+              "2. Wellbeing": { low: [], medium: [], high: [], custom1: [], custom2: [] },
+            },''',
+          1)
+          text = text.replace(
+          '''    clean.defaultStrength = ["low", "medium", "high", "custom"].includes(body.defaultStrength) ? body.defaultStrength : "medium";
+              for (const project of ["1. Legal", "2. Wellbeing"]) {
+                for (const strength of ["low", "medium", "high"]) {
+                  clean.presets[project][strength] = [...new Set((body.presets?.[project]?.[strength] || []).map((v) => normalizeFilePath(v)).filter((v) => v && !v.includes("..") && !/^(?:[a-z]:|\\)/i.test(v)))];
+                }
+              }''',
+          '''    clean.defaultStrength = ["low", "medium", "high", "custom1", "custom2", "custom"].includes(body.defaultStrength) ? body.defaultStrength : "medium";
+              const blockedStartupPath = (value) => normalizeFilePath(value).split("/").some((part) => ["_trash", "trash", "archive", "archives", "_sorter"].includes(part.toLowerCase()));
+              for (const project of ["1. Legal", "2. Wellbeing"]) {
+                for (const strength of ["low", "medium", "high", "custom1", "custom2"]) {
+                  clean.presets[project][strength] = [...new Set((body.presets?.[project]?.[strength] || []).map((v) => normalizeFilePath(v)).filter((v) => v && !v.includes("..") && !/^(?:[a-z]:|\\)/i.test(v) && !blockedStartupPath(v)))];
+                }
+              }''',
+          1)
+          server.write_text(text, encoding='utf-8')
+
+          index = Path('public/index.html')
+          html = index.read_text(encoding='utf-8')
+          html = html.replace(
+          '''            <label class="field-label">High</label><textarea id="startup-files-high" rows="7" placeholder="One Hive-relative file per line"></textarea>
+                        <button type="submit" class="primary">Save load presets</button>''',
+          '''            <label class="field-label">High</label><textarea id="startup-files-high" rows="7" placeholder="One Hive-relative file per line"></textarea>
+                        <label class="field-label">Custom 1</label><textarea id="startup-files-custom1" rows="7" placeholder="One Hive-relative file per line"></textarea>
+                        <label class="field-label">Custom 2</label><textarea id="startup-files-custom2" rows="7" placeholder="One Hive-relative file per line"></textarea>
+                        <button type="submit" class="primary">Save load presets</button>''',
+          1)
+          html = html.replace(
+          '''<p class="muted-text"><strong>MEGA</strong> remains a separate Startup UI button and loads every readable non-Archive file under <code>0. Core</code>.</p>''',
+          '''<p class="muted-text"><strong>MEGA</strong> loads as much readable content as possible from <code>0. Core</code>, <code>1. Legal</code>, and <code>2. Wellbeing</code>. Archive, trash, and sorter are always excluded from every preset.</p>''',
+          1)
+          index.write_text(html, encoding='utf-8')
+
+          app = Path('public/app.js')
+          js = app.read_text(encoding='utf-8')
+          js = js.replace(
+          '''  document.getElementById("startup-files-high").value = (preset.high || []).join("\\n");''',
+          '''  document.getElementById("startup-files-high").value = (preset.high || []).join("\\n");
+            document.getElementById("startup-files-custom1").value = (preset.custom1 || []).join("\\n");
+            document.getElementById("startup-files-custom2").value = (preset.custom2 || []).join("\\n");''',
+          1)
+          js = js.replace(
+          '''    high: startupLines("startup-files-high"),
+              };''',
+          '''    high: startupLines("startup-files-high"),
+                custom1: startupLines("startup-files-custom1"),
+                custom2: startupLines("startup-files-custom2"),
+              };''',
+          1)
+          app.write_text(js, encoding='utf-8')
+
+          cleanup = Path('public/startup-config-cleanup.js')
+          js = cleanup.read_text(encoding='utf-8')
+          js = js.replace(
+          '''    ["startup-files-low", "startup-files-medium", "startup-files-high"].forEach((id) => normalizePresetTextarea(q(`#${id}`)));''',
+          '''    ["startup-files-low", "startup-files-medium", "startup-files-high", "startup-files-custom1", "startup-files-custom2"].forEach((id) => normalizePresetTextarea(q(`#${id}`)));''',
+          1)
+          js = js.replace(
+          '''      ["startup-files-low", "startup-files-medium", "startup-files-high"].forEach((id) => {''',
+          '''      ["startup-files-low", "startup-files-medium", "startup-files-high", "startup-files-custom1", "startup-files-custom2"].forEach((id) => {''',
+          1)
+          js = js.replace(
+          '''      if (text === "high") label.textContent = "High preset additions";''',
+          '''      if (text === "high") label.textContent = "High preset additions";
+                if (text === "custom 1") label.textContent = "Custom 1 preset additions";
+                if (text === "custom 2") label.textContent = "Custom 2 preset additions";''',
+          1)
+          cleanup.write_text(js, encoding='utf-8')
+          PY
+      - name: Verify JavaScript
+        run: |
+          node --check server.js
+          node --check public/app.js
+          node --check public/startup-config-cleanup.js
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js public/index.html public/app.js public/startup-config-cleanup.js
+          git diff --cached --quiet || git commit -m "Add Custom 1 Custom 2 startup presets and exclusions"
+          git push
