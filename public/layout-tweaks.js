@@ -26,9 +26,19 @@
     telemetryZone.appendChild(serverControls);
   }
 
+  function loadDriveUpload() {
+    if (document.querySelector('script[data-orbit-drive-upload="1"]')) return;
+    const script = document.createElement("script");
+    script.src = "drive-upload.js";
+    script.async = false;
+    script.dataset.orbitDriveUpload = "1";
+    document.body.appendChild(script);
+  }
+
   function install() {
     groupSystemMonitorAndControls();
     syncWorkspaceBarVisibility();
+    loadDriveUpload();
 
     document.querySelectorAll(".tab-btn").forEach((button) => {
       button.addEventListener("click", () => requestAnimationFrame(syncWorkspaceBarVisibility));
