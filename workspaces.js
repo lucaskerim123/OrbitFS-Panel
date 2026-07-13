@@ -3,6 +3,7 @@ import path from "path";
 import { query } from "./db.js";
 
 const DEFAULT_QUOTA = 2684354560;
+const DEFAULT_MAX_WORKSPACES_PER_USER = 1;
 const BRANCHED_ROOT = "F:\\OrbitFS Project\\The Orbit FS\\Branched Workshop";
 
 function cleanName(value) {
@@ -46,7 +47,31 @@ export async function getWorkspaceForUser(workspaceId, userId, systemRole) {
   );
   return result.rows[0] || null;
 }
+export async function getWorkspaceCreationSettings() {
+  await query(`INSERT INTO system_settings(setting_key,setting_value) VALUES('max_workspaces_per_user',$1::jsonb) ON CONFLICT(setting_key) DO NOTHING`, [JSON.stringify(DEFAULT_MAX_WORKSPACES_PER_USER)]);
+  const result = await query(`SELECT setting_value FROM system_settings WHERE setting_key='max_workspaces_per_user' LIMIT 1`);
+  const value = Number(result.rows[0]?.setting_value ?? DEFAULT_MAX_WORKSPACES_PER_USER);
+  return { maxWorkspacesPerUser: Number.isInteger(value) && value >= 0 ? value : DEFAULT_MAX_WORKSPACES_PER_USER };
+}
+
+export async function setMaxWorkspacesPerUser(value) {
+  const limit = Number(value);
+  if (!Number.isInteger(limit) || limit < 0 || limit > 1000) throw new Error('Maximum workspaces must be a whole number from 0 to 1000');
+  await query(`INSERT INTO system_settings(setting_key,setting_value,updated_at) VALUES('max_workspaces_per_user',$1::jsonb,now()) ON CONFLICT(setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value,updated_at=now()`, [JSON.stringify(limit)]);
+  return { maxWorkspacesPerUser: limit };
+}
+
+export async function ownedWorkspaceCount(userId) {
+  const result = await query(`SELECT count(*)::int AS count FROM workspaces WHERE owner_id=$1 AND is_main=false AND status<>'archived'`, [userId]);
+  return result.rows[0]?.count || 0;
+}
+
 export async function createWorkspace({ name, description, userId, username }) {
+  const settings = await getWorkspaceCreationSettings();
+  const currentCount = await ownedWorkspaceCount(userId);
+  if (settings.maxWorkspacesPerUser > 0 && currentCount >= settings.maxWorkspacesPerUser) {
+    throw new Error(`Workspace limit reached (${settings.maxWorkspacesPerUser})`);
+  }
   const safeName = cleanName(name);
   if (safeName.length < 2) throw new Error("Workspace name must be at least 2 characters");
   const slug = await uniqueSlug(slugify(safeName));
@@ -54,7 +79,7 @@ export async function createWorkspace({ name, description, userId, username }) {
   if (!client.rowCount) throw new Error("Owner account not found");
   const inserted = await query(
     `INSERT INTO workspaces(slug,name,description,owner_id,status,storage_quota_mode,storage_quota_bytes,storage_used_bytes,filesystem_root,is_main)
-     VALUES($1,$2,$3,$4,'active','fixed',$5,0,'',false) RETURNING id`,
+     VALUES($1,$2,$3,$4,'active','custom',$5,0,'',false) RETURNING id`,
     [slug,safeName,String(description||"").trim().slice(0,500),userId,DEFAULT_QUOTA]
   );
   const id = inserted.rows[0].id;
@@ -100,12 +125,12 @@ export function assertWorkspaceWrite(workspace) {
 }
 
 export function assertWorkspaceQuota(workspace,incomingBytes=0,currentBytes=0) {
-  if(workspace.storage_quota_mode!=="fixed" || workspace.storage_quota_bytes==null) return;
+  if(workspace.storage_quota_mode!=="custom" || workspace.storage_quota_bytes==null) return;
   const projected=Number(workspace.storage_used_bytes||0)-Number(currentBytes||0)+Number(incomingBytes||0);
   if(projected>Number(workspace.storage_quota_bytes)) throw new Error("Workspace storage quota exceeded");
 }
 
-export { BRANCHED_ROOT, DEFAULT_QUOTA };
+export { BRANCHED_ROOT, DEFAULT_QUOTA, DEFAULT_MAX_WORKSPACES_PER_USER };
 
 export async function updateWorkspace(workspaceId, changes, actorId, systemRole) {
   const workspace = await getWorkspaceForUser(workspaceId, actorId, systemRole);

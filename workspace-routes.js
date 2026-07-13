@@ -4,6 +4,7 @@ import { makeLocalOps } from "./local-hive-ops.js";
 import {
   listUserWorkspaces, getWorkspaceForUser, createWorkspace, updateWorkspace,
   listWorkspaceMembers, setWorkspaceMember, removeWorkspaceMember,
+  getWorkspaceCreationSettings, setMaxWorkspacesPerUser, ownedWorkspaceCount,
   refreshWorkspaceUsage, assertWorkspaceWrite, assertWorkspaceQuota,
 } from "./workspaces.js";
 
@@ -29,7 +30,7 @@ async function selectedWorkspace(req) {
 async function branched(req, res, next) {
   try {
     const workspace = await selectedWorkspace(req);
-    if (workspace.is_main) return next();
+    if (workspace.is_main) return next("router");
     req.workspace = await refreshWorkspaceUsage(workspace);
     req.workspaceOps = makeLocalOps(req.workspace.filesystem_root);
     req.workspacePermissions = permissions(req.workspace, req.role);
@@ -44,8 +45,22 @@ export function workspaceRouter() {
       const rows = await listUserWorkspaces(req.userId,req.role);
       const workspaces = [];
       for (const row of rows) workspaces.push(row.is_main ? row : await refreshWorkspaceUsage(row));
-      res.json({ workspaces });
+      const settings = await getWorkspaceCreationSettings();
+      const ownedCount = await ownedWorkspaceCount(req.userId);
+      res.json({ workspaces, settings, ownedCount });
     } catch(error) { res.status(500).json({error:error.message}); }
+  });
+  router.get("/workspace-settings", async (req,res) => {
+    try {
+      const settings = await getWorkspaceCreationSettings();
+      const ownedCount = await ownedWorkspaceCount(req.userId);
+      res.json({ ...settings, ownedCount });
+    } catch(error) { res.status(500).json({error:error.message}); }
+  });
+  router.patch("/workspace-settings", express.json(), async (req,res) => {
+    if (req.role !== "admin") return res.status(403).json({error:"Admin access required"});
+    try { res.json(await setMaxWorkspacesPerUser(req.body?.maxWorkspacesPerUser)); }
+    catch(error) { res.status(400).json({error:error.message}); }
   });
   router.post("/workspaces", express.json(), async (req,res) => {
     try { res.status(201).json({ workspace:await createWorkspace({ ...req.body,userId:req.userId,username:req.username }) }); }

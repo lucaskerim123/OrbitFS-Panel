@@ -76,6 +76,10 @@ async function migratePermissions(client, workspaceId) {
   }
 }
 
+async function ensureWorkspaceSettings(client) {
+  await client.query(`INSERT INTO system_settings(setting_key,setting_value) VALUES('max_workspaces_per_user','1'::jsonb) ON CONFLICT(setting_key) DO NOTHING`);
+}
+
 export async function ensureDatabase() {
   if (initialized) return;
   if (initializing) return initializing;
@@ -86,6 +90,7 @@ export async function ensureDatabase() {
       await migrateUsers(client);
       const workspaceId = await ensureMainWorkspace(client);
       await migratePermissions(client, workspaceId);
+      await ensureWorkspaceSettings(client);
       await client.query("COMMIT");
       initialized = true;
     } catch (error) {

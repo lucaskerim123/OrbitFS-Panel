@@ -93,3 +93,33 @@
   .workspace-admin-card dl { grid-template-columns: 1fr; }
   .workspace-member-form { grid-template-columns: 1fr; }
 }
+
+.workspace-limit-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 110px auto;
+  align-items: end;
+  gap: 0.5rem;
+  margin: 0.7rem 0 1rem;
+  padding: 0.7rem;
+  border: 1px solid var(--sys-line, var(--border));
+  border-radius: 8px;
+  background: var(--sys-void, var(--bg));
+}
+.workspace-limit-form label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.workspace-limit-form input { width: 100%; }
+.workspace-limit-form small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.workspace-limit-form p { grid-column: 1 / -1; margin: 0; }
+#workspace-create-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 600px) {
+  .workspace-limit-form { grid-template-columns: 1fr; }
+  .workspace-limit-form small,
+  .workspace-limit-form p { grid-column: 1; }
+}

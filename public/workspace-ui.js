@@ -4,6 +4,7 @@
 
   state.workspaceId = localStorage.getItem("panelWorkspaceId") || "";
   state.workspaces = [];
+  state.workspaceSettings = { maxWorkspacesPerUser: 1, ownedCount: 0 };
 
   const nativeFetch = window.fetch.bind(window);
   window.fetch = (input, init = {}) => {
@@ -78,6 +79,11 @@ function renderWorkspaceBar() {
     select.appendChild(option);
   }
   select.value = state.workspaceId;
+  const createButton = document.getElementById("workspace-create-btn");
+  const max = Number(state.workspaceSettings?.maxWorkspacesPerUser ?? 1);
+  const owned = Number(state.workspaceSettings?.ownedCount ?? 0);
+  const reached = max > 0 && owned >= max;
+  if (createButton) { createButton.disabled = reached; createButton.title = reached ? `Workspace limit reached (${max})` : `${owned} of ${max || "unlimited"} workspaces used`; }
   const workspace = currentWorkspace();
   if (!workspace) return;
   document.getElementById("workspace-role").textContent = workspace.is_main ? "Main" : (workspace.permission || "viewer");
@@ -100,6 +106,7 @@ async function loadOrbitWorkspaces(preferredId = state.workspaceId) {
   try {
     const response = await api("/api/workspaces");
     state.workspaces = response.workspaces || [];
+    state.workspaceSettings = { maxWorkspacesPerUser: Number(response.settings?.maxWorkspacesPerUser ?? 1), ownedCount: Number(response.ownedCount ?? 0) };
     const selected = state.workspaces.find((item) => String(item.id) === String(preferredId))
       || state.workspaces.find((item) => item.is_main)
       || state.workspaces[0];
@@ -139,7 +146,7 @@ function ensureWorkspaceDialog() {
       <input id="workspace-name" type="text" maxlength="80" required autocomplete="off" />
       <label class="field-label" for="workspace-description">Description</label>
       <textarea id="workspace-description" rows="4" maxlength="500"></textarea>
-      <p class="field-hint">2.5 GB default quota. Storage can later be moved to another drive.</p>
+      <p id="workspace-limit-hint" class="field-hint">2.5 GB default quota. Storage can later be moved to another drive.</p>
       <p id="workspace-form-error" class="error"></p>
       <div class="modal-actions"><button id="workspace-cancel" type="button">Cancel</button><button type="submit" class="primary">Create</button></div>
     </form>`;
@@ -151,6 +158,11 @@ function ensureWorkspaceDialog() {
 
 function openWorkspaceDialog() {
   ensureWorkspaceDialog();
+  const max = Number(state.workspaceSettings?.maxWorkspacesPerUser ?? 1);
+  const owned = Number(state.workspaceSettings?.ownedCount ?? 0);
+  if (max > 0 && owned >= max) return alert(`Workspace limit reached (${max})`);
+  const hint = document.getElementById("workspace-limit-hint");
+  if (hint) hint.textContent = `2.5 GB default quota · ${owned} of ${max || "unlimited"} workspaces used.`;
   document.getElementById("workspace-dialog").classList.remove("hidden");
   document.getElementById("workspace-name").focus();
 }
@@ -200,9 +212,32 @@ function ensureWorkspaceAdmin() {
   card.innerHTML = `
     <summary>Workspace manager</summary>
     <p id="workspace-admin-summary" class="muted-text"></p>
+    <form id="workspace-limit-form" class="workspace-limit-form">
+      <label for="workspace-max-per-user">Maximum workspaces per user</label>
+      <input id="workspace-max-per-user" type="number" min="0" max="1000" step="1" required />
+      <button type="submit" class="primary">Save limit</button>
+      <small>0 = unlimited. Main Workspace is not counted.</small>
+      <p id="workspace-limit-message" class="error"></p>
+    </form>
     <div id="workspace-admin-list" class="workspace-admin-list"></div>`;
   const label = zone.querySelector(".sys-zone-label");
   label.insertAdjacentElement("afterend", card);
+  document.getElementById("workspace-limit-form")?.addEventListener("submit", saveWorkspaceLimit);
+}
+
+async function saveWorkspaceLimit(event) {
+  event.preventDefault();
+  const input = document.getElementById("workspace-max-per-user");
+  const message = document.getElementById("workspace-limit-message");
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  message.textContent = ""; button.disabled = true;
+  try {
+    const result = await api("/api/workspace-settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ maxWorkspacesPerUser: Number(input.value) }) });
+    state.workspaceSettings.maxWorkspacesPerUser = result.maxWorkspacesPerUser;
+    message.className = "muted-text"; message.textContent = "Saved.";
+    renderWorkspaceBar(); renderWorkspaceAdmin();
+  } catch (error) { message.className = "error"; message.textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 function workspaceQuotaText(workspace) {
@@ -217,7 +252,10 @@ function renderWorkspaceAdmin() {
   const summary = document.getElementById("workspace-admin-summary");
   if (!list || !summary) return;
   const total = state.workspaces.reduce((sum, item) => sum + Number(item.storage_used_bytes || 0), 0);
-  summary.textContent = `${state.workspaces.length} workspace${state.workspaces.length === 1 ? "" : "s"} · ${workspaceFormatBytes(total)} tracked`;
+  const max = Number(state.workspaceSettings?.maxWorkspacesPerUser ?? 1);
+  summary.textContent = `${state.workspaces.length} visible workspace${state.workspaces.length === 1 ? "" : "s"} · ${workspaceFormatBytes(total)} tracked · user limit ${max || "unlimited"}`;
+  const input = document.getElementById("workspace-max-per-user");
+  if (input) input.value = String(max);
   list.innerHTML = "";
   for (const workspace of state.workspaces) list.appendChild(buildWorkspaceAdminCard(workspace));
 }
