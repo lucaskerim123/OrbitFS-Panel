@@ -158,7 +158,7 @@ switch ($Action) {
   "status" {
     $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
     if ($service) {
-      Write-Host "$DisplayName: $($service.Status)"
+      Write-Host "${DisplayName}: $($service.Status)"
       Write-Host "Runtime: $(Get-ServiceRuntimeDirectory)"
     } else {
       Write-Host "$DisplayName is not installed."
