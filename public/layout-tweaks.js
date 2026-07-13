@@ -14,6 +14,7 @@
   function install() {
     loadScriptOnce("drive-upload.js", "data-orbit-drive-upload");
     loadScriptOnce("page-refresh.js", "data-orbit-page-refresh");
+    loadScriptOnce("stable-admin-layout.js", "data-orbit-stable-admin-layout");
   }
 
   if (document.readyState === "loading") {
