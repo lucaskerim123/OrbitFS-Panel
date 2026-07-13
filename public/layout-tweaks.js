@@ -73,6 +73,7 @@
     syncWorkspaceBarVisibility();
     loadScriptOnce("drive-upload.js", "data-orbit-drive-upload");
     loadScriptOnce("page-refresh.js", "data-orbit-page-refresh");
+    loadScriptOnce("workspace-access.js", "data-orbit-workspace-access");
 
     document.querySelectorAll(".tab-btn").forEach((button) => {
       button.addEventListener("click", () => requestAnimationFrame(() => {
