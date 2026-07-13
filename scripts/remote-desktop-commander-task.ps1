@@ -1,10 +1,12 @@
 param(
-  [ValidateSet("install", "uninstall", "start", "stop", "restart", "status")]
+  [ValidateSet("install", "uninstall", "start", "stop", "restart", "status", "verify")]
   [string]$Action = "install",
 
   [string]$TaskName = "OrbitFS Remote Desktop Commander",
 
-  [string]$Package = "@wonderwhy-er/desktop-commander@latest"
+  [string]$Package = "@wonderwhy-er/desktop-commander@latest",
+
+  [string]$Mode = "remote"
 )
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -18,17 +20,11 @@ function Assert-Administrator {
   }
 }
 
-function Get-RepoRoot {
-  return Split-Path -Parent $PSScriptRoot
-}
-
-function Get-RuntimeDir {
-  return Join-Path (Get-RepoRoot) "runtime\remote-desktop-commander-task"
-}
-
-function Get-RunnerPath {
-  return Join-Path (Get-RuntimeDir) "run-remote-desktop-commander.cmd"
-}
+function Get-RepoRoot { return Split-Path -Parent $PSScriptRoot }
+function Get-RuntimeDir { return Join-Path (Get-RepoRoot) "runtime\remote-desktop-commander-task" }
+function Get-RunnerPath { return Join-Path (Get-RuntimeDir) "run-remote-desktop-commander.cmd" }
+function Get-LogPath { return Join-Path (Get-RuntimeDir) "logs\remote-desktop-commander.log" }
+function Get-ErrPath { return Join-Path (Get-RuntimeDir) "logs\remote-desktop-commander.err.log" }
 
 function Resolve-NpxPath {
   $cmd = Get-Command "npx.cmd" -ErrorAction SilentlyContinue
@@ -42,16 +38,16 @@ function Write-Runner {
   New-Item -ItemType Directory -Path (Join-Path $runtime "logs") -Force | Out-Null
 
   $npx = Resolve-NpxPath
-  $log = Join-Path $runtime "logs\remote-desktop-commander.log"
-  $err = Join-Path $runtime "logs\remote-desktop-commander.err.log"
+  $log = Get-LogPath
+  $err = Get-ErrPath
 
   $runner = @"
 @echo off
 setlocal
 cd /d "$runtime"
 echo ===== started %DATE% %TIME% =====>> "$log"
-echo npx: $npx>> "$log"
-"$npx" --yes $Package >> "$log" 2>> "$err"
+echo command: "$npx" --yes $Package $Mode>> "$log"
+"$npx" --yes $Package $Mode >> "$log" 2>> "$err"
 echo ===== exited %DATE% %TIME% code %ERRORLEVEL% =====>> "$log"
 exit /b %ERRORLEVEL%
 "@
@@ -75,8 +71,9 @@ function Install-Task {
 
   Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($triggerStartup, $triggerLogon) -Settings $settings -Principal $principal | Out-Null
   Start-ScheduledTask -TaskName $TaskName
-  Start-Sleep -Seconds 2
+  Start-Sleep -Seconds 4
   Show-Status
+  Verify-Task
 }
 
 function Show-Status {
@@ -90,8 +87,59 @@ function Show-Status {
   Write-Host "${TaskName}: $($task.State)"
   Write-Host "LastRunTime: $($info.LastRunTime)"
   Write-Host "LastTaskResult: $($info.LastTaskResult)"
+  Write-Host "Command: npx --yes $Package $Mode"
   Write-Host "Runner: $(Get-RunnerPath)"
   Write-Host "Logs: $(Join-Path (Get-RuntimeDir) 'logs')"
+}
+
+function Verify-Task {
+  Write-Host ""
+  Write-Host "Verification"
+  Write-Host "------------"
+
+  $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+  if (-not $task) {
+    Write-Host "FAIL: Scheduled Task is not installed."
+    return
+  }
+  Write-Host "OK: Scheduled Task exists. State: $($task.State)"
+
+  try {
+    $npx = Resolve-NpxPath
+    Write-Host "OK: npx found at $npx"
+  } catch {
+    Write-Host "FAIL: $($_.Exception.Message)"
+  }
+
+  $runner = Get-RunnerPath
+  if (Test-Path -LiteralPath $runner) { Write-Host "OK: Runner exists." } else { Write-Host "FAIL: Runner missing." }
+
+  $log = Get-LogPath
+  $err = Get-ErrPath
+  if (Test-Path -LiteralPath $log) {
+    $logText = (Get-Content -LiteralPath $log -Tail 60 -ErrorAction SilentlyContinue) -join "`n"
+    if ($logText -match "desktop-commander|remote|http|localhost|listening|connected|online|mcp") {
+      Write-Host "OK: Recent log output detected."
+    } elseif ($logText -match "exited") {
+      Write-Host "WARN: Runner exited. Check logs below."
+    } else {
+      Write-Host "WARN: Log exists but no clear online marker yet."
+    }
+    Write-Host ""
+    Write-Host "Recent log:"
+    Get-Content -LiteralPath $log -Tail 30 -ErrorAction SilentlyContinue
+  } else {
+    Write-Host "WARN: No normal log yet."
+  }
+
+  if (Test-Path -LiteralPath $err) {
+    $errText = (Get-Content -LiteralPath $err -Tail 40 -ErrorAction SilentlyContinue) -join "`n"
+    if ($errText.Trim()) {
+      Write-Host ""
+      Write-Host "Recent error log:"
+      Get-Content -LiteralPath $err -Tail 40 -ErrorAction SilentlyContinue
+    }
+  }
 }
 
 switch ($Action) {
@@ -104,9 +152,11 @@ switch ($Action) {
   }
   "start" {
     Assert-Administrator
+    Write-Runner
     Start-ScheduledTask -TaskName $TaskName
-    Start-Sleep -Seconds 1
+    Start-Sleep -Seconds 4
     Show-Status
+    Verify-Task
   }
   "stop" {
     Assert-Administrator
@@ -116,11 +166,14 @@ switch ($Action) {
   }
   "restart" {
     Assert-Administrator
+    Write-Runner
     Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 1
     Start-ScheduledTask -TaskName $TaskName
-    Start-Sleep -Seconds 1
+    Start-Sleep -Seconds 4
     Show-Status
+    Verify-Task
   }
   "status" { Show-Status }
+  "verify" { Show-Status; Verify-Task }
 }
