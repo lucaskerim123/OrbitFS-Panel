@@ -1,11 +1,11 @@
 {
   "status": "preview",
   "safeMode": true,
-  "startedAt": "2026-07-12T19:55:44.184Z",
+  "startedAt": "2026-07-13T12:48:06.081Z",
   "items": [],
   "index": {
     "root": "F:\\OrbitFS Project\\The Orbit FS",
-    "builtAt": "2026-07-12T19:55:44.170Z",
+    "builtAt": "2026-07-13T12:48:06.066Z",
     "folders": [
       {
         "path": "0. Core",
@@ -92,27 +92,9 @@
         "suggestable": true
       },
       {
-        "path": "1. Legal/Documents",
-        "name": "Documents",
-        "meaning": "1  legal/documents",
-        "suggestable": true
-      },
-      {
-        "path": "1. Legal/Imports",
-        "name": "Imports",
-        "meaning": "1  legal/imports",
-        "suggestable": true
-      },
-      {
-        "path": "1. Legal/Key Dates",
-        "name": "Key Dates",
-        "meaning": "1  legal/key dates",
-        "suggestable": true
-      },
-      {
-        "path": "1. Legal/Key Dates/November - TikTok",
-        "name": "November - TikTok",
-        "meaning": "1  legal/key dates/november   tiktok",
+        "path": "1. Legal/Files",
+        "name": "Files",
+        "meaning": "1  legal/files",
         "suggestable": true
       },
       {
@@ -122,15 +104,27 @@
         "suggestable": true
       },
       {
-        "path": "1. Legal/Reference Files",
-        "name": "Reference Files",
-        "meaning": "1  legal/reference files",
+        "path": "1. Legal/Raw Paperwork",
+        "name": "Raw Paperwork",
+        "meaning": "1  legal/raw paperwork",
         "suggestable": true
       },
       {
         "path": "1. Legal/Statements",
         "name": "Statements",
         "meaning": "1  legal/statements",
+        "suggestable": true
+      },
+      {
+        "path": "1. Legal/Upcoming Dates",
+        "name": "Upcoming Dates",
+        "meaning": "1  legal/upcoming dates",
+        "suggestable": true
+      },
+      {
+        "path": "1. Legal/Upcoming Dates/November - TikTok",
+        "name": "November - TikTok",
+        "meaning": "1  legal/upcoming dates/november   tiktok",
         "suggestable": true
       },
       {
@@ -224,6 +218,12 @@
         "suggestable": true
       },
       {
+        "path": "_system/Config",
+        "name": "Config",
+        "meaning": " system/config",
+        "suggestable": true
+      },
+      {
         "path": "_system/Index",
         "name": "Index",
         "meaning": " system/index",
@@ -255,5 +255,5 @@
       }
     ]
   },
-  "lastRun": "2026-07-12T19:55:44.184Z"
+  "lastRun": "2026-07-13T12:48:06.081Z"
 }
