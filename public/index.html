@@ -520,14 +520,15 @@
 
         <details class="card" open>
           <summary>Connected MCP clients</summary>
+          <div class="toolbar action-bar"><button type="button" id="mcp-users-refresh">Refresh MCP users</button><span id="mcp-users-message" class="muted-text"></span></div>
           <div class="table-scroll">
             <table id="oauth-table">
               <thead><tr><th>Client</th><th>Redirect host</th></tr></thead>
               <tbody id="oauth-clients-body"></tbody>
             </table>
           </div>
-          <p class="muted-text">Accounts with an active refresh token:</p>
-          <ul id="oauth-emails" class="plain-list"></ul>
+          <p class="muted-text">Accounts with an active refresh token. Disconnect revokes that account's saved MCP login; currently-issued access tokens may remain valid for up to one hour.</p>
+          <div id="oauth-emails" class="workspace-invitations-list"></div>
         </details>
       </div>
 

@@ -1634,20 +1634,66 @@ async function loadSystem() {
     });
     const emailsEl = document.getElementById("oauth-emails");
     emailsEl.innerHTML = "";
-    const uniqueEmails = [...new Set(oauth.refreshTokens.map((r) => r.email))];
-    uniqueEmails.forEach((email) => {
-      const li = document.createElement("li");
-      li.textContent = email;
-      emailsEl.appendChild(li);
+    const accounts = [...new Map((oauth.refreshTokens || []).map((r) => [`${r.email}|${r.flow || "unknown"}`, r])).values()];
+    accounts.forEach((account) => {
+      const row = document.createElement("div");
+      row.className = "workspace-invitation-row";
+      const details = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = account.email || "Unknown account";
+      const meta = document.createElement("p");
+      meta.className = "muted-text";
+      meta.textContent = `Client: ${account.flow || "unknown"} · Connected`;
+      details.append(title, meta);
+      const disconnect = document.createElement("button");
+      disconnect.type = "button";
+      disconnect.className = "danger";
+      disconnect.textContent = "Disconnect";
+      disconnect.addEventListener("click", async () => {
+        if (!confirm(`Disconnect ${account.email} from ${account.flow || "MCP"}?`)) return;
+        const message = document.getElementById("mcp-users-message");
+        disconnect.disabled = true;
+        try {
+          const result = await api("/api/system/oauth/disconnect", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: account.email, flow: account.flow || null }),
+          });
+          message.textContent = result.revoked ? `Disconnected ${account.email}.` : `No active saved login found for ${account.email}.`;
+          await loadSystem();
+        } catch (err) {
+          message.textContent = err.message;
+          disconnect.disabled = false;
+        }
+      });
+      row.append(details, disconnect);
+      emailsEl.appendChild(row);
     });
-    if (!uniqueEmails.length) emailsEl.innerHTML = "<li>(none)</li>";
+    if (!accounts.length) emailsEl.innerHTML = '<p class="muted-text">No MCP accounts with saved logins.</p>';
     renderFlowStatus(hiveRunning, oauth, logEntries);
   } catch (err) {
     console.error(err);
     renderFlowStatus(hiveRunning, { clients: [] });
   }
 
-  if (state.role === "admin") loadTrashConfig();
+  if (state.role === "admin") {
+    loadTrashConfig();
+    try {
+      const hardstop = await api("/api/system/hardstop-status");
+      const messageEl = document.getElementById("guarded-hardstop-message");
+      const runBtn = document.getElementById("guarded-hardstop-run-btn");
+      if (messageEl) {
+        messageEl.textContent = hardstop.ready
+          ? "Emergency hard stop ready."
+          : `Not ready: ${!hardstop.scriptExists ? "script missing" : !hardstop.passwordConfigured ? "password not configured" : hardstop.cloudMode ? "disabled in cloud mode" : "configuration error"}.`;
+      }
+      if (runBtn) runBtn.disabled = !hardstop.ready;
+    } catch (err) {
+      const messageEl = document.getElementById("guarded-hardstop-message");
+      const runBtn = document.getElementById("guarded-hardstop-run-btn");
+      if (messageEl) messageEl.textContent = `Readiness check failed: ${err.message}`;
+      if (runBtn) runBtn.disabled = true;
+    }
+  }
   loadUsers();
 }
 
@@ -2045,4 +2091,12 @@ document.getElementById("startup-config-form")?.addEventListener("submit", async
     message.textContent = "Startup load presets saved.";
     renderStartupConfig();
   } catch (err) { message.textContent = err.message; }
+});
+
+
+document.getElementById("mcp-users-refresh")?.addEventListener("click", async () => {
+  const message = document.getElementById("mcp-users-message");
+  message.textContent = "Refreshing…";
+  await loadSystem();
+  message.textContent = `Updated ${new Date().toLocaleTimeString()}`;
 });

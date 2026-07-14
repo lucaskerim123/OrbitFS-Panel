@@ -155,23 +155,8 @@
       host.prepend(roles);
     }
 
-    if (!q("#admin-login-security", host)) {
-      const card = document.createElement("details");
-      card.id = "admin-login-security";
-      card.className = "card";
-      card.open = false;
-      card.innerHTML = `<summary>User status, login and IP</summary><div id="admin-login-security-list"><p class="muted-text">Use Admin refresh to load account details.</p></div>`;
-      host.appendChild(card);
-    }
-
-    if (!q("#admin-audit-log", host)) {
-      const card = document.createElement("details");
-      card.id = "admin-audit-log";
-      card.className = "card";
-      card.open = false;
-      card.innerHTML = `<summary>Connection and admin audit log</summary><div id="admin-audit-list"><p class="muted-text">Connection and administrator actions only.</p></div>`;
-      host.appendChild(card);
-    }
+    q("#admin-login-security", host)?.remove();
+    q("#admin-audit-log", host)?.remove();
 
     const permissions = findCard("File permissions");
     if (permissions) {

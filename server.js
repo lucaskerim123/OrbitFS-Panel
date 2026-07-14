@@ -867,6 +867,21 @@ app.post("/api/system/control", requireAdmin, express.json(), async (req, res) =
   }
 });
 
+app.get("/api/system/hardstop-status", requireAdmin, async (_req, res) => {
+  try {
+    const scriptExists = await fs.access(HARDSTOP_SCRIPT_PATH).then(() => true).catch(() => false);
+    res.json({
+      ready: scriptExists && Boolean(HARDSTOP_PASSWORD) && !CLOUD_MODE,
+      scriptExists,
+      passwordConfigured: Boolean(HARDSTOP_PASSWORD),
+      cloudMode: CLOUD_MODE,
+      scriptPath: HARDSTOP_SCRIPT_PATH,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/system/hardstop", requireAdmin, express.json({ limit: "8kb" }), async (req, res) => {
   if (CLOUD_MODE) {
     return res.status(501).json({ error: "Hard stop is disabled in cloud mode." });
@@ -938,6 +953,14 @@ app.get("/api/system/oauth", async (req, res) => {
     res.json(await hive.oauthState());
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/system/oauth/disconnect", requireAdmin, express.json(), async (req, res) => {
+  try {
+    res.json(await hive.disconnectOauth(req.body?.email, req.body?.flow || null));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

@@ -120,8 +120,18 @@ export function makeOrbitFSClient(baseUrl, apiKey) {
     return resp.json();
   }
 
+  async function disconnectOauth(email, flow) {
+    const resp = await fetch(new URL("/api/oauth-disconnect", baseUrl), {
+      method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, flow }),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(body.error || `oauth disconnect failed: ${resp.status}`);
+    return body;
+  }
+
   // Upload/download are proxied by server.js as raw byte streams rather than
   // wrapped here, so large files never get buffered into a JS string.
 
-  return { baseUrl, headers, ping, listFiles, readFile, writeFile, deleteFile, moveToTrash, emptyTrash, getTrashConfig, setTrashConfig, moveFile, mkdir, previewSort, applySort, oauthState };
+  return { baseUrl, headers, ping, listFiles, readFile, writeFile, deleteFile, moveToTrash, emptyTrash, getTrashConfig, setTrashConfig, moveFile, mkdir, previewSort, applySort, oauthState, disconnectOauth };
 }

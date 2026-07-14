@@ -223,29 +223,15 @@
   }
 
   function ensureAdminSecurityCards() {
-    const host = q("#admin-zone-host");
-    if (!host) return;
-    if (!q("#admin-login-security")) {
-      const card = document.createElement("details");
-      card.id = "admin-login-security";
-      card.className = "card";
-      card.open = true;
-      card.innerHTML = '<summary>User status, login and IP</summary><div id="admin-login-security-list" class="compact-admin-list"><p class="muted-text">Loading account details…</p></div>';
-      host.appendChild(card);
-    }
-    if (!q("#admin-audit-log")) {
-      const card = document.createElement("details");
-      card.id = "admin-audit-log";
-      card.className = "card";
-      card.innerHTML = '<summary>Connection and admin audit log</summary><div id="admin-audit-list" class="compact-admin-list"><p class="muted-text">Loading audit log…</p></div>';
-      host.appendChild(card);
-    }
+    q("#admin-login-security")?.remove();
+    q("#admin-audit-log")?.remove();
   }
 
   async function refreshAdminSecurity() {
     ensureAdminSecurityCards();
     const securityList = q("#admin-login-security-list");
     const auditList = q("#admin-audit-list");
+    if (!securityList && !auditList) return;
     try {
       const result = await api("/api/admin/users-security");
       const users = result.users || [];
