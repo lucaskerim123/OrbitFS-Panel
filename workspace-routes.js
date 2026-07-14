@@ -3,7 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 import { Readable } from "stream";
 import { query } from "./db.js";
-import { makeLocalOps } from "./local-hive-ops.js";
+import { makeLocalOps } from "./local-orbitfs-ops.js";
 import { beginDownload } from "./download-limits.js";
 import { requestWorkspaceTransfer,listTransferRequests,respondTransferRequest,cancelTransferRequest,listWorkspaceUserDirectory } from "./workspace-transfers.js";
 import { inviteWorkspaceUser,listPendingInvitations,listWorkspaceInvitations,respondToWorkspaceInvitation,revokeWorkspaceInvitation } from "./workspace-invitations.js";

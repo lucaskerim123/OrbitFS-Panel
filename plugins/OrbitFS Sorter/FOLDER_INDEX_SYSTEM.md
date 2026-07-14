@@ -1,8 +1,8 @@
 # Folder Index System
 
-The sorter does not trust old hardcoded paths. Every `/startsorter` run rescans the current Master Hive tree and rebuilds:
+The sorter does not trust old hardcoded paths. Every `/startsorter` run rescans the current OrbitFS tree and rebuilds:
 
-`C:\Project FireStorm\The Master Hive\_system\Index\folder_index.json`
+`F:\OrbitFS Project\The Orbit FS\_system\Index\folder_index.json`
 
 The index stores the live folder paths, folder names, generated timestamp, and searchable meaning text.
 

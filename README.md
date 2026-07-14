@@ -1,8 +1,8 @@
 ﻿# The OrbitFS
 
-Mobile-first admin panel for the Master Hive file server.
+Mobile-first admin panel for the OrbitFS file server.
 
-It is the operator UI for the shared Hive server and covers:
+It is the operator UI for the shared OrbitFS server and covers:
 
 - File browsing, upload, download, move, rename, and sort operations
   - Move/rename uses a visual folder browser with breadcrumbs and folder filtering; no destination path typing required
@@ -23,7 +23,7 @@ It is the operator UI for the shared Hive server and covers:
   download, move/rename, delete/trash, and create/upload. Folder rules inherit
   downward, specific file/subfolder rules override them, and Admin always has
   every action.
-- System tab: infrastructure telemetry (Hive/tunnel/panel/sorter health,
+- System tab: infrastructure telemetry (OrbitFS/tunnel/panel/sorter health,
   disk usage, ChatGPT↔Claude connection flows), power controls for each
   service, and admin management (users, file permissions, trash, connected
   MCP clients)

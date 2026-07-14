@@ -93,7 +93,7 @@ async function openPermissionEditor(filepath, current = null) {
   if (!isAdminUser()) return;
   const overlay = ensurePermissionEditor();
   overlay.dataset.path = filepath;
-  overlay.querySelector("#permission-editor-path").textContent = filepath || "/ (Hive root)";
+  overlay.querySelector("#permission-editor-path").textContent = filepath || "/ (OrbitFS root)";
   overlay.querySelector("#permission-editor-error").textContent = "";
   overlay.classList.remove("hidden");
   if (!current) {

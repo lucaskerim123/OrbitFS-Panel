@@ -22,12 +22,12 @@
 
   function renameUi() {
     const heading = [...document.querySelectorAll("strong")].find((el) => el.textContent.trim() === "ChatGPT ↔ Claude connection monitor");
-    if (heading) heading.textContent = "Hive connections";
+    if (heading) heading.textContent = "OrbitFS connections";
 
     const diskRow = q("#disk-summary")?.closest(".infra-item");
     const label = diskRow?.querySelector("span:first-child");
     if (label && !label.id) label.id = "hive-drive-label";
-    if (label && !label.textContent.includes("Hive files drive")) label.textContent = "Hive files drive";
+    if (label && !label.textContent.includes("OrbitFS files drive")) label.textContent = "OrbitFS files drive";
   }
 
   function applyState(running, disk) {
@@ -39,7 +39,7 @@
     }
 
     const label = q("#hive-drive-label");
-    if (label) label.textContent = disk?.label || "Hive files drive";
+    if (label) label.textContent = disk?.label || "OrbitFS files drive";
     const summary = q("#disk-summary");
     if (summary && Number.isFinite(Number(disk?.freeGB))) summary.textContent = `${disk.freeGB} GB free`;
   }

@@ -1,6 +1,6 @@
-# Hive Sorter Rules
+# OrbitFS Sorter Rules
 
-Root: `C:\Project FireStorm\The Master Hive`
+Root: `F:\OrbitFS Project\The Orbit FS`
 
 The sorter is standalone and safe by default. It scans `_sorter`, previews suggested destinations, lets the user edit/select destinations, and only moves approved items when `/confirmsorter` is used.
 
@@ -12,7 +12,7 @@ User-facing commands only:
 
 Rules:
 
-- `/startsorter` rescans the live Master Hive folder tree every time.
+- `/startsorter` rescans the live OrbitFS folder tree every time.
 - `/startsorter` builds or updates `_system/Index/folder_index.json`.
 - Destination suggestions come from the live folder tree.
 - `_sorter` and `_trash` are hidden from destination suggestions.

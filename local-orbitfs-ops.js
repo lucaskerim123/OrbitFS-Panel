@@ -3,9 +3,9 @@ import fsSync from "fs";
 import path from "path";
 import dotenv from "dotenv";
 
-export function resolveLocalHiveRoot(hiveServerDir) {
+export function resolveLocalOrbitFSRoot(orbitfsServerDir) {
   try {
-    const parsed = dotenv.parse(fsSync.readFileSync(path.join(hiveServerDir, ".env"), "utf8"));
+    const parsed = dotenv.parse(fsSync.readFileSync(path.join(orbitfsServerDir, ".env"), "utf8"));
     return parsed.HIVE_ROOT || null;
   } catch { return null; }
 }

@@ -6,11 +6,11 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import { execFile, spawn } from "child_process";
 import { Readable } from "stream";
-import { makeHiveClient } from "./hive-client.js";
-import { resolveLocalHiveRoot, makeLocalOps } from "./local-hive-ops.js";
+import { makeOrbitFSClient } from "./orbitfs-client.js";
+import { resolveLocalOrbitFSRoot, makeLocalOps } from "./local-orbitfs-ops.js";
 import { verifyLogin, validateSession, invalidateSession, listUsers, upsertUser, removeUser, getUserProfile, updateUserProfile } from "./auth.js";
 import { canAccessPath, permissionsForPath, filterEntriesForRole, listPermissions, setPermission, clearPermission, normalizeFilePath } from "./permissions.js";
-import { needsSetup, runSetup, tryStartHiveServer } from "./setup.js";
+import { needsSetup, runSetup, tryStartOrbitFSServer } from "./setup.js";
 import { workspaceRouter } from "./workspace-routes.js";
 import { beginDownload } from "./download-limits.js";
 import { evaluateWorkspaceLifecycle } from "./workspaces.js";
@@ -33,7 +33,7 @@ const PANEL_EVENT_LOG = path.join(LOG_DIR, "orbitfs-panel-events.jsonl");
 const PANEL_ERROR_LOG = path.join(LOG_DIR, "orbitfs-panel-errors.jsonl");
 const PANEL_SERVICE_NAME = process.env.PANEL_SERVICE_NAME || "OrbitFSPanel";
 const HIVE_SERVICE_NAME = process.env.HIVE_SERVICE_NAME || "OrbitFSMcpServer";
-const HIVE_SERVER_DIR = process.env.HIVE_SERVER_DIR || "F:\\orbitfs-mcp";
+const HIVE_SERVER_DIR = process.env.HIVE_SERVER_DIR || "F:\\OrbitFS Project\\orbitfs-mcp";
 const HIVE_LOG_DIR = process.env.HIVE_LOG_DIR || path.join(HIVE_SERVER_DIR, "logs");
 const CLOUDFLARED_SERVICE_NAME = process.env.CLOUDFLARED_SERVICE_NAME || "OrbitFSTunnel";
 const CLOUDFLARED_DIR = process.env.CLOUDFLARED_DIR || "C:\\cloudflared";
@@ -53,12 +53,12 @@ const POWERSHELL_CANDIDATES = [
   "pwsh.exe",
 ].filter(Boolean);
 
-let hive = makeHiveClient(process.env.HIVE_URL, process.env.HIVE_API_KEY);
+let hive = makeOrbitFSClient(process.env.HIVE_URL, process.env.HIVE_API_KEY);
 
 // Read-only disk fallback for browsing/viewing/downloading when the MCP
-// server is down - see local-hive-ops.js for why writes aren't covered here.
-const localHiveRoot = resolveLocalHiveRoot(HIVE_SERVER_DIR);
-const localOps = localHiveRoot ? makeLocalOps(localHiveRoot) : null;
+// server is down - see local-orbitfs-ops.js for why writes aren't covered here.
+const localOrbitFSRoot = resolveLocalOrbitFSRoot(HIVE_SERVER_DIR);
+const localOps = localOrbitFSRoot ? makeLocalOps(localOrbitFSRoot) : null;
 
 const app = express();
 app.set("etag", false);
@@ -164,11 +164,11 @@ app.post("/api/setup", express.json(), async (req, res) => {
       hiveServerDir: HIVE_SERVER_DIR,
       panelPort: PORT,
     });
-    hive = makeHiveClient(result.hiveUrl, result.hiveApiKey);
+    hive = makeOrbitFSClient(result.hiveUrl, result.hiveApiKey);
     process.env.HIVE_URL = result.hiveUrl;
     process.env.HIVE_API_KEY = result.hiveApiKey;
     logEvent("panel.setup.complete", { dataFolder: result.dataFolder, adminUsername: req.body?.adminUsername });
-    const hiveStatus = await tryStartHiveServer(HIVE_SERVER_DIR, result.hiveUrl);
+    const hiveStatus = await tryStartOrbitFSServer(HIVE_SERVER_DIR, result.hiveUrl);
     res.json({
       ok: true,
       hiveStatus,
@@ -412,7 +412,7 @@ app.post("/api/trash/empty", requireAdmin, async (req, res) => {
   }
 });
 
-const STARTUP_CONFIG_PATH = localHiveRoot ? path.join(localHiveRoot, "_system", "Config", "startup-loading.json") : null;
+const STARTUP_CONFIG_PATH = localOrbitFSRoot ? path.join(localOrbitFSRoot, "_system", "Config", "startup-loading.json") : null;
 const STARTUP_CONFIG_DEFAULT = {
   defaultStrength: "medium",
   excludeFolders: ["_trash", "trash", "archive", "archives", "_sorter", "2. Wellbeing/Pure Vent Mode"],
@@ -424,7 +424,7 @@ const STARTUP_CONFIG_DEFAULT = {
 
 app.get("/api/system/startup-config", requireAdmin, async (req, res) => {
   try {
-    if (!STARTUP_CONFIG_PATH) throw new Error("Local Hive root is unavailable");
+    if (!STARTUP_CONFIG_PATH) throw new Error("Local OrbitFS root is unavailable");
     let config = STARTUP_CONFIG_DEFAULT;
     try { config = { ...STARTUP_CONFIG_DEFAULT, ...JSON.parse(await fs.readFile(STARTUP_CONFIG_PATH, "utf8")) }; } catch {}
     delete config.defaultProject;
@@ -434,7 +434,7 @@ app.get("/api/system/startup-config", requireAdmin, async (req, res) => {
 
 app.post("/api/system/startup-config", requireAdmin, express.json(), async (req, res) => {
   try {
-    if (!STARTUP_CONFIG_PATH) throw new Error("Local Hive root is unavailable");
+    if (!STARTUP_CONFIG_PATH) throw new Error("Local OrbitFS root is unavailable");
     const body = req.body || {};
     const clean = structuredClone(STARTUP_CONFIG_DEFAULT);
     clean.defaultStrength = ["low", "medium", "high", "custom"].includes(body.defaultStrength) ? body.defaultStrength : "medium";
@@ -670,7 +670,7 @@ app.delete("/api/file-permissions", requireAdmin, async (req, res) => {
 });
 
 // --- System monitoring / control ----------------------------------------
-// So there's no reason to RDP into the VPS just to check whether the Hive
+// So there's no reason to RDP into the VPS just to check whether the OrbitFS
 // server / tunnel / this panel itself are alive, or to bounce one of them.
 
 function runPs(args) {
@@ -709,7 +709,7 @@ async function buildCloudSystemStatus() {
   const hiveOk = await hive.ping();
   const sorterPort = fsSync.existsSync(SORTER_DIR) ? await resolveSorterPort() : 0;
   const sorterRunning = fsSync.existsSync(SORTER_DIR) && (await sorterOnline(sorterPort));
-  const disk = await readDiskUsage(process.env.HIVE_ROOT || localHiveRoot || WORKSPACE_ROOT);
+  const disk = await readDiskUsage(process.env.HIVE_ROOT || localOrbitFSRoot || WORKSPACE_ROOT);
   return {
     panel: {
       exists: true,
@@ -911,14 +911,14 @@ const LOG_FILES = {
   "panel-errors": PANEL_ERROR_LOG,
   "panel-out": path.join(__dirname, "service-out.log"),
   "panel-err": path.join(__dirname, "service-err.log"),
-  "hive-out": path.join(HIVE_SERVER_DIR, "out.log"),
-  "hive-err": path.join(HIVE_SERVER_DIR, "err.log"),
+  "hive-out": path.join(HIVE_SERVER_DIR, "service-out.log"),
+  "hive-err": path.join(HIVE_SERVER_DIR, "service-err.log"),
   "hive-events": path.join(HIVE_LOG_DIR, "master-hive-events.jsonl"),
   "hive-errors": path.join(HIVE_LOG_DIR, "master-hive-errors.jsonl"),
   "tunnel-out": path.join(CLOUDFLARED_DIR, "tunnel_out.log"),
   "tunnel-err": path.join(CLOUDFLARED_DIR, "tunnel_err.log"),
-  "sorter-out": path.join(SORTER_DIR, "out.log"),
-  "sorter-err": path.join(SORTER_DIR, "err.log"),
+  "sorter-out": path.join(SORTER_DIR, "service-out.log"),
+  "sorter-err": path.join(SORTER_DIR, "service-err.log"),
 };
 
 app.get("/api/system/logs", async (req, res) => {

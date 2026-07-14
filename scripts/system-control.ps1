@@ -457,7 +457,7 @@ function Stop-HiveProcess {
   }
 
   if ($stoppedAny -or (Test-HiveHttp)) {
-    throw "Hive server force-stop requested but $HivePingUrl is still responding."
+    throw "OrbitFS server force-stop requested but $HivePingUrl is still responding."
   }
 }
 
@@ -469,14 +469,14 @@ function Start-HiveProcess {
         return
       }
     }
-    throw "Hive service '$HiveServiceName' started but $HivePingUrl did not come up."
+    throw "OrbitFS service '$HiveServiceName' started but $HivePingUrl did not come up."
   }
 
   if (-not (Test-Path -LiteralPath $HiveDir)) {
-    throw "Hive directory not found: $HiveDir"
+    throw "OrbitFS directory not found: $HiveDir"
   }
   if (-not (Test-Path -LiteralPath $HiveServerScript)) {
-    throw "Hive server entry file not found: $HiveServerScript"
+    throw "OrbitFS server entry file not found: $HiveServerScript"
   }
 
   if (-not (Test-HiveHttp)) {
@@ -495,7 +495,7 @@ function Start-HiveProcess {
       if ($proc.HasExited) {
         $stderr = if (Test-Path -LiteralPath $HiveErrLog) { (Get-Content $HiveErrLog -Tail 40 -ErrorAction SilentlyContinue) -join "`n" } else { "" }
         $stdout = if (Test-Path -LiteralPath $HiveOutLog) { (Get-Content $HiveOutLog -Tail 20 -ErrorAction SilentlyContinue) -join "`n" } else { "" }
-        $message = "Hive server exited during startup."
+        $message = "OrbitFS server exited during startup."
         if ($stderr) { $message += " stderr: $stderr" }
         elseif ($stdout) { $message += " stdout: $stdout" }
         throw $message
@@ -504,7 +504,7 @@ function Start-HiveProcess {
 
     $stderr = if (Test-Path -LiteralPath $HiveErrLog) { (Get-Content $HiveErrLog -Tail 40 -ErrorAction SilentlyContinue) -join "`n" } else { "" }
     $stdout = if (Test-Path -LiteralPath $HiveOutLog) { (Get-Content $HiveOutLog -Tail 20 -ErrorAction SilentlyContinue) -join "`n" } else { "" }
-    $message = "Hive server process started but /api/ping did not come up at $HivePingUrl."
+    $message = "OrbitFS server process started but /api/ping did not come up at $HivePingUrl."
     if ($stderr) { $message += " stderr: $stderr" }
     elseif ($stdout) { $message += " stdout: $stdout" }
     throw $message

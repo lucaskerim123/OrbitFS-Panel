@@ -54,7 +54,7 @@ const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "m4a", "flac", "aac"]);
 const SHEET_EXTENSIONS = new Set(["xlsx", "xls", "csv"]);
 // TEMPORARILY EMPTY during the top-level folder redesign, matching
-// mcp-hive-server/server.js. Restore the real list once the new structure
+// orbitfs-mcp/server.js. Restore the real list once the new structure
 // is settled:
 //   "_system", "_sorter", "_trash", "0. Core", "1. Legal",
 //   "2. Wellbeing", "_media"
@@ -965,7 +965,7 @@ function renderMovePickerBreadcrumbs() {
   const wrap = document.getElementById("move-picker-breadcrumbs");
   wrap.innerHTML = "";
   const parts = movePicker.folder ? movePicker.folder.split("/") : [];
-  const root = Object.assign(document.createElement("button"), { type: "button", textContent: "🏠 Hive" });
+  const root = Object.assign(document.createElement("button"), { type: "button", textContent: "🏠 OrbitFS" });
   root.addEventListener("click", () => loadMovePickerFolder(""));
   wrap.appendChild(root);
   parts.forEach((part, index) => {
@@ -1107,7 +1107,7 @@ document.getElementById("new-folder-btn").addEventListener("click", async () => 
 });
 
 // --- Sorter tab -------------------------------------------------------------
-// The addon sorter is a separate localhost service (MasterHiveSorter); the
+// The addon sorter is a separate localhost service (OrbitFSSorter); the
 // panel proxies its API at /api/sorter/* behind panel auth. This tab drives
 // the whole preview -> edit -> confirm flow inline: items on the left,
 // destination picker for the selected item on the right. Nothing moves on
@@ -1439,6 +1439,31 @@ function parseLogLine(line) {
   }
 }
 
+// Every HTTP request logs http.request/auth.jwt.ok/auth.api_key.ok, and every
+// MCP call logs mcp.request.start - these dwarf the events that actually
+// matter (tool results, errors, file changes) in normal use. Hide them by
+// default, with a per-page toggle to see everything.
+const NOISE_LOG_EVENTS = new Set(["http.request", "auth.jwt.ok", "auth.api_key.ok", "mcp.request.start"]);
+const lastLogLines = new Map(); // target -> raw lines from the last fetch
+let showAllLogLines = false;
+
+function renderLogLines(target) {
+  const el = document.getElementById(`log-${target}`);
+  if (!el) return;
+  const raw = lastLogLines.get(target) || [];
+  const filtered = showAllLogLines
+    ? raw
+    : raw.filter((line) => {
+        const entry = parseLogLine(line);
+        return !entry || !NOISE_LOG_EVENTS.has(entry.event);
+      });
+  const hidden = raw.length - filtered.length;
+  const text = filtered.map(formatLogLine).join("\n") || "(empty)";
+  el.textContent = hidden > 0
+    ? `${text}\n\n(+${hidden} routine request/auth line${hidden === 1 ? "" : "s"} hidden - "Show all" reveals them)`
+    : text;
+}
+
 document.querySelectorAll(".log-tab-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
     const group = btn.closest(".log-tabs");
@@ -1448,10 +1473,25 @@ document.querySelectorAll(".log-tab-btn").forEach((btn) => {
     const target = which.split("-")[0]; // hive | tunnel | panel
     try {
       const { lines } = await api(`/api/system/logs?which=${which}`);
-      document.getElementById(`log-${target}`).textContent = lines.map(formatLogLine).join("\n") || "(empty)";
+      lastLogLines.set(target, lines);
+      renderLogLines(target);
     } catch (err) {
       document.getElementById(`log-${target}`).textContent = err.message;
     }
+  });
+});
+
+document.querySelectorAll(".log-tabs").forEach((group) => {
+  if (group.querySelector(".log-show-all-toggle")) return;
+  const label = document.createElement("label");
+  label.className = "log-show-all-toggle";
+  label.style.cssText = "display:inline-flex;align-items:center;gap:6px;font-size:12px;margin-left:8px;font-weight:400;cursor:pointer;white-space:nowrap";
+  label.innerHTML = `<input type="checkbox">Show all`;
+  group.appendChild(label);
+  label.querySelector("input").addEventListener("change", (event) => {
+    showAllLogLines = event.target.checked;
+    document.querySelectorAll(".log-show-all-toggle input").forEach((cb) => { cb.checked = showAllLogLines; });
+    lastLogLines.forEach((_, target) => renderLogLines(target));
   });
 });
 
@@ -1505,8 +1545,8 @@ function renderFlowStatus(hiveRunning, oauth, logEntries = []) {
   setPill("flows-pill", allReady, allReady ? "ready" : "check");
   setPill("flow-shared-pill", hiveRunning, hiveRunning ? "online" : "offline");
   document.getElementById("flow-shared-detail").textContent = hiveRunning
-    ? "Shared Hive MCP is reachable."
-    : "Shared Hive MCP is offline.";
+    ? "Shared OrbitFS MCP is reachable."
+    : "Shared OrbitFS MCP is offline.";
   document.getElementById("flow-shared-accounts").textContent = accounts.length;
   document.getElementById("flow-shared-events").textContent = mcpEvents;
   renderFlowStats(logEntries, "shared");
@@ -1523,7 +1563,7 @@ function renderFlowStatus(hiveRunning, oauth, logEntries = []) {
     const plural = count === 1 ? "client" : "clients";
     detail.textContent = hiveRunning
       ? `${count} ${label} OAuth ${plural} registered.`
-      : "Hive server is stopped, so this flow is offline.";
+      : "OrbitFS server is stopped, so this flow is offline.";
     document.getElementById(`flow-${key}-clients`).textContent = count;
     document.getElementById(`flow-${key}-events`).textContent = flowEvents;
     renderFlowStats(logEntries, key);

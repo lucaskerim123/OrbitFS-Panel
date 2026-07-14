@@ -47,7 +47,7 @@
   (prompts for CodeDir and HiveDataRoot)
 
 .EXAMPLE
-  .\Install-OrbitFS.ps1 -CodeDir "D:\apps" -HiveDataRoot "D:\FireStorm\The Master Hive"
+  .\Install-OrbitFS.ps1 -CodeDir "D:\apps" -HiveDataRoot "D:\FireStorm\The Orbit FS"
 #>
 [CmdletBinding()]
 param(
@@ -186,7 +186,7 @@ if (-not $CodeDir) {
 }
 if (-not $HiveDataRoot) {
   Write-Host "Where should the shared FireStorm file store live? (this is the actual data - separate from code)" -ForegroundColor White
-  $HiveDataRoot = Read-PathWithDefault "FireStorm data directory" (Join-Path $CodeDir "Project FireStorm\The Master Hive")
+  $HiveDataRoot = Read-PathWithDefault "FireStorm data directory" (Join-Path $CodeDir "Project FireStorm\The Orbit FS")
 }
 
 # Resolve to an absolute path immediately, whatever form the user typed

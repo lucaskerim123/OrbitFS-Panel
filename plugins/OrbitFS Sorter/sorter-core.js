@@ -34,7 +34,7 @@ function relFromRoot(full) {
 
 export function safeJoin(...parts) {
   const full = path.resolve(rootPath(), ...parts);
-  if (!full.startsWith(rootPath())) throw new Error('Path escapes Hive root');
+  if (!full.startsWith(rootPath())) throw new Error('Path escapes OrbitFS root');
   return full;
 }
 

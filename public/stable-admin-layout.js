@@ -133,7 +133,7 @@
       system.appendChild(logs);
     }
     const logsHost = q("#system-all-logs-host", logs);
-    const hiveLogs = qa("#tab-system details").find((item) => q("summary", item)?.textContent.trim() === "Hive activity logs");
+    const hiveLogs = qa("#tab-system details").find((item) => q("summary", item)?.textContent.trim() === "OrbitFS activity logs");
     if (hiveLogs && logsHost && !logsHost.contains(hiveLogs)) logsHost.appendChild(hiveLogs);
     const diagnostics = q(".sys-zone-diagnostics", system);
     if (diagnostics && logsHost) {

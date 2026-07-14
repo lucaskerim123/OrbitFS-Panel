@@ -1,5 +1,5 @@
 // First-run setup wizard: creates the data folder, writes both this panel's
-// and the Hive server's .env files, and creates the first admin login.
+// and the OrbitFS server's .env files, and creates the first admin login.
 // Exists so a fresh clone of both repos can be configured entirely from the
 // browser instead of hand-editing .env files and running add-user.mjs.
 import fs from "fs/promises";
@@ -15,9 +15,9 @@ function randomSecret(bytes = 32) {
 // The folder the user picks in the wizard is a base location (e.g.
 // "F:\Project Firestorm") - the actual working root always lives one level
 // deeper, inside this subfolder, so the base folder can hold other things
-// (installers, other projects) without them getting mixed into the Hive's
+// (installers, other projects) without them getting mixed into OrbitFS's
 // own _system/_sorter/_trash structure.
-const HIVE_SUBFOLDER_NAME = "The Master Hive";
+const HIVE_SUBFOLDER_NAME = "The Orbit FS";
 
 // Merges `overrides` into an .env file's KEY=value lines. If the file
 // doesn't exist yet, starts from `templatePath` (usually .env.example).
@@ -56,7 +56,7 @@ export async function needsSetup() {
   return users.length === 0;
 }
 
-async function ensureHiveSkeleton(dataFolder) {
+async function ensureOrbitFSSkeleton(dataFolder) {
   await fs.mkdir(dataFolder, { recursive: true });
   const systemDir = path.join(dataFolder, "_system");
   const dirs = [
@@ -133,7 +133,7 @@ export async function runSetup(input, { panelDir, hiveServerDir, panelPort }) {
   const sorterDir = path.join(panelDir, "plugins", "OrbitFS Sorter");
 
   try {
-    await ensureHiveSkeleton(dataFolder);
+    await ensureOrbitFSSkeleton(dataFolder);
     await ensureSorterSkeleton(sorterDir);
   } catch (fsErr) {
     const err = new Error(`Couldn't create that folder (${fsErr.code || fsErr.message}). Check the drive letter exists and you have permission to write there.`);
@@ -214,10 +214,10 @@ export async function runSetup(input, { panelDir, hiveServerDir, panelPort }) {
   };
 }
 
-// Best-effort: start the Hive server if it isn't already responding. Never
+// Best-effort: start the OrbitFS server if it isn't already responding. Never
 // throws - setup should succeed even if this fails, the user can start it
 // manually (or it's already running as a service).
-export async function tryStartHiveServer(hiveServerDir, hiveUrl) {
+export async function tryStartOrbitFSServer(hiveServerDir, hiveUrl) {
   try {
     const resp = await fetch(new URL("/api/ping", hiveUrl), { signal: AbortSignal.timeout(3000) });
     if (resp.ok) return { started: false, reason: "already running" };

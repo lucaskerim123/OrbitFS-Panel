@@ -16,7 +16,7 @@ Add a separate prominent `MEGA — LOAD ALL OF 0. CORE` button. MEGA is not anot
 Each project has editable Low, Medium and High profiles. Show every configured item with:
 
 - name;
-- resolved live Hive path;
+- resolved live OrbitFS path;
 - exact file, folder, semantic current-file rule, profile or context-group type;
 - required or optional status;
 - enabled load strengths;
@@ -27,7 +27,7 @@ Custom applies only to the current startup unless explicitly saved over a preset
 
 ## File selection
 
-Use a live Hive file/folder picker. Do not require full paths to be typed. Archive remains excluded unless explicitly requested.
+Use a live OrbitFS file/folder picker. Do not require full paths to be typed. Archive remains excluded unless explicitly requested.
 
 ## Runtime request
 

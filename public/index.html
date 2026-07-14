@@ -38,7 +38,7 @@
 
       <label class="field-label" for="setup-data-folder">Where should your files be stored?</label>
       <input id="setup-data-folder" type="text" placeholder="e.g. D:\MyFiles" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
-      <p class="field-hint">A "The Master Hive" folder is created inside this location - created automatically if it doesn't exist yet.</p>
+      <p class="field-hint">A "The Orbit FS" folder is created inside this location - created automatically if it doesn't exist yet.</p>
 
       <label class="field-label" for="setup-hive-port">Server port</label>
       <input id="setup-hive-port" type="number" min="1" max="65535" placeholder="3939" />
@@ -102,7 +102,7 @@
         <h1>OrbitFS Panel</h1>
       </button>
       <div class="status-pills">
-        <button id="status-hive" class="pill status-hive-button" type="button" aria-expanded="false">Hive</button>
+        <button id="status-hive" class="pill status-hive-button" type="button" aria-expanded="false">OrbitFS</button>
         <div id="hive-mini-status" class="hive-mini-status hidden" role="dialog" aria-label="Server status">
           <div><span>MCP</span><strong id="mini-mcp-status">Checking…</strong></div>
           <div><span>Sorter</span><strong id="mini-sorter-status">Checking…</strong></div>
@@ -314,13 +314,13 @@
           <div class="topology">
             <span class="topology-node">ChatGPT / Codex</span>
             <span class="topology-link" aria-hidden="true"><span class="topology-pulse"></span></span>
-            <span class="topology-node topology-node-hub">Shared Hive MCP</span>
+            <span class="topology-node topology-node-hub">Shared OrbitFS MCP</span>
             <span class="topology-link" aria-hidden="true"><span class="topology-pulse"></span></span>
             <span class="topology-node">Claude</span>
           </div>
           <div class="infra-grid">
             <div class="infra-item">
-              <span>Hive server</span>
+              <span>OrbitFS server</span>
               <span id="svc-hive-pill" class="pill">-</span>
             </div>
             <div class="infra-item">
@@ -388,9 +388,9 @@
               </dl>
             </div>
           </div>
-          <p class="muted-text">Status uses shared Hive health, OAuth registrations, refresh-token accounts, and recent structured Hive logs.</p>
+          <p class="muted-text">Status uses shared OrbitFS health, OAuth registrations, refresh-token accounts, and recent structured OrbitFS logs.</p>
           <pre id="flow-recent-log" class="log-view compact-log">(waiting)</pre>
-          <details><summary>Hive activity logs</summary>
+          <details><summary>OrbitFS activity logs</summary>
             <p class="muted-text">Activity includes shared MCP, REST, OAuth, ChatGPT/Codex, Claude, web panel, and file-change events.</p>
             <div class="log-tabs">
               <button class="log-tab-btn active" data-log="hive-events">activity</button>
@@ -408,15 +408,15 @@
 
         <details class="card" open>
           <summary>Startup Load Control</summary>
-          <p class="muted-text">No default project. Configure the real Hive files loaded by each project preset. One Hive-relative file path per line. Archive remains excluded.</p>
+          <p class="muted-text">No default project. Configure the real OrbitFS files loaded by each project preset. One OrbitFS-relative file path per line. Archive remains excluded.</p>
           <form id="startup-config-form" class="user-form">
             <label class="field-label">Project</label>
             <select id="startup-config-project"><option value="1. Legal">1. Legal</option><option value="2. Wellbeing">2. Wellbeing</option></select>
-            <label class="field-label">Low</label><textarea id="startup-files-low" rows="3" placeholder="One Hive-relative file per line"></textarea>
-            <label class="field-label">Medium</label><textarea id="startup-files-medium" rows="5" placeholder="One Hive-relative file per line"></textarea>
-            <label class="field-label">High</label><textarea id="startup-files-high" rows="7" placeholder="One Hive-relative file per line"></textarea>
-            <label class="field-label">Custom 1</label><textarea id="startup-files-custom1" rows="5" placeholder="One Hive-relative file per line"></textarea>
-            <label class="field-label">Custom 2</label><textarea id="startup-files-custom2" rows="5" placeholder="One Hive-relative file per line"></textarea>
+            <label class="field-label">Low</label><textarea id="startup-files-low" rows="3" placeholder="One OrbitFS-relative file per line"></textarea>
+            <label class="field-label">Medium</label><textarea id="startup-files-medium" rows="5" placeholder="One OrbitFS-relative file per line"></textarea>
+            <label class="field-label">High</label><textarea id="startup-files-high" rows="7" placeholder="One OrbitFS-relative file per line"></textarea>
+            <label class="field-label">Custom 1</label><textarea id="startup-files-custom1" rows="5" placeholder="One OrbitFS-relative file per line"></textarea>
+            <label class="field-label">Custom 2</label><textarea id="startup-files-custom2" rows="5" placeholder="One OrbitFS-relative file per line"></textarea>
             <button type="submit" class="primary">Save load presets</button>
             <p id="startup-config-message" class="muted-text"></p>
           </form>
@@ -427,7 +427,7 @@
           <summary>Server controls</summary>
           <p id="system-control-message" class="muted-text"></p>
           <div class="breaker-row">
-            <div class="breaker-name">Hive server</div>
+            <div class="breaker-name">OrbitFS server</div>
             <div class="btn-group">
               <button class="control-btn" data-target="hive" data-action="start">Start</button>
               <button class="control-btn danger" data-target="hive" data-action="stop">Stop</button>

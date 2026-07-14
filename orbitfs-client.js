@@ -1,8 +1,8 @@
-// Talks to the Master Hive REST API (see mcp-hive-server/server.js /api/*).
+// Talks to the OrbitFS REST API (see orbitfs-mcp/server.js /api/*).
 // One node, one client - this used to be split into "pc"/"vps" clients for
 // a two-way sync feature that never made sense once it turned out Claude
-// Desktop and the Hive server both just run on this one VPS.
-export function makeHiveClient(baseUrl, apiKey) {
+// Desktop and the OrbitFS server both just run on this one VPS.
+export function makeOrbitFSClient(baseUrl, apiKey) {
   const headers = { Authorization: `Bearer ${apiKey}`, "X-Hive-Flow": "webpanel" };
 
   async function ping() {

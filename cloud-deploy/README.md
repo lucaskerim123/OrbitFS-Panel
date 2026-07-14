@@ -11,7 +11,7 @@ Use one container, one persistent volume, and three local Node processes:
 
 Do not split these into separate hosted services unless you redesign storage.
 The panel proxies to the sorter over `localhost`, and the sorter and MCP server
-both expect direct access to the same Hive filesystem.
+both expect direct access to the same OrbitFS filesystem.
 
 ## Included here
 
@@ -72,7 +72,7 @@ HIVE_SERVER_DIR=/app/orbitfs-mcp
 HIVE_LOG_DIR=/app/orbitfs-mcp/logs
 SORTER_DIR=/app/orbitfs-panel/plugins/OrbitFS Sorter
 
-HIVE_ROOT=/data/hive
+HIVE_ROOT=/data/orbitfs
 PUBLIC_BASE_URL=https://replace-me-with-your-public-url
 
 HIVE_API_KEY=replace-with-random-secret
@@ -87,10 +87,10 @@ Mount one persistent volume at:
 /data
 ```
 
-The current default Hive root inside the container is:
+The current default OrbitFS root inside the container is:
 
 ```text
-/data/hive
+/data/orbitfs
 ```
 
 That keeps all live content on the mounted disk instead of the ephemeral
@@ -189,7 +189,7 @@ http://localhost:4000
 - Vercel Functions have request-duration limits rather than acting like a
   normal always-on server process.
 - Vercel storage is Blob/Edge Config/marketplace databases, not a mounted
-  shared filesystem the current sorter and Hive code can treat like local disk.
+  shared filesystem the current sorter and OrbitFS code can treat like local disk.
 
 Official references:
 

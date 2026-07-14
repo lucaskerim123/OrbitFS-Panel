@@ -181,7 +181,7 @@
     if (!host) return;
 
     const candidates = [];
-    const hiveActivity = qa("#tab-system details").find((detail) => q("summary", detail)?.textContent.trim() === "Hive activity logs");
+    const hiveActivity = qa("#tab-system details").find((detail) => q("summary", detail)?.textContent.trim() === "OrbitFS activity logs");
     if (hiveActivity) candidates.push(hiveActivity);
     const diagnostics = q("#tab-system .sys-zone-diagnostics");
     if (diagnostics) candidates.push(...qa(":scope > details.card", diagnostics));

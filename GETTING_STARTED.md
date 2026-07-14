@@ -65,7 +65,7 @@ accept the suggested default, or type your own):
 Or skip the prompts by passing both up front:
 
 ```powershell
-.\Install-OrbitFS.ps1 -CodeDir "D:\apps" -HiveDataRoot "D:\FireStorm\The Master Hive"
+.\Install-OrbitFS.ps1 -CodeDir "D:\apps" -HiveDataRoot "D:\FireStorm\The Orbit FS"
 ```
 
 It's safe to run more than once - it never overwrites a `.env` file or

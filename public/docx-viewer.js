@@ -1,16 +1,10 @@
 (() => {
-  for (const href of ["system-compact.css", "startup-settings.css"]) {
+  for (const href of ["system-compact.css"]) {
     if (document.querySelector(`link[href="${href}"]`)) continue;
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = href;
     document.head.appendChild(link);
-  }
-  if (!document.querySelector('script[src="startup-settings.js"]')) {
-    const settingsScript = document.createElement("script");
-    settingsScript.src = "startup-settings.js";
-    settingsScript.async = false;
-    document.body.appendChild(settingsScript);
   }
 
   const DOCX_PREVIEW_SRC = "https://cdn.jsdelivr.net/npm/docx-preview@0.3.6/dist/docx-preview.min.js";
