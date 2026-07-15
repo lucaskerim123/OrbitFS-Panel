@@ -14,14 +14,14 @@
   <div id="login" class="login-screen hidden">
     <form id="login-form">
       <div class="brand">
-        <span class="brand-mark">ðŸ§ </span>
+        <span class="brand-mark">&#129504;</span>
         <h1>OrbitFS Panel</h1>
       </div>
       <p class="brand-subtitle">OrbitFS file manager &amp; server control</p>
       <input id="login-username" type="text" placeholder="Username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" />
       <div class="pin-field">
         <input id="login-pin" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="PIN" autocomplete="current-password" />
-        <button type="button" id="pin-toggle" class="link-btn pin-toggle" aria-label="Show PIN">ðŸ‘</button>
+        <button type="button" id="pin-toggle" class="link-btn pin-toggle" aria-label="Show PIN">Show</button>
       </div>
       <button type="submit" class="primary">Enter</button>
       <p id="login-error" class="error"></p>
@@ -31,7 +31,7 @@
   <div id="setup" class="login-screen hidden">
     <form id="setup-form">
       <div class="brand">
-        <span class="brand-mark">ðŸ§ </span>
+        <span class="brand-mark">&#129504;</span>
         <h1>Let's get set up</h1>
       </div>
       <p class="brand-subtitle">This only runs once, on first launch.</p>
@@ -47,7 +47,7 @@
       <input id="setup-public-url" type="text" placeholder="https://your-domain.example.com" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
       <p class="field-hint">The address Claude/ChatGPT will connect to. Leave blank to keep whatever's already configured, or set it later.</p>
 
-      <button type="button" id="setup-oauth-toggle" class="link-btn setup-advanced-toggle">â–¸ Advanced: OAuth login for Claude/ChatGPT (optional)</button>
+      <button type="button" id="setup-oauth-toggle" class="link-btn setup-advanced-toggle">> Advanced: OAuth login for Claude/ChatGPT (optional)</button>
       <div id="setup-oauth-fields" class="hidden">
         <p class="field-hint">Only needed if you want Claude/ChatGPT to connect with a one-click login instead of pasting an API key. Requires a Cloudflare Access application already set up. Leave all blank to skip - the API key still works either way.</p>
 
@@ -72,7 +72,7 @@
       <label class="field-label" for="setup-admin-pin">Your admin PIN <span class="field-optional">(4-10 digits)</span></label>
       <div class="pin-field">
         <input id="setup-admin-pin" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="PIN" autocomplete="new-password" />
-        <button type="button" id="setup-pin-toggle" class="link-btn pin-toggle" aria-label="Show PIN">ðŸ‘</button>
+        <button type="button" id="setup-pin-toggle" class="link-btn pin-toggle" aria-label="Show PIN">Show</button>
       </div>
 
       <button type="submit" class="primary">Finish setup</button>
@@ -82,7 +82,7 @@
 
     <div id="setup-done" class="hidden">
       <div class="brand">
-        <span class="brand-mark">âœ…</span>
+        <span class="brand-mark">&#129504;</span>
         <h1>You're set up</h1>
       </div>
       <p class="field-hint">Connect Claude or ChatGPT to this server with:</p>
@@ -104,8 +104,8 @@
       <div class="status-pills">
         <button id="status-hive" class="pill status-hive-button" type="button" aria-expanded="false">OrbitFS</button>
         <div id="hive-mini-status" class="hive-mini-status hidden" role="dialog" aria-label="Server status">
-          <div><span>MCP</span><strong id="mini-mcp-status">Checkingâ€¦</strong></div>
-          <div><span>Sorter</span><strong id="mini-sorter-status">Checkingâ€¦</strong></div>
+          <div><span>MCP</span><strong id="mini-mcp-status">Checking...</strong></div>
+          <div><span>Sorter</span><strong id="mini-sorter-status">Checking...</strong></div>
           <small id="mini-status-time">Not checked yet</small>
         </div>
         <button id="logout" class="link-btn header-logout" aria-label="Log out"><span class="power-icon" aria-hidden="true"></span></button>
@@ -163,7 +163,7 @@
 
         <div id="editor" class="editor hidden">
           <div class="editor-toolbar">
-            <button id="back-to-list-btn" class="link-btn back-btn" aria-label="Back to file list">â† Back</button>
+            <button id="back-to-list-btn" class="link-btn back-btn" aria-label="Back to file list">Back</button>
             <span id="editor-dirty-dot" class="dirty-dot hidden" title="Unsaved changes"></span>
             <span id="editor-path"></span>
             <span class="spacer"></span>
@@ -178,15 +178,15 @@
                 <option value="'Fira Code', ui-monospace, monospace">Fira Code</option>
               </select>
               <div class="step">
-                <button id="editor-font-dec" type="button" aria-label="Decrease font size">â€“</button>
+                <button id="editor-font-dec" type="button" aria-label="Decrease font size">-</button>
                 <span id="editor-font-size-display">13</span>
                 <button id="editor-font-inc" type="button" aria-label="Increase font size">+</button>
               </div>
             </div>
-            <button id="editor-find-btn" type="button">ðŸ” Find</button>
+            <button id="editor-find-btn" type="button">Find</button>
             <button id="editor-permission-btn" class="hidden">Permission</button>
             <button id="save-file-btn" class="primary">Save</button>
-            <button id="editor-download-btn">â¬‡ Download</button>
+            <button id="editor-download-btn">Download</button>
             <button id="move-file-btn">Move</button>
             <button id="delete-file-btn" class="danger">Move To Trash</button>
           </div>
@@ -194,10 +194,10 @@
             <input id="editor-find-input" type="text" placeholder="Find" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
             <input id="editor-replace-input" type="text" placeholder="Replace" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
             <span id="editor-find-count" class="find-count"></span>
-            <button id="editor-find-prev" type="button">â†‘</button>
-            <button id="editor-find-next" type="button">â†“</button>
+            <button id="editor-find-prev" type="button">Prev</button>
+            <button id="editor-find-next" type="button">Next</button>
             <button id="editor-replace-all-btn" type="button">Replace all</button>
-            <button id="editor-find-close" type="button" class="link-btn" aria-label="Close find bar">âœ•</button>
+            <button id="editor-find-close" type="button" class="link-btn" aria-label="Close find bar">X</button>
           </div>
           <div id="editor-rendered" class="rendered-view hidden"></div>
           <textarea id="editor-content" spellcheck="false"></textarea>
@@ -205,17 +205,17 @@
 
         <div id="preview" class="editor hidden">
           <div class="editor-toolbar">
-            <button id="preview-back-btn" class="link-btn back-btn" aria-label="Back to file list">â† Back</button>
+            <button id="preview-back-btn" class="link-btn back-btn" aria-label="Back to file list">Back</button>
             <span id="preview-path"></span>
             <span class="spacer"></span>
-            <button id="preview-close-btn" class="link-btn" type="button" aria-label="Close preview">âœ•</button>
+            <button id="preview-close-btn" class="link-btn" type="button" aria-label="Close preview">X</button>
           </div>
           <div class="preview-body">
             <div id="preview-media" class="preview-media hidden"></div>
             <p id="preview-info" class="muted-text"></p>
             <div class="preview-actions">
               <button id="preview-permission-btn" class="hidden">Permission</button>
-              <button id="preview-download-btn" class="primary">â¬‡ Download</button>
+              <button id="preview-download-btn" class="primary">Download</button>
               <button id="preview-move-btn">Move</button>
               <button id="preview-delete-btn" class="danger">Move To Trash</button>
             </div>
@@ -233,7 +233,7 @@
           <p class="muted-text">Review suggestions, correct destinations and let each workspace build its own sorting memory.</p>
         </div>
         <div class="sorter-workspace-strip">
-          <div><span class="sorter-eyebrow">Active workspace</span><strong id="sorter-workspace-name">Loading workspaceâ€¦</strong></div>
+          <div><span class="sorter-eyebrow">Active workspace</span><strong id="sorter-workspace-name">Loading workspace...</strong></div>
           <label for="sorter-workspace-select">Working in<select id="sorter-workspace-select" aria-label="Sorter workspace"></select></label>
         </div>
       </div>
@@ -266,7 +266,7 @@
               <label class="sorter-approve-all"><input type="checkbox" id="sorter-approve-all" /> Approve all</label>
             </div>
             <ul id="sorter-items" class="sorter-item-list"></ul>
-            <p id="sorter-items-empty" class="muted-text">Nothing loaded. Scan the selected workspaceâ€™s _sorter folder to build a safe preview.</p>
+            <p id="sorter-items-empty" class="muted-text">Nothing loaded. Scan the selected workspace's _sorter folder to build a safe preview.</p>
           </div>
           <div class="sorter-pane sorter-detail-pane">
             <p id="sorter-detail-empty" class="muted-text">Select an item to review its confidence, alternatives and destination.</p>
@@ -274,7 +274,7 @@
               <h3 id="sorter-detail-name" class="sorter-detail-name"></h3>
               <p id="sorter-detail-reason" class="muted-text"></p>
               <label class="sorter-approve-row"><input type="checkbox" id="sorter-detail-approve" /> Approve this move</label>
-              <input id="sorter-folder-filter" type="text" placeholder="Filter workspace foldersâ€¦" autocomplete="off" spellcheck="false" />
+              <input id="sorter-folder-filter" type="text" placeholder="Filter workspace folders..." autocomplete="off" spellcheck="false" />
               <ul id="sorter-folders" class="sorter-folder-list"></ul>
               <label class="sorter-dest-label">Destination path
                 <input id="sorter-detail-dest" type="text" spellcheck="false" autocomplete="off" />
@@ -300,7 +300,7 @@
           <section class="card">
             <h3>Workspace learning</h3>
             <p class="muted-text">Learning is isolated to this workspace and is updated from confirmed and corrected destinations.</p>
-            <button id="sorter-reset-learning" type="button" class="danger">Reset this workspaceâ€™s learning</button>
+            <button id="sorter-reset-learning" type="button" class="danger">Reset this workspace's learning</button>
             <p id="sorter-learning-message" class="muted-text"></p>
           </section>
           <section id="sorter-admin-policy-card" class="card hidden">
@@ -350,7 +350,7 @@
     </section>
 
     <section id="tab-admin" class="tab-panel sys-panel admin-panel">
-      <div class="sys-header"><div class="sys-header-text"><h2 class="sys-title">Admin</h2><p class="sys-subtitle">Users, permissions, workspace policy and security</p></div><button id="admin-refresh-btn" class="sys-refresh-btn">âŸ³ Refresh</button></div>
+      <div class="sys-header"><div class="sys-header-text"><h2 class="sys-title">Admin</h2><p class="sys-subtitle">Users, permissions, workspace policy and security</p></div><button id="admin-refresh-btn" class="sys-refresh-btn">Refresh</button></div>
       <div id="admin-zone-host"></div>
     </section>
 
@@ -360,7 +360,7 @@
           <h2 class="sys-title">System</h2>
           <p class="sys-subtitle">OrbitFS infrastructure control</p>
         </div>
-        <button id="system-refresh-btn" class="sys-refresh-btn">âŸ³ Refresh</button>
+        <button id="system-refresh-btn" class="sys-refresh-btn">Refresh</button>
       </div>
 
       <div class="sys-zone sys-zone-telemetry">
@@ -369,7 +369,7 @@
         <div class="card primary-system-card">
           <div class="service-row">
             <div>
-              <strong>ChatGPT â†” Claude connection monitor</strong>
+              <strong>ChatGPT <-> Claude connection monitor</strong>
               <span id="flows-pill" class="pill">-</span>
             </div>
           </div>
@@ -624,8 +624,8 @@
       <p id="move-picker-source" class="move-picker-source"></p>
       <div id="move-picker-breadcrumbs" class="move-picker-breadcrumbs"></div>
       <div class="move-picker-toolbar">
-        <button id="move-picker-up" type="button">â† Up</button>
-        <input id="move-picker-filter" type="search" placeholder="Filter foldersâ€¦" autocomplete="off" spellcheck="false" />
+        <button id="move-picker-up" type="button">Up</button>
+        <input id="move-picker-filter" type="search" placeholder="Filter folders..." autocomplete="off" spellcheck="false" />
       </div>
       <ul id="move-picker-folders" class="move-picker-folders"></ul>
       <label class="move-picker-name-label" for="move-picker-name">File or folder name</label>
@@ -662,7 +662,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="app.js?v=20260715-addons4"></script>
-  <script src="permissions.js?v=20260715-maintenance"></script>
+  <script src="app.js?v=20260715-final2"></script>
+  <script src="permissions.js?v=20260715-final"></script>
 </body>
 </html>

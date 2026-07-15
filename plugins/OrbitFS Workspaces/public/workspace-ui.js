@@ -30,7 +30,7 @@
 
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260715-maintenance";
+  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260715-final";
   document.head.appendChild(css);
 })();
 function workspaceFormatBytes(value) {
@@ -61,10 +61,10 @@ function workspaceStorageState(percent) {
 function workspaceStorageSummary(workspace) {
   const used = Number(workspace.storage_used_bytes || 0);
   const quota = Number(workspace.storage_quota_bytes || 0);
-  if (!quota || workspace.storage_quota_mode === "unlimited") return `${workspaceFormatBytes(used)} used Â· Unlimited`;
+  if (!quota || workspace.storage_quota_mode === "unlimited") return `${workspaceFormatBytes(used)} used  /  Unlimited`;
   const free = Math.max(0, quota - used);
   const percent = workspaceStoragePercent(workspace);
-  return `${workspaceFormatBytes(used)} of ${workspaceFormatBytes(quota)} Â· ${workspaceFormatBytes(free)} free Â· ${percent.toFixed(1)}%`;
+  return `${workspaceFormatBytes(used)} of ${workspaceFormatBytes(quota)}  /  ${workspaceFormatBytes(free)} free  /  ${percent.toFixed(1)}%`;
 }
 
 function currentWorkspace() {
@@ -102,7 +102,7 @@ function renderWorkspaceBar() {
     const option = document.createElement("option");
     option.value = workspace.id;
     const offline = !workspace.is_main && workspace.drive_state === "offline";
-    option.textContent = workspace.is_main ? `Main Workspace â€” ${workspace.name}` : `${workspace.name}${offline ? " â€” Drive offline" : (workspace.status === "suspended" ? " â€” Suspended" : "")}`;
+    option.textContent = workspace.is_main ? `Main Workspace  -  ${workspace.name}` : `${workspace.name}${offline ? "  -  Drive offline" : (workspace.status === "suspended" ? "  -  Suspended" : "")}`;
     option.disabled = offline || (workspace.status === "suspended" && state.role !== "admin");
     select.appendChild(option);
   }
@@ -162,7 +162,7 @@ function resetWorkspaceView() {
   state.subpath = "";
   if (typeof closeAllPanels === "function") closeAllPanels();
   const list = document.getElementById("file-list");
-  if (list) list.innerHTML = "<li>Loading workspaceâ€¦</li>";
+  if (list) list.innerHTML = "<li>Loading workspace...</li>";
   const breadcrumb = document.getElementById("breadcrumb");
   if (breadcrumb) breadcrumb.textContent = "/";
   const uploadPanel = document.getElementById("upload-panel");
@@ -187,7 +187,7 @@ loadFiles = async function workspaceAwareLoadFiles() {
   const subpath = String(state.subpath || "");
   const list = document.getElementById("file-list");
   document.getElementById("breadcrumb").textContent = `/${subpath}`;
-  list.innerHTML = "<li>Loadingâ€¦</li>";
+  list.innerHTML = "<li>Loading...</li>";
   try {
     const { entries, folderPermissions } = await api(`/api/files?subpath=${encodeURIComponent(subpath)}`);
     if (generation !== workspaceFileLoadGeneration || workspaceId !== String(state.workspaceId || "") || subpath !== String(state.subpath || "")) return;
@@ -246,7 +246,7 @@ function openWorkspaceDialog() {
   const owned = Number(state.workspaceSettings?.ownedCount ?? 0);
   if (state.role !== "admin" && max > 0 && owned >= max) return alert(`Workspace limit reached (${max})`);
   const hint = document.getElementById("workspace-limit-hint");
-  if (hint) hint.textContent = `2.5 GB default quota Â· ${owned} of ${max || "unlimited"} workspaces used.`;
+  if (hint) hint.textContent = `2.5 GB default quota  /  ${owned} of ${max || "unlimited"} workspaces used.`;
   document.getElementById("workspace-dialog").classList.remove("hidden");
   document.getElementById("workspace-name").focus();
 }
@@ -381,8 +381,8 @@ function renderAdminStorageOverview() {
   }
   const total = state.workspaces.reduce((sum,w)=>sum+Number(w.storage_used_bytes||0),0);
   const branched = state.workspaces.filter(w=>!w.is_main).reduce((sum,w)=>sum+Number(w.storage_used_bytes||0),0);
-  const rows = state.workspaces.map(w=>`<div class="workspace-system-storage-row"><strong>${escapeWorkspaceHtml(w.name)}</strong><span>${escapeWorkspaceHtml(w.owner_username||"â€”")}</span><span>${workspaceStorageSummary(w)}</span></div>`).join("");
-  card.innerHTML = `<summary>Workspace storage</summary><p class="muted-text">${workspaceFormatBytes(total)} tracked Â· ${workspaceFormatBytes(branched)} branched</p><div class="workspace-system-storage-list">${rows}</div>`;
+  const rows = state.workspaces.map(w=>`<div class="workspace-system-storage-row"><strong>${escapeWorkspaceHtml(w.name)}</strong><span>${escapeWorkspaceHtml(w.owner_username||" - ")}</span><span>${workspaceStorageSummary(w)}</span></div>`).join("");
+  card.innerHTML = `<summary>Workspace storage</summary><p class="muted-text">${workspaceFormatBytes(total)} tracked  /  ${workspaceFormatBytes(branched)} branched</p><div class="workspace-system-storage-list">${rows}</div>`;
 }
 
 function renderWorkspaceAdmin() {
@@ -392,7 +392,7 @@ function renderWorkspaceAdmin() {
   if (!list || !summary) return;
   const total = state.workspaces.reduce((sum, item) => sum + Number(item.storage_used_bytes || 0), 0);
   const max = Number(state.workspaceSettings?.maxWorkspacesPerUser ?? 1);
-  summary.textContent = `${state.workspaces.length} visible workspace${state.workspaces.length === 1 ? "" : "s"} Â· ${workspaceFormatBytes(total)} tracked Â· user limit ${max || "unlimited"}`;
+  summary.textContent = `${state.workspaces.length} visible workspace${state.workspaces.length === 1 ? "" : "s"}  /  ${workspaceFormatBytes(total)} tracked  /  user limit ${max || "unlimited"}`;
   const input = document.getElementById("workspace-max-per-user");
   if (input) input.value = String(max);
   const lifecycleForm=document.getElementById("workspace-lifecycle-form");
@@ -531,7 +531,7 @@ function escapeWorkspaceHtml(value) {
 async function showWorkspaceStorage(workspace, card) {
   const detail = card.querySelector(".workspace-admin-detail");
   detail.classList.remove("hidden");
-  detail.innerHTML = "Refreshing storageâ€¦";
+  detail.innerHTML = "Refreshing storage...";
   try {
     const result = await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/storage?refresh=true`);
     const updated = result.workspace;
@@ -539,7 +539,7 @@ async function showWorkspaceStorage(workspace, card) {
     detail.innerHTML = `<div class="workspace-storage-grid">
       <div><span>Used</span><strong>${workspaceFormatBytes(updated.storage_used_bytes)}</strong></div>
       <div><span>Quota</span><strong>${updated.storage_quota_mode === "unlimited" ? "Unlimited" : workspaceFormatBytes(updated.storage_quota_bytes)}</strong></div>
-      <div><span>Free</span><strong>${updated.storage_quota_mode === "unlimited" ? "â€”" : workspaceFormatBytes(Math.max(0,Number(updated.storage_quota_bytes||0)-Number(updated.storage_used_bytes||0)))}</strong></div>
+      <div><span>Free</span><strong>${updated.storage_quota_mode === "unlimited" ? " - " : workspaceFormatBytes(Math.max(0,Number(updated.storage_quota_bytes||0)-Number(updated.storage_used_bytes||0)))}</strong></div>
       <div><span>Files</span><strong>${Number(updated.file_count||0).toLocaleString()}</strong></div>
       <div><span>Folders</span><strong>${Number(updated.folder_count||0).toLocaleString()}</strong></div>
       <div><span>Trash</span><strong>${workspaceFormatBytes(updated.trash_used_bytes||0)}</strong></div>
@@ -571,7 +571,7 @@ async function loadWorkspaceTrash(workspace, detail) {
   const host=detail.querySelector(".workspace-trash-view");
   if(!host) return;
   host.classList.remove("hidden");
-  host.innerHTML='<p class="muted-text">Loading workspace trashâ€¦</p>';
+  host.innerHTML='<p class="muted-text">Loading workspace trash...</p>';
   try {
     const result=await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/trash`);
     const items=result.items||[];
@@ -588,7 +588,7 @@ async function loadWorkspaceTrash(workspace, detail) {
 async function showWorkspaceMembers(workspace, card) {
   const detail = card.querySelector(".workspace-admin-detail");
   detail.classList.remove("hidden");
-  detail.innerHTML = "Loading membersâ€¦";
+  detail.innerHTML = "Loading members...";
   try {
     const { members } = await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/members`);
     const canManage = state.role === "admin" || workspace.permission === "owner" || !!workspace.management_permissions?.manage_members;
@@ -678,7 +678,7 @@ async function loadWorkspaceInvitations() {
     for (const invite of invitations) {
       const row = document.createElement("div");
       row.className = "workspace-invite-row";
-      row.innerHTML = `<span><strong>${escapeWorkspaceHtml(invite.workspace_name)}</strong><small>${escapeWorkspaceHtml(invite.permission)} Â· from ${escapeWorkspaceHtml(invite.owner_username || invite.invited_by_username || "owner")}</small></span><div><button data-decision="accept" class="primary">Accept</button><button data-decision="decline">Decline</button></div>`;
+      row.innerHTML = `<span><strong>${escapeWorkspaceHtml(invite.workspace_name)}</strong><small>${escapeWorkspaceHtml(invite.permission)}  /  from ${escapeWorkspaceHtml(invite.owner_username || invite.invited_by_username || "owner")}</small></span><div><button data-decision="accept" class="primary">Accept</button><button data-decision="decline">Decline</button></div>`;
       row.querySelectorAll("button").forEach((button) => button.addEventListener("click", async () => {
         await api(`/api/workspace-invitations/${encodeURIComponent(invite.id)}/respond`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: button.dataset.decision }) });
         await loadOrbitWorkspaces();
@@ -718,13 +718,13 @@ async function showWorkspaceSettings(workspace, card) {
   if (!canView) { detail.classList.remove("hidden"); detail.innerHTML = `<p class="error">Workspace settings access denied.</p>`; return; }
   const editDisabled = canEdit ? "" : "disabled";
   detail.classList.remove("hidden");
-  detail.innerHTML = "Loading settingsâ€¦";
+  detail.innerHTML = "Loading settings...";
   let directory = [];
   if (isAdmin || workspace.permission === "owner") {
     try { directory = (await api("/api/workspace-user-directory")).users || []; }
     catch (error) { detail.innerHTML = `<p class="error">${escapeWorkspaceHtml(error.message)}</p>`; return; }
   }
-  const userOptions = directory.map((user)=>`<option value="${escapeWorkspaceHtml(user.username)}">${escapeWorkspaceHtml(user.username)}${user.email ? ` â€” ${escapeWorkspaceHtml(user.email)}` : ""}</option>`).join("");
+  const userOptions = directory.map((user)=>`<option value="${escapeWorkspaceHtml(user.username)}">${escapeWorkspaceHtml(user.username)}${user.email ? `  -  ${escapeWorkspaceHtml(user.email)}` : ""}</option>`).join("");
   detail.innerHTML = `
     <form class="workspace-settings-form">
       <label>Name<input name="name" type="text" value="${escapeWorkspaceHtml(workspace.name)}" required ${editDisabled} /></label>
@@ -801,7 +801,7 @@ async function loadWorkspaceTransferRequests() {
     for (const request of requests) {
       const row = document.createElement("div");
       row.className = "workspace-transfer-row";
-      row.innerHTML = `<span><strong>${escapeWorkspaceHtml(request.workspace_name)}</strong><small>${escapeWorkspaceHtml(request.requested_by_username)} â†’ ${escapeWorkspaceHtml(request.target_username)}${request.target_email ? ` Â· ${escapeWorkspaceHtml(request.target_email)}` : ""}</small></span><div></div>`;
+      row.innerHTML = `<span><strong>${escapeWorkspaceHtml(request.workspace_name)}</strong><small>${escapeWorkspaceHtml(request.requested_by_username)}  ->  ${escapeWorkspaceHtml(request.target_username)}${request.target_email ? `  /  ${escapeWorkspaceHtml(request.target_email)}` : ""}</small></span><div></div>`;
       const actions = row.lastElementChild;
       if (state.role === "admin") {
         for (const decision of ["approve","decline"]) {

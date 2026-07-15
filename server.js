@@ -234,7 +234,7 @@ async function currentAddonStatuses() {
   let online = false;
   if (sorter.installed) {
     const port = await resolveSorterPort().catch(() => null);
-    online = !!port && await sorterOnline(port).catch(() => false);
+    online = !!port && await sorterOnlineWithRetry(port).catch(() => false);
   }
   return listAddonStatuses({ sorter:{ online }, workspaces:{ online:await addonEnabled("workspaces") } });
 }
@@ -324,7 +324,7 @@ app.get("/api/status", async (req, res) => {
   const hiveOk = await hive.ping();
   const sorterAddon = await addonStatus("sorter");
   const sorterPort = sorterAddon.attached ? await resolveSorterPort() : null;
-  const sorterOk = sorterAddon.attached && await sorterOnline(sorterPort || 0);
+  const sorterOk = sorterAddon.attached && await sorterOnlineWithRetry(sorterPort || 0);
   res.json({
     hive: { ok: hiveOk, url: hive.baseUrl },
     sorter: { installed:sorterAddon.installed, attached:sorterAddon.attached, status:sorterAddon.status, ok:sorterOk, port:sorterPort },
@@ -379,7 +379,7 @@ async function testSorterPort(port) {
   const timer = setTimeout(() => controller.abort(), 1200);
   try {
     const headers = getSorterApiKey() ? { Authorization: `Bearer ${getSorterApiKey()}` } : {};
-    const resp = await fetch(`http://localhost:${port}/api/status`, {
+    const resp = await fetch(`http://127.0.0.1:${port}/api/status`, {
       signal: controller.signal,
       headers,
     });
@@ -404,7 +404,7 @@ async function sorterOnline(port) {
   const timer = setTimeout(() => controller.abort(), 1500);
   try {
     const headers = getSorterApiKey() ? { Authorization: `Bearer ${getSorterApiKey()}` } : {};
-    const resp = await fetch(`http://localhost:${port}/api/status`, {
+    const resp = await fetch(`http://127.0.0.1:${port}/api/status`, {
       signal: controller.signal,
       headers,
     });
@@ -416,6 +416,14 @@ async function sorterOnline(port) {
   }
 }
 
+async function sorterOnlineWithRetry(port, attempts = 3) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (await sorterOnline(port)) return true;
+    if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
+}
+
 // installed = folder exists (feature present at all); online = service is
 // actually answering right now. The Sorter tab shows only when online.
 // SORTER_ENABLED=false forces it hidden even if the folder exists.
@@ -424,7 +432,7 @@ app.get("/api/sorter-available", async (req, res) => {
   const addon = await addonStatus("sorter");
   const attached = enabled && addon.attached;
   const port = attached ? await resolveSorterPort() : null;
-  const online = attached && (await sorterOnline(port || 0));
+  const online = attached && (await sorterOnlineWithRetry(port || 0));
   res.json({ available:addon.installed, installed:addon.installed, attached, status:addon.status, online, url:port ? `http://localhost:${port}` : SORTER_URL });
 });
 
@@ -905,7 +913,18 @@ app.get("/api/system/status", async (req, res) => {
     const addonStatuses = await currentAddonStatuses();
     status.addons = addonStatuses.map(({folderPath,requiredFiles,...addon}) => addon);
     const sorterAddon = addonStatuses.find((addon) => addon.id === "sorter");
-    status.sorter = { ...(status.sorter || {}), installed:!!sorterAddon?.installed, attached:!!sorterAddon?.attached, addonStatus:sorterAddon?.status || "uninstalled" };
+    const liveSorterPort = sorterAddon?.attached ? await resolveSorterPort().catch(() => 0) : 0;
+    const sorterReachable = !!liveSorterPort && await sorterOnlineWithRetry(liveSorterPort).catch(() => false);
+    status.sorter = {
+      ...(status.sorter || {}),
+      installed:!!sorterAddon?.installed,
+      attached:!!sorterAddon?.attached,
+      addonStatus:sorterAddon?.status || "uninstalled",
+      running:sorterReachable,
+      reachable:sorterReachable,
+      status:sorterReachable ? "Running" : "Stopped",
+      url:liveSorterPort ? "http://127.0.0.1:" + liveSorterPort : SORTER_URL,
+    };
     const hiveOk = await hive.ping();
     status.hive = {
       ...(status.hive || {}),

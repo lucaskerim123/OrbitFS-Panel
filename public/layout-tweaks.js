@@ -17,8 +17,8 @@
     loadScriptOnce("stable-admin-layout.js?v=20260715-addons4", "data-orbit-stable-admin-layout");
     loadScriptOnce("nav-workspace-cleanup.js?v=20260715-notifications", "data-orbit-nav-workspace-cleanup");
     loadScriptOnce("mobile-sorter-header.js?v=20260715-addons2", "data-orbit-mobile-sorter-header");
-    loadScriptOnce("addon-manager.js?v=20260715-maintenance", "data-orbit-addon-manager");
-    loadScriptOnce("maintenance-banner.js?v=20260715-maintenance", "data-orbit-maintenance-banner");
+    loadScriptOnce("addon-manager.js?v=20260715-final", "data-orbit-addon-manager");
+    loadScriptOnce("maintenance-banner.js?v=20260715-final", "data-orbit-maintenance-banner");
     loadScriptOnce("sorter-settings-ui.js?v=20260715-addons2", "data-orbit-sorter-settings-ui");
     loadScriptOnce("startup-config-cleanup.js", "data-orbit-startup-config-cleanup");
     loadScriptOnce("hive-health-ui.js", "data-orbit-hive-health-ui");

@@ -30,15 +30,15 @@
   }
   async function loadWorkspaceAddonAssets() {
     await loadScript(
-      "/addon-assets/workspaces/workspace-ui.js?v=20260715-maintenance",
+      "/addon-assets/workspaces/workspace-ui.js?v=20260715-final",
       "workspaces-ui"
     );
     await loadScript(
-      "/addon-assets/workspaces/workspace-permission-editor.js?v=20260715-maintenance",
+      "/addon-assets/workspaces/workspace-permission-editor.js?v=20260715-final",
       "workspaces-permissions"
     );
     await loadScript(
-      "/addon-assets/workspaces/notification-center.js?v=20260715-maintenance",
+      "/addon-assets/workspaces/notification-center.js?v=20260715-final",
       "workspaces-notifications"
     );
   }
