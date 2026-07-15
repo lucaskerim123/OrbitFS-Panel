@@ -602,9 +602,9 @@ app.post("/api/system/startup-config", requireAdmin, express.json(), async (req,
     if (!STARTUP_CONFIG_PATH) throw new Error("Local OrbitFS root is unavailable");
     const body = req.body || {};
     const clean = structuredClone(STARTUP_CONFIG_DEFAULT);
-    clean.defaultStrength = ["low", "medium", "high", "custom"].includes(body.defaultStrength) ? body.defaultStrength : "medium";
+    clean.defaultStrength = ["low", "medium", "high", "custom1", "custom2", "custom"].includes(body.defaultStrength) ? body.defaultStrength : "medium";
     for (const project of ["1. Legal", "2. Wellbeing"]) {
-      for (const strength of ["low", "medium", "high"]) {
+      for (const strength of ["low", "medium", "high", "custom1", "custom2"]) {
         clean.presets[project][strength] = [...new Set((body.presets?.[project]?.[strength] || []).map((v) => normalizeFilePath(v)).filter((v) => v && !v.includes("..") && !/^(?:[a-z]:|\\)/i.test(v)))];
       }
     }
