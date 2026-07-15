@@ -125,6 +125,12 @@
     document.getElementById("notification-button")?.setAttribute("aria-label", unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications");
   }
 
+  function notificationSource(item) {
+    const manualMessage = item?.event_type === "global_message" || item?.event_type === "workspace_message";
+    if (manualMessage && item?.actor_username) return item.actor_username;
+    return "OrbitFS System";
+  }
+
   function renderNotifications(unreadCount) {
     updateBadge(unreadCount);
     const summary = document.getElementById("notification-summary");
@@ -141,7 +147,7 @@
         <button type="button" class="notification-dismiss" aria-label="Dismiss">x</button>
         <div class="notification-item-head"><strong>${esc(item.title)}</strong><time datetime="${esc(item.created_at)}">${esc(relativeTime(item.created_at))}</time></div>
         <p>${esc(item.message)}</p>
-        <div class="notification-item-meta"><span>${esc(CATEGORY_LABELS[item.category] || item.category)}</span>${item.workspace_name ? `<span>${esc(item.workspace_name)}</span>` : ""}${item.actor_username ? `<span>From ${esc(item.actor_username)}</span>` : ""}</div>
+        <div class="notification-item-meta"><span>${esc(CATEGORY_LABELS[item.category] || item.category)}</span>${item.workspace_name ? `<span>${esc(item.workspace_name)}</span>` : ""}<span>From ${esc(notificationSource(item))}</span></div>
         <div class="notification-item-actions">${item.workspace_id ? `<button type="button" class="notification-open-workspace">Open workspace</button>` : ""}${!item.read_at ? `<button type="button" class="notification-mark-read">Mark read</button>` : ""}</div>
       </article>`).join("");
     list.querySelectorAll(".notification-item").forEach((card) => wireNotificationCard(card));

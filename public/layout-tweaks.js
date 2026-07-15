@@ -21,7 +21,7 @@
     loadScriptOnce("sorter-settings-ui.js", "data-orbit-sorter-settings-ui");
     loadScriptOnce("startup-config-cleanup.js", "data-orbit-startup-config-cleanup");
     loadScriptOnce("hive-health-ui.js", "data-orbit-hive-health-ui");
-    loadScriptOnce("notification-center.js?v=20260715-notifications", "data-orbit-notification-center");
+    loadScriptOnce("notification-center.js?v=20260715-source", "data-orbit-notification-center");
   }
 
   if (document.readyState === "loading") {

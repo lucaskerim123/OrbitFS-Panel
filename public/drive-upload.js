@@ -281,7 +281,7 @@
       <div class="drive-import-head"><div><strong>Google Drive</strong><p class="muted-text">Browse and multi-select files without downloading them to your phone first.</p></div><button type="button" id="drive-connect-btn">Connect Google Drive</button></div>
       <div id="drive-setup" class="drive-setup hidden"><input id="drive-client-id" type="text" placeholder="Google OAuth client ID" autocomplete="off"><button type="button" id="drive-save-client">Save setup</button></div>
       <div id="drive-browser" class="drive-browser hidden">
-        <div class="drive-browser-tools"><button type="button" id="drive-up-btn">← Up</button><input id="drive-search" type="search" placeholder="Search this Drive folder" autocomplete="off"></div>
+        <div class="drive-browser-tools"><button type="button" id="drive-up-btn">Up</button><input id="drive-search" type="search" placeholder="Search this Drive folder" autocomplete="off"></div>
         <div id="drive-breadcrumb" class="drive-breadcrumb"></div>
         <div id="drive-file-list" class="drive-file-list"></div>
         <button type="button" id="drive-import-btn" class="primary" disabled>Add selected to upload queue</button>

@@ -52,9 +52,9 @@ async function loadPermissions() {
       permissionTd.className = "permission-summary-cell";
       permissionTd.textContent = permissionSummary(rule.permissions);
       const actionTd = document.createElement("td");
-      const edit = Object.assign(document.createElement("button"), { className: "icon-btn", textContent: "⚙", title: "Edit permissions" });
+      const edit = Object.assign(document.createElement("button"), { className: "icon-btn", textContent: "âš™", title: "Edit permissions" });
       edit.addEventListener("click", () => openPermissionEditor(rule.path, rule.permissions));
-      const clear = Object.assign(document.createElement("button"), { className: "icon-btn", textContent: "↺", title: "Restore inherited permissions" });
+      const clear = Object.assign(document.createElement("button"), { className: "icon-btn", textContent: "â†º", title: "Restore inherited permissions" });
       clear.addEventListener("click", async () => {
         if (!confirm(`Remove the custom permission rule for '${rule.path || "/"}' and inherit from its parent?`)) return;
         await api(`/api/file-permissions?path=${encodeURIComponent(rule.path)}`, { method: "DELETE" });
@@ -65,7 +65,7 @@ async function loadPermissions() {
       tr.append(pathTd, permissionTd, actionTd);
       body.appendChild(tr);
     });
-    if (!rules.length) body.innerHTML = `<tr><td colspan="3">(no overrides — users can perform all actions)</td></tr>`;
+    if (!rules.length) body.innerHTML = `<tr><td colspan="3">(no overrides â€” users can perform all actions)</td></tr>`;
   } catch (err) {
     console.error(err);
   }
@@ -159,7 +159,7 @@ function setPermissionPrompt(filepath) {
 
 function addPermissionButton(container, filepath, permissions) {
   if (!isAdminUser() || !container) return;
-  const btn = Object.assign(document.createElement("button"), { className: "icon-btn", textContent: "⚙", title: "Customize user permissions" });
+  const btn = Object.assign(document.createElement("button"), { className: "icon-btn", textContent: "âš™", title: "Customize user permissions" });
   btn.addEventListener("click", (event) => { event.stopPropagation(); openPermissionEditor(filepath, permissions); });
   container.appendChild(btn);
 }
@@ -212,6 +212,6 @@ startupPickerScript.async = false;
 document.body.appendChild(startupPickerScript);
 
 const layoutTweaksScript = document.createElement("script");
-layoutTweaksScript.src = "layout-tweaks.js?v=20260715-notifications";
+layoutTweaksScript.src = "layout-tweaks.js?v=20260715-source";
 layoutTweaksScript.async = false;
 document.body.appendChild(layoutTweaksScript);
