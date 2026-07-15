@@ -1297,3 +1297,24 @@ table.data-table tr:hover td { background: var(--bg); }
   margin-bottom: 0.75rem;
 }
 .workspace-detail-heading .workspace-detail-close { flex: 0 0 auto; }
+
+/* Galaxy S21 / narrow Chrome layout pass */
+@media(max-width:520px){
+  html,body,#app{max-width:100%;overflow-x:hidden}
+  header{padding-left:.48rem;padding-right:.48rem}
+  .tabs{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;justify-content:flex-start;padding:0 .22rem}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab-btn{flex:0 0 auto;min-width:72px;padding:.46rem .42rem;white-space:nowrap}
+  #tab-btn-workspaces{min-width:94px}
+  .tab-panel{padding:.45rem .38rem}
+  .toolbar{width:100%;min-width:0}
+  .toolbar>*{max-width:100%}
+  .action-bar{gap:.3rem}
+  .file-list,.editor,.card{max-width:100%}
+  .row-actions{max-width:48%;overflow-x:auto;scrollbar-width:none}
+  .row-actions::-webkit-scrollbar{display:none}
+  .modal-overlay{padding:.45rem}
+  .modal-box{max-width:calc(100vw - .9rem);padding:.85rem}
+  select,input,textarea,button{max-width:100%}
+  .sys-panel{border-radius:0}
+}

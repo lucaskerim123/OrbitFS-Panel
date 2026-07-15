@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { query } from "./db.js";
+import { createNotification,notifyWorkspaceMembers,notifyWorkspaceOwner } from "./notifications.js";
 
 const DEFAULT_QUOTA = 2684354560;
 const DEFAULT_MAX_WORKSPACES_PER_USER = 1;
@@ -199,7 +200,29 @@ export async function updateWorkspace(workspaceId, changes, actorId, systemRole,
   if (!fields.length) return workspace;
   values.push(workspaceId);
   await query(`UPDATE workspaces SET ${fields.join(",")},updated_at=now() WHERE id=$${values.length}`, values);
-  return getWorkspaceForUser(workspaceId, actorId, systemRole);
+  const updated=await getWorkspaceForUser(workspaceId, actorId, systemRole);
+  if(!workspace.is_main && workspace.status!==updated.status){
+    if(updated.status==="suspended"){
+      await notifyWorkspaceMembers(workspaceId,{
+        actorUserId:actorId,category:"workspace_status",eventType:"workspace_suspended",
+        title:"Workspace suspended",message:`${updated.name} has been suspended by an administrator.`,
+        severity:"warning",metadata:{status:"suspended"},
+      },{excludeUserIds:[updated.owner_id]});
+      await notifyWorkspaceOwner(workspaceId,{
+        actorUserId:actorId,category:"workspace_status",eventType:"workspace_suspended",
+        title:"Your workspace was suspended",
+        message:`${updated.name} was suspended. Reason: ${updated.suspension_reason || "No reason was provided."}`,
+        severity:"warning",metadata:{status:"suspended",reason:updated.suspension_reason || null},
+      });
+    } else if(updated.status==="active" && workspace.status==="suspended"){
+      await notifyWorkspaceMembers(workspaceId,{
+        actorUserId:actorId,category:"workspace_status",eventType:"workspace_unsuspended",
+        title:"Workspace restored",message:`${updated.name} is active again.`,severity:"success",
+        metadata:{status:"active"},
+      });
+    }
+  }
+  return updated;
 }
 
 export async function listWorkspaceMembers(workspaceId, actorId, systemRole, allowManageMembers=false) {
@@ -224,6 +247,7 @@ export async function setWorkspaceMember(workspaceId, username, permission, acto
   const user = await query("SELECT id FROM users WHERE lower(username)=lower($1) AND status='active' LIMIT 1", [username]);
   if (!user.rows[0]) throw new Error("User not found");
   const userId = user.rows[0].id;
+  const prior=(await query("SELECT permission FROM workspace_members WHERE workspace_id=$1 AND user_id=$2",[workspaceId,userId])).rows[0] || null;
   if (permission === "owner") {
     await query("BEGIN");
     try {
@@ -248,6 +272,25 @@ export async function setWorkspaceMember(workspaceId, username, permission, acto
       [workspaceId, userId, permission, actorId]
     );
   }
+  if(permission==="owner"){
+    if(String(workspace.owner_id)!==String(userId)){
+      await createNotification({recipientUserId:workspace.owner_id,workspaceId,actorUserId:actorId,
+        category:"ownership_changes",eventType:"workspace_owner_changed",title:"Workspace ownership changed",
+        message:`You are no longer the owner of ${workspace.name}.`,severity:"warning"});
+      await createNotification({recipientUserId:userId,workspaceId,actorUserId:actorId,
+        category:"ownership_changes",eventType:"workspace_owner_changed",title:"You now own a workspace",
+        message:`You are now the owner of ${workspace.name}.`,severity:"success"});
+    }
+  } else if(!prior){
+    await createNotification({recipientUserId:userId,workspaceId,actorUserId:actorId,
+      category:"membership_changes",eventType:"workspace_added",title:"Added to workspace",
+      message:`You were added to ${workspace.name} as ${permission}.`,severity:"success",metadata:{permission}});
+  } else if(prior.permission!==permission){
+    await createNotification({recipientUserId:userId,workspaceId,actorUserId:actorId,
+      category:"role_changes",eventType:"workspace_role_changed",title:"Workspace role changed",
+      message:`Your role in ${workspace.name} changed from ${prior.permission} to ${permission}.`,
+      severity:"info",metadata:{previousRole:prior.permission,permission}});
+  }
   return listWorkspaceMembers(workspaceId, actorId, systemRole, allowManageMembers);
 }
 
@@ -256,8 +299,17 @@ export async function removeWorkspaceMember(workspaceId, userId, actorId, system
   if (!workspace) throw new Error("Workspace not found or access denied");
   if (systemRole !== "admin" && workspace.permission !== "owner" && !allowManageMembers) throw new Error("Manage members permission required");
   if (String(userId) === String(workspace.owner_id)) throw new Error("Transfer ownership before removing the owner");
-  await query("DELETE FROM workspace_members WHERE workspace_id=$1 AND user_id=$2", [workspaceId, userId]);
-  return listWorkspaceMembers(workspaceId, actorId, systemRole);
+  const removedUser=(await query("SELECT username FROM users WHERE id=$1",[userId])).rows[0];
+  const removed=await query("DELETE FROM workspace_members WHERE workspace_id=$1 AND user_id=$2 RETURNING user_id", [workspaceId, userId]);
+  if(removed.rowCount){
+    await createNotification({recipientUserId:userId,workspaceId,actorUserId:actorId,
+      category:"membership_changes",eventType:"workspace_removed",title:"Removed from workspace",
+      message:`You were removed from ${workspace.name}.`,severity:"warning"});
+    await notifyWorkspaceOwner(workspaceId,{actorUserId:actorId,category:"membership_changes",
+      eventType:"workspace_member_removed",title:"Workspace member removed",
+      message:`${removedUser?.username || "A member"} was removed from ${workspace.name}.`,severity:"info"});
+  }
+  return listWorkspaceMembers(workspaceId, actorId, systemRole, allowManageMembers);
 }
 
 
@@ -304,6 +356,14 @@ export async function transferWorkspaceOwner(workspaceId, username, actorId, sys
   } catch (error) {
     await query("ROLLBACK");
     throw error;
+  }
+  if(String(workspace.owner_id)!==String(user.id)){
+    await createNotification({recipientUserId:workspace.owner_id,workspaceId,actorUserId:actorId,
+      category:"ownership_changes",eventType:"workspace_owner_changed",title:"Workspace ownership transferred",
+      message:`Ownership of ${workspace.name} was transferred to ${user.username}.`,severity:"warning"});
+    await createNotification({recipientUserId:user.id,workspaceId,actorUserId:actorId,
+      category:"ownership_changes",eventType:"workspace_owner_changed",title:"You now own a workspace",
+      message:`You are now the owner of ${workspace.name}.`,severity:"success"});
   }
   return getWorkspaceForUser(workspaceId,actorId,systemRole);
 }
@@ -361,7 +421,16 @@ export async function setWorkspaceDriveState(workspaceId,online,actorId,systemRo
   } else {
     await query(`UPDATE workspaces SET drive_state='offline',offline_at=now(),deletion_due_at=now()+($2||' days')::interval,lifecycle_notice=$3,updated_at=now() WHERE id=$1`,[workspaceId,String(settings.deleteAfterOfflineDays),`Drive offline. Scheduled for deletion after ${settings.deleteAfterOfflineDays} days offline.`]);
   }
-  return getWorkspaceForUser(workspaceId,actorId,systemRole);
+  const updated=await getWorkspaceForUser(workspaceId,actorId,systemRole);
+  await notifyWorkspaceMembers(workspaceId,{
+    actorUserId:actorId,category:"lifecycle_warnings",
+    eventType:online?"workspace_drive_online":"workspace_drive_offline",
+    title:online?"Workspace drive online":"Workspace drive offline",
+    message:online?`${workspace.name} is online again.`:`${workspace.name} was taken offline. It is scheduled for deletion after ${settings.deleteAfterOfflineDays} days unless brought online.`,
+    severity:online?"success":"warning",dedupKey:`workspace:${workspaceId}:drive-state`,
+    metadata:{driveState:online?"online":"offline",deletionDueAt:updated.deletion_due_at || null},
+  });
+  return updated;
 }
 
 
@@ -377,8 +446,18 @@ export async function evaluateWorkspaceLifecycle() {
       const remaining=settings.inactiveDays-inactiveDays;
       if(remaining<=0){
         await query(`UPDATE workspaces SET drive_state='offline',offline_at=now(),deletion_due_at=now()+($2||' days')::interval,lifecycle_notice=$3,updated_at=now() WHERE id=$1`,[workspace.id,String(settings.deleteAfterOfflineDays),`Automatically offline after ${settings.inactiveDays} days without activity. Scheduled for deletion after ${settings.deleteAfterOfflineDays} days offline.`]);
+        await notifyWorkspaceOwner(workspace.id,{category:"lifecycle_warnings",eventType:"workspace_auto_offline",
+          title:"Workspace automatically taken offline",message:`${workspace.name} was taken offline after ${settings.inactiveDays} days without activity. Bring it online within ${settings.deleteAfterOfflineDays} days to prevent deletion.`,
+          severity:"warning",dedupKey:`workspace:${workspace.id}:drive-state`,metadata:{driveState:"offline"}});
       } else if(remaining<=settings.offlineWarningDays){
-        await query(`UPDATE workspaces SET lifecycle_notice=$2,updated_at=now() WHERE id=$1`,[workspace.id,`Warning: drive will go offline in ${Math.max(1,Math.ceil(remaining))} day(s) without activity.`]);
+        const daysRemaining=Math.max(1,Math.ceil(remaining));
+        const notice=`Warning: drive will go offline in ${daysRemaining} day(s) without activity.`;
+        if(workspace.lifecycle_notice!==notice){
+          await query(`UPDATE workspaces SET lifecycle_notice=$2,updated_at=now() WHERE id=$1`,[workspace.id,notice]);
+          await notifyWorkspaceOwner(workspace.id,{category:"lifecycle_warnings",eventType:"workspace_inactivity_warning",
+            title:"Workspace inactivity warning",message:`${workspace.name} will go offline in ${daysRemaining} day(s) without activity.`,
+            severity:"warning",dedupKey:`workspace:${workspace.id}:inactivity-warning`,metadata:{daysRemaining}});
+        }
       }
       continue;
     }
@@ -386,11 +465,21 @@ export async function evaluateWorkspaceLifecycle() {
     const remaining=(due-now)/86400000;
     if(remaining<=0){
       const root=workspace.filesystem_root ? path.resolve(workspace.filesystem_root) : null;
+      await createNotification({recipientUserId:workspace.owner_id,category:"lifecycle_warnings",eventType:"workspace_deleted_offline",
+        title:"Workspace deleted",message:`${workspace.name} was deleted after remaining offline past its deletion date.`,
+        severity:"critical",force:true,metadata:{formerWorkspaceId:workspace.id,workspaceName:workspace.name}});
       await query(`DELETE FROM workspaces WHERE id=$1`,[workspace.id]);
       if(root) await fs.rm(root,{recursive:true,force:true}).catch(()=>{});
       deleted.push(workspace.id);
     } else if(remaining<=settings.deleteWarningDays){
-      await query(`UPDATE workspaces SET lifecycle_notice=$2,updated_at=now() WHERE id=$1`,[workspace.id,`Final warning: workspace will be deleted in ${Math.max(1,Math.ceil(remaining))} day(s). Bring it online to cancel deletion.`]);
+      const daysRemaining=Math.max(1,Math.ceil(remaining));
+      const notice=`Final warning: workspace will be deleted in ${daysRemaining} day(s). Bring it online to cancel deletion.`;
+      if(workspace.lifecycle_notice!==notice){
+        await query(`UPDATE workspaces SET lifecycle_notice=$2,updated_at=now() WHERE id=$1`,[workspace.id,notice]);
+        await notifyWorkspaceOwner(workspace.id,{category:"lifecycle_warnings",eventType:"workspace_deletion_warning",
+          title:"Workspace deletion warning",message:`${workspace.name} will be deleted in ${daysRemaining} day(s). Bring it online to cancel deletion.`,
+          severity:"critical",force:true,dedupKey:`workspace:${workspace.id}:deletion-warning`,metadata:{daysRemaining}});
+      }
     }
   }
   return {checked:rows.length,deleted};

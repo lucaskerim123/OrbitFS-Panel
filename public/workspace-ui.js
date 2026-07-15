@@ -30,7 +30,7 @@
 
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "workspace-ui.css";
+  css.href = "workspace-ui.css?v=20260715-notifications";
   document.head.appendChild(css);
 })();
 function workspaceFormatBytes(value) {
@@ -285,33 +285,43 @@ async function createWorkspaceFromDialog(event) {
 }
 
 function ensureWorkspaceAdmin() {
-  if (document.getElementById("workspace-admin-list")) return;
-  const host = document.getElementById("workspace-manager-host");
+  const host = document.getElementById("workspace-manager-settings-host");
   if (!host) return;
+  if (state.role !== "admin") {
+    host.innerHTML = "";
+    host.classList.add("hidden");
+    return;
+  }
+  host.classList.remove("hidden");
+  if (document.getElementById("workspace-manager-settings-card")) return;
   const card = document.createElement("details");
+  card.id = "workspace-manager-settings-card";
   card.className = "card workspace-manager-card";
-  card.open = true;
   card.innerHTML = `
-    <summary>Workspace manager</summary>
-    <p id="workspace-admin-summary" class="muted-text"></p>
-    <div id="workspace-transfer-requests" class="workspace-transfer-requests"></div>
-    ${state.role === "admin" ? `<form id="workspace-limit-form" class="workspace-limit-form">
-      <label for="workspace-max-per-user">Maximum workspaces per user</label>
-      <input id="workspace-max-per-user" type="number" min="0" max="1000" step="1" required />
-      <button type="submit" class="primary">Save limit</button>
-      <small>0 = unlimited. Main Workspace is not counted.</small>
-      <p id="workspace-limit-message" class="error"></p>
-    </form>
-    <form id="workspace-lifecycle-form" class="workspace-limit-form">
-      <label>Inactive before offline (days)<input name="inactiveDays" type="number" min="1" max="3650" required /></label>
-      <label>Offline warning (days)<input name="offlineWarningDays" type="number" min="1" max="3650" required /></label>
-      <label>Delete after offline (days)<input name="deleteAfterOfflineDays" type="number" min="1" max="3650" required /></label>
-      <label>Deletion warning (days)<input name="deleteWarningDays" type="number" min="1" max="3650" required /></label>
-      <button type="submit" class="primary">Save lifecycle</button>
-      <small>Main Workspace is excluded. Offline workspaces keep files but release their quota allocation.</small>
-      <p id="workspace-lifecycle-message" class="error"></p>
-    </form>` : ""}
-    <div id="workspace-admin-list" class="workspace-admin-list"></div>`;
+    <summary><span>Workspace Manager</span><small>Admin only</small></summary>
+    <p class="muted-text">Global limits and lifecycle rules. Users cannot see these controls.</p>
+    <details class="workspace-setting-group">
+      <summary>Workspace limits</summary>
+      <form id="workspace-limit-form" class="workspace-limit-form">
+        <label for="workspace-max-per-user">Maximum workspaces per user</label>
+        <input id="workspace-max-per-user" type="number" min="0" max="1000" step="1" required />
+        <button type="submit" class="primary">Save limit</button>
+        <small>0 = unlimited. Main Workspace is not counted.</small>
+        <p id="workspace-limit-message" class="error"></p>
+      </form>
+    </details>
+    <details class="workspace-setting-group">
+      <summary>Lifecycle rules</summary>
+      <form id="workspace-lifecycle-form" class="workspace-limit-form workspace-lifecycle-form">
+        <label>Inactive before offline<input name="inactiveDays" type="number" min="1" max="3650" required /><span>days</span></label>
+        <label>Offline warning<input name="offlineWarningDays" type="number" min="1" max="3650" required /><span>days</span></label>
+        <label>Delete after offline<input name="deleteAfterOfflineDays" type="number" min="1" max="3650" required /><span>days</span></label>
+        <label>Deletion warning<input name="deleteWarningDays" type="number" min="1" max="3650" required /><span>days</span></label>
+        <button type="submit" class="primary">Save lifecycle</button>
+        <small>Main Workspace is excluded. Offline workspaces keep files but release their quota allocation.</small>
+        <p id="workspace-lifecycle-message" class="error"></p>
+      </form>
+    </details>`;
   host.appendChild(card);
   document.getElementById("workspace-limit-form")?.addEventListener("submit", saveWorkspaceLimit);
   document.getElementById("workspace-lifecycle-form")?.addEventListener("submit", saveWorkspaceLifecycle);
@@ -394,6 +404,7 @@ function renderWorkspaceAdmin() {
 }
 
 function toggleWorkspaceDetail(card, view, render) {
+  if (typeof card.expandWorkspaceCard === "function") card.expandWorkspaceCard();
   const detail = card.querySelector(".workspace-admin-detail");
   if (!detail) return;
   if (!detail.classList.contains("hidden") && detail.dataset.view === view) {
@@ -422,63 +433,69 @@ window.toggleWorkspaceDetail = toggleWorkspaceDetail;
 function buildWorkspaceAdminCard(workspace) {
   const isOwner = workspace.permission === "owner";
   const isAdmin = state.role === "admin";
-  const canManage = isAdmin || isOwner;
+  const management = workspace.management_permissions || {};
+  const canManageMembers = isAdmin || isOwner || management.manage_members;
+  const canViewSettings = isAdmin || isOwner || management.view_settings;
+  const canEditSettings = isAdmin || isOwner || management.edit_settings;
   const isSuspended = workspace.status === "suspended";
   const mainOffline = workspace.is_main && workspace.is_visible === false;
   const branchOffline = !workspace.is_main && workspace.drive_state === "offline";
   const canOpen = !branchOffline && (!isSuspended || isAdmin) && (!mainOffline || isOwner || isAdmin);
+  const statusText = workspace.is_main ? "Main" : branchOffline ? "Offline" : isSuspended ? "Suspended" : "Active";
   const card = document.createElement("article");
-  card.className = `workspace-admin-card${isSuspended ? " workspace-suspended" : ""}`;
+  card.dataset.workspaceId = workspace.id;
+  card.className = `workspace-admin-card workspace-card-collapsed${isSuspended ? " workspace-suspended" : ""}`;
   card.innerHTML = `
-    <div class="workspace-admin-head">
-      <div><strong>${escapeWorkspaceHtml(workspace.name)}</strong><span>${workspace.is_main ? (mainOffline ? "Drive offline" : "Main Workspace") : (branchOffline ? "Drive offline" : escapeWorkspaceHtml(workspace.status))}</span></div>
-      <button type="button" class="workspace-open-btn" ${canOpen ? "" : "disabled"}>${branchOffline ? "Drive offline" : (mainOffline && !isOwner && !isAdmin ? "Drive offline" : (isSuspended && !isAdmin ? "Suspended" : "Open"))}</button>
+    <div class="workspace-admin-head workspace-card-summary">
+      <button type="button" class="workspace-card-toggle" aria-expanded="false">
+        <span class="workspace-card-title"><strong>${escapeWorkspaceHtml(workspace.name)} <span class="workspace-state-badge" data-state="${statusText.toLowerCase()}">${statusText}</span></strong><small>${workspace.is_main ? "Simple Mode / shared filesystem" : "Workspace Mode / private to members"}</small></span>
+        <span class="workspace-card-summary-meta"><small>${escapeWorkspaceHtml(workspace.owner_username || "--")}</small><span aria-hidden="true">&gt;</span></span>
+      </button>
+      <button type="button" class="workspace-open-btn" ${canOpen ? "" : "disabled"}>Open</button>
     </div>
-    <dl>
-      <div><dt>Owner</dt><dd>${escapeWorkspaceHtml(workspace.owner_username || "—")}</dd></div>
-      <div><dt>Role</dt><dd>${escapeWorkspaceHtml(workspace.permission || "admin")}</dd></div>
-      <div><dt>Storage</dt><dd>${escapeWorkspaceHtml(workspaceStorageSummary(workspace))}</dd></div>
-      <div><dt>Allocated</dt><dd>${workspaceFormatBytes(workspace.allocated_bytes || 0)}</dd></div>
-      <div><dt>Trash</dt><dd>${workspaceFormatBytes(workspace.trash_used_bytes || 0)} / ${workspaceFormatBytes(workspace.trash_limit_bytes || 209715200)}</dd></div>
-      <div><dt>Files</dt><dd>${Number(workspace.file_count || 0).toLocaleString()}</dd></div>
-      <div><dt>Folders</dt><dd>${Number(workspace.folder_count || 0).toLocaleString()}</dd></div>
-    </dl>
-    <div class="workspace-card-meter" data-state="${workspaceStorageState(workspaceStoragePercent(workspace))}"><span style="width:${Math.min(100,workspaceStoragePercent(workspace)||0)}%"></span></div>
-    ${isSuspended ? `<p class="workspace-suspension-note"><strong>Suspended</strong>${workspace.suspension_reason ? ` — ${escapeWorkspaceHtml(workspace.suspension_reason)}` : ""}</p>` : ""}
-    ${workspace.lifecycle_notice ? `<p class="workspace-suspension-note"><strong>Lifecycle notice</strong> — ${escapeWorkspaceHtml(workspace.lifecycle_notice)}</p>` : ""}
-    <div class="workspace-admin-actions">
-      <button type="button" class="workspace-storage-btn">Storage details</button>
-      ${canManage ? '<button type="button" class="workspace-members-btn">Members</button>' : ""}
-      ${workspace.is_main && canManage ? `<button type="button" class="workspace-visibility-btn">${mainOffline ? "Bring drive online" : "Hide drive"}</button>` : ""}
-      ${!workspace.is_main && canManage ? `<button type="button" class="workspace-drive-state-btn">${branchOffline ? "Bring drive online" : "Take drive offline"}</button>` : ""}
-      ${!workspace.is_main && canManage ? '<button type="button" class="workspace-edit-btn">Settings</button>' : ""}
-    </div>
-    <div class="workspace-admin-detail hidden"></div>`;
-  card.querySelector(".workspace-open-btn").addEventListener("click", () => {
-    activateWorkspace(workspace.id);
-  });
-  card.querySelector(".workspace-storage-btn")?.addEventListener("click", () => toggleWorkspaceDetail(card,"storage",() => showWorkspaceStorage(workspace, card)));
-  card.querySelector(".workspace-members-btn")?.addEventListener("click", () => toggleWorkspaceDetail(card,"members",() => showWorkspaceMembers(workspace, card)));
+    <div class="workspace-card-body hidden">
+      ${workspace.description ? `<p class="workspace-card-description">${escapeWorkspaceHtml(workspace.description)}</p>` : ""}
+      ${isSuspended && (isOwner || isAdmin) && workspace.suspension_reason ? `<div class="workspace-suspension-reason"><strong>Suspension reason</strong><p>${escapeWorkspaceHtml(workspace.suspension_reason)}</p></div>` : ""}
+      <div class="workspace-card-meta">
+        <span><small>Owner</small><strong>${escapeWorkspaceHtml(workspace.owner_username || "--")}</strong></span>
+        <span><small>Your role</small><strong>${escapeWorkspaceHtml(workspace.permission || (isAdmin ? "admin" : "viewer"))}</strong></span>
+        <span><small>Storage</small><strong>${workspaceFormatBytes(workspace.storage_used_bytes || 0)}</strong></span>
+      </div>
+      <div class="workspace-card-meter" data-state="${workspaceStorageState(workspaceStoragePercent(workspace))}"><span style="width:${Math.min(100,workspaceStoragePercent(workspace)||0)}%"></span></div>
+      ${workspace.lifecycle_notice ? `<p class="workspace-suspension-note">${escapeWorkspaceHtml(workspace.lifecycle_notice)}</p>` : ""}
+      <div class="workspace-admin-actions">
+        <button type="button" class="workspace-storage-btn">Storage</button>
+        ${canManageMembers ? '<button type="button" class="workspace-members-btn">Members</button>' : ""}
+        ${workspace.is_main && (isAdmin || isOwner) ? `<button type="button" class="workspace-visibility-btn">${mainOffline ? "Bring online" : "Hide drive"}</button>` : ""}
+        ${!workspace.is_main && canEditSettings ? `<button type="button" class="workspace-drive-state-btn">${branchOffline ? "Bring online" : "Take offline"}</button>` : ""}
+        ${!workspace.is_main && canViewSettings ? '<button type="button" class="workspace-edit-btn">Settings</button>' : ""}
+      </div>
+      <div class="workspace-admin-detail hidden"></div>
+    </div>`;
+  const body = card.querySelector(".workspace-card-body");
+  const toggle = card.querySelector(".workspace-card-toggle");
+  const setExpanded = (expanded) => {
+    body.classList.toggle("hidden", !expanded);
+    card.classList.toggle("workspace-card-collapsed", !expanded);
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.querySelector(".workspace-card-summary-meta span").textContent = expanded ? "v" : ">";
+  };
+  toggle.addEventListener("click", () => setExpanded(toggle.getAttribute("aria-expanded") !== "true"));
+  card.querySelector(".workspace-open-btn").addEventListener("click", () => activateWorkspace(workspace.id));
+  card.querySelector(".workspace-storage-btn")?.addEventListener("click", () => { setExpanded(true); toggleWorkspaceDetail(card,"storage",() => showWorkspaceStorage(workspace, card)); });
+  card.querySelector(".workspace-members-btn")?.addEventListener("click", () => { setExpanded(true); toggleWorkspaceDetail(card,"members",() => showWorkspaceMembers(workspace, card)); });
   card.querySelector(".workspace-visibility-btn")?.addEventListener("click", async () => {
-    try {
-      await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/visibility`, {
-        method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({visible:mainOffline}),
-      });
-      await loadOrbitWorkspaces(workspace.id);
-    } catch (error) { alert(error.message); }
+    try { await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/visibility`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({visible:mainOffline})}); await loadOrbitWorkspaces(workspace.id); }
+    catch (error) { alert(error.message); }
   });
   card.querySelector(".workspace-drive-state-btn")?.addEventListener("click", async () => {
     const nextOnline = branchOffline;
-    const action = nextOnline ? "bring this drive online" : "take this drive offline and release its quota allocation";
-    if(!confirm(`Are you sure you want to ${action}?`)) return;
-    try {
-      await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/drive-state`, {
-        method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({online:nextOnline}),
-      });
-      await loadOrbitWorkspaces(workspace.id);
-    } catch(error){ alert(error.message); }
+    if(!confirm(nextOnline ? "Bring this workspace drive online?" : "Take this workspace drive offline?")) return;
+    try { await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/drive-state`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({online:nextOnline})}); await loadOrbitWorkspaces(workspace.id); }
+    catch(error){ alert(error.message); }
   });
-  card.querySelector(".workspace-edit-btn")?.addEventListener("click", () => toggleWorkspaceDetail(card,"settings",() => showWorkspaceSettings(workspace, card)));
+  card.querySelector(".workspace-edit-btn")?.addEventListener("click", () => { setExpanded(true); toggleWorkspaceDetail(card,"settings",() => showWorkspaceSettings(workspace, card)); });
+  card.expandWorkspaceCard = () => setExpanded(true);
   return card;
 }
 
@@ -552,7 +569,7 @@ async function showWorkspaceMembers(workspace, card) {
   detail.innerHTML = "Loading members…";
   try {
     const { members } = await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/members`);
-    const canManage = state.role === "admin" || workspace.permission === "owner";
+    const canManage = state.role === "admin" || workspace.permission === "owner" || !!workspace.management_permissions?.manage_members;
     detail.innerHTML = `
       <div class="workspace-member-list"></div>
       ${canManage ? `<form class="workspace-member-form">
@@ -672,33 +689,42 @@ async function saveWorkspaceMember(event, workspace, card) {
 async function showWorkspaceSettings(workspace, card) {
   const detail = card.querySelector(".workspace-admin-detail");
   const isAdmin = state.role === "admin";
+  const management = workspace.management_permissions || {};
+  const canView = isAdmin || workspace.permission === "owner" || management.view_settings;
+  const canEdit = isAdmin || workspace.permission === "owner" || management.edit_settings;
+  const canDelete = isAdmin || workspace.permission === "owner" || management.delete_workspace;
+  if (!canView) { detail.classList.remove("hidden"); detail.innerHTML = `<p class="error">Workspace settings access denied.</p>`; return; }
+  const editDisabled = canEdit ? "" : "disabled";
   detail.classList.remove("hidden");
   detail.innerHTML = "Loading settings…";
   let directory = [];
-  try { directory = (await api("/api/workspace-user-directory")).users || []; }
-  catch (error) { detail.innerHTML = `<p class="error">${escapeWorkspaceHtml(error.message)}</p>`; return; }
+  if (isAdmin || workspace.permission === "owner") {
+    try { directory = (await api("/api/workspace-user-directory")).users || []; }
+    catch (error) { detail.innerHTML = `<p class="error">${escapeWorkspaceHtml(error.message)}</p>`; return; }
+  }
   const userOptions = directory.map((user)=>`<option value="${escapeWorkspaceHtml(user.username)}">${escapeWorkspaceHtml(user.username)}${user.email ? ` — ${escapeWorkspaceHtml(user.email)}` : ""}</option>`).join("");
   detail.innerHTML = `
     <form class="workspace-settings-form">
-      <label>Name<input name="name" type="text" value="${escapeWorkspaceHtml(workspace.name)}" required /></label>
-      <label>Description<textarea name="description" rows="3">${escapeWorkspaceHtml(workspace.description || "")}</textarea></label>
+      <label>Name<input name="name" type="text" value="${escapeWorkspaceHtml(workspace.name)}" required ${editDisabled} /></label>
+      <label>Description<textarea name="description" rows="3" ${editDisabled}>${escapeWorkspaceHtml(workspace.description || "")}</textarea></label>
       ${isAdmin ? `<label>Quota (GB)<input name="quotaGb" type="number" min="0" step="0.1" value="${(Number(workspace.storage_quota_bytes || 0)/1073741824).toFixed(2)}" /></label>
       <label>Trash limit (MB)<input name="trashLimitMb" type="number" min="0" step="1" value="${Math.round(Number(workspace.trash_limit_bytes || 209715200)/1048576)}" /></label>
       <label>Workspace owner<select name="ownerUsername">${userOptions}</select></label>
       <label>Filesystem root<input name="root" type="text" value="${escapeWorkspaceHtml(workspace.filesystem_root || "")}" /></label>
       <label>Status<select name="status"><option value="active">Active</option><option value="suspended">Suspended</option><option value="archived">Archived</option></select></label>
       <label>Suspension reason<textarea name="suspensionReason" rows="3" maxlength="500">${escapeWorkspaceHtml(workspace.suspension_reason || "")}</textarea></label>` : ""}
-      <button type="submit" class="primary">Save</button>
-      ${!isAdmin ? `<label>Request ownership transfer<select name="transferUsername"><option value="">Select user</option>${userOptions}</select></label><button type="button" class="workspace-transfer-request-btn">Request transfer</button>` : ""}
-      <button type="button" class="danger workspace-delete-btn">Delete workspace</button>
+      ${canEdit ? `<button type="submit" class="primary">Save</button>` : `<p class="muted-text">View only. This role cannot edit workspace settings.</p>`}
+      ${workspace.permission === "owner" && !isAdmin ? `<label>Request ownership transfer<select name="transferUsername"><option value="">Select user</option>${userOptions}</select></label><button type="button" class="workspace-transfer-request-btn">Request transfer</button>` : ""}
+      ${canDelete ? `<button type="button" class="danger workspace-delete-btn">Delete workspace</button>` : ""}
     </form>
     <p class="error workspace-detail-error"></p>`;
   if (isAdmin) {
     detail.querySelector('[name="status"]').value = workspace.status;
-    detail.querySelector('[name="ownerUsername"]').value = workspace.owner_username || "";
+    detail.querySelector('[name="ownerUsername"]').value = workspace.owner_username || "--";
   }
   detail.querySelector("form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEdit) return;
     const form = event.currentTarget;
     const error = detail.querySelector(".workspace-detail-error");
     const body = { name: form.elements.name.value.trim(), description: form.elements.description.value.trim() };
@@ -711,7 +737,7 @@ async function showWorkspaceSettings(workspace, card) {
     }
     try {
       await api(`/api/workspaces/${encodeURIComponent(workspace.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (isAdmin && form.elements.ownerUsername.value.trim() && form.elements.ownerUsername.value.trim().toLowerCase() !== String(workspace.owner_username || "").toLowerCase()) {
+      if (isAdmin && form.elements.ownerUsername.value.trim() && form.elements.ownerUsername.value.trim().toLowerCase() !== String(workspace.owner_username || "--").toLowerCase()) {
         await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/owner`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: form.elements.ownerUsername.value.trim() }) });
       }
       await loadOrbitWorkspaces(workspace.id);
@@ -731,7 +757,7 @@ async function showWorkspaceSettings(workspace, card) {
       await loadWorkspaceTransferRequests();
     } catch (err) { error.className = "error workspace-detail-error"; error.textContent = err.message; }
   });
-  detail.querySelector(".workspace-delete-btn").addEventListener("click", async () => {
+  detail.querySelector(".workspace-delete-btn")?.addEventListener("click", async () => {
     if (!confirm(`Delete workspace "${workspace.name}" and all files permanently?`)) return;
     try {
       await api(`/api/workspaces/${encodeURIComponent(workspace.id)}`, { method: "DELETE" });

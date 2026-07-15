@@ -13,9 +13,9 @@
     const system = q('.tab-btn[data-tab="system"]');
     const config = q('.tab-btn[data-tab="config"]');
     const admin = q('.tab-btn[data-tab="admin"]');
-    if (system) system.textContent = "Systems";
-    if (config) config.textContent = "Config";
-    if (admin) admin.textContent = "Admin";
+    if (system) system.textContent = "\u{1F5A5}\uFE0F Systems";
+    if (config) config.textContent = "\u2699\uFE0F Config";
+    if (admin) admin.textContent = "\u{1F6E1}\uFE0F Admin";
 
     const systemTitle = q("#tab-system .sys-title");
     const configTitle = q("#tab-config .sys-title");

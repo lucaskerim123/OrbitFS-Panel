@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0f1115" />
 <title>OrbitFS Panel</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235b8cff'/%3E%3Ctext x='32' y='43' font-size='30' font-family='sans-serif' text-anchor='middle' fill='white'%3E%F0%9F%A7%A0%3C/text%3E%3C/svg%3E" />
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="style.css?v=20260715-workspaces2" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css" />
 </head>
@@ -116,7 +116,7 @@
     <nav class="tabs">
       <button class="tab-btn" id="tab-btn-account" data-tab="account">&#128100; Account</button>
       <button class="tab-btn active" data-tab="files">&#128193; Files</button>
-      <button class="tab-btn" id="tab-btn-workspaces" data-tab="workspaces">&#128451;&#65039; Workspace Manager</button>
+      <button class="tab-btn" id="tab-btn-workspaces" data-tab="workspaces">&#128451;&#65039; Workspaces</button>
       <button class="tab-btn hidden" id="tab-btn-sorter" data-tab="sorter">&#129529; Sorter</button>
       <button class="tab-btn hidden" id="tab-btn-system" data-tab="system">&#128421;&#65039; System</button>
       <button class="tab-btn hidden" id="tab-btn-admin" data-tab="admin">&#128737;&#65039; Admin</button>
@@ -317,15 +317,22 @@
     </section>
 
     <section id="tab-workspaces" class="tab-panel workspace-panel">
-      <div class="workspace-page-header">
-        <div><h2>Workspace Manager</h2><p class="muted-text">Your workspaces, invitations, members and roles.</p></div>
-        <button id="workspace-page-create" type="button" class="primary">+ Workspace</button>
+      <div class="workspace-page-shell">
+        <div class="workspace-page-header">
+          <div><span class="workspace-eyebrow">Workspace Mode</span><h2>Workspaces</h2><p class="muted-text">Switch file systems, manage access and keep each workspace separate.</p></div>
+        </div>
+        <div id="workspace-manager-settings-host"></div>
+        <div id="workspace-invitations-panel" class="card workspace-invitations-card">
+          <h3>Invitations</h3>
+          <div id="workspace-invitations-list" class="workspace-invitations-list"></div>
+        </div>
+        <section class="workspace-list-section">
+          <div class="workspace-list-heading"><div><span class="workspace-eyebrow">Available file systems</span><h3>Your Workspaces</h3></div><button id="workspace-page-create" type="button" class="primary">+ Create</button></div>
+          <p id="workspace-admin-summary" class="muted-text"></p>
+          <div id="workspace-transfer-requests" class="workspace-transfer-requests"></div>
+          <div id="workspace-admin-list" class="workspace-admin-list"></div>
+        </section>
       </div>
-      <div id="workspace-invitations-panel" class="card">
-        <h3>Invitations</h3>
-        <div id="workspace-invitations-list" class="workspace-invitations-list"></div>
-      </div>
-      <div id="workspace-manager-host"></div>
     </section>
 
 
@@ -656,7 +663,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="app.js"></script>
-  <script src="permissions.js"></script>
+  <script src="app.js?v=20260715-workspaces2"></script>
+  <script src="permissions.js?v=20260715-notifications"></script>
 </body>
 </html>

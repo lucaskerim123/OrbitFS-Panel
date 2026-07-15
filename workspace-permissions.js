@@ -2,14 +2,14 @@ import { query } from './db.js';
 
 export const WORKSPACE_ACTIONS=['read','write','download','move','delete','create'];
 export const WORKSPACE_ROLES=['editor','contributor','viewer'];
-export const WORKSPACE_ADMIN_ACTIONS=['view_settings','edit_settings','manage_members','manage_permissions','delete_workspace'];
+export const WORKSPACE_ADMIN_ACTIONS=['view_settings','edit_settings','manage_members','manage_permissions','send_messages','delete_workspace'];
 const FULL={read:true,write:true,download:true,move:true,delete:true,create:true};
 const READ={read:true,write:false,download:true,move:false,delete:false,create:false};
-const ADMIN_FULL={view_settings:true,edit_settings:true,manage_members:true,manage_permissions:true,delete_workspace:true};
+const ADMIN_FULL={view_settings:true,edit_settings:true,manage_members:true,manage_permissions:true,send_messages:true,delete_workspace:true};
 const ADMIN_DEFAULTS={
-  editor:{view_settings:true,edit_settings:false,manage_members:false,manage_permissions:false,delete_workspace:false},
-  contributor:{view_settings:false,edit_settings:false,manage_members:false,manage_permissions:false,delete_workspace:false},
-  viewer:{view_settings:false,edit_settings:false,manage_members:false,manage_permissions:false,delete_workspace:false},
+  editor:{view_settings:true,edit_settings:false,manage_members:false,manage_permissions:false,send_messages:false,delete_workspace:false},
+  contributor:{view_settings:false,edit_settings:false,manage_members:false,manage_permissions:false,send_messages:false,delete_workspace:false},
+  viewer:{view_settings:false,edit_settings:false,manage_members:false,manage_permissions:false,send_messages:false,delete_workspace:false},
 };
 
 export function roleDefaults(role){
@@ -42,13 +42,14 @@ export async function effectiveWorkspacePermissions(workspaceId,role,filepath=''
 export async function effectiveWorkspaceAdminPermissions(workspaceId,role){
   const base=workspaceAdminRoleDefaults(role);
   if(!WORKSPACE_ROLES.includes(role)) return base;
-  const row=(await query(`SELECT can_view_settings,can_edit_settings,can_manage_members,can_manage_permissions,can_delete_workspace
+  const row=(await query(`SELECT can_view_settings,can_edit_settings,can_manage_members,can_manage_permissions,can_send_messages,can_delete_workspace
     FROM workspace_role_admin_permissions WHERE workspace_id=$1 AND workspace_role=$2 LIMIT 1`,[workspaceId,role])).rows[0];
   return row?{
     view_settings:row.can_view_settings,
     edit_settings:row.can_edit_settings,
     manage_members:row.can_manage_members,
     manage_permissions:row.can_manage_permissions,
+    send_messages:row.can_send_messages,
     delete_workspace:row.can_delete_workspace,
   }:base;
 }

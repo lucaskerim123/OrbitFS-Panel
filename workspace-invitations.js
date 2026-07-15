@@ -1,5 +1,6 @@
 import { query } from "./db.js";
 import { getWorkspaceForUser, listWorkspaceMembers } from "./workspaces.js";
+import { createNotification,notifyWorkspaceOwner } from "./notifications.js";
 
 const INVITE_ROLES = new Set(["editor", "contributor", "viewer"]);
 
@@ -12,7 +13,7 @@ async function requireWorkspaceManager(workspaceId, actorId, systemRole, allowMa
 }
 
 export async function inviteWorkspaceUser(workspaceId, username, permission, actorId, systemRole, allowManageMembers=false) {
-  await requireWorkspaceManager(workspaceId, actorId, systemRole, allowManageMembers);
+  const workspace=await requireWorkspaceManager(workspaceId, actorId, systemRole, allowManageMembers);
   if (!INVITE_ROLES.has(permission)) throw new Error("Invite role must be editor, contributor, or viewer");
   const userResult = await query(
     "SELECT id,username FROM users WHERE lower(username)=lower($1) AND status='active' LIMIT 1",
@@ -34,6 +35,12 @@ export async function inviteWorkspaceUser(workspaceId, username, permission, act
      VALUES($1,$2,$3,$4,'pending',now()+interval '30 days') RETURNING id,permission,status,created_at,expires_at`,
     [workspaceId, invited.id, permission, actorId]
   );
+  await createNotification({
+    recipientUserId:invited.id,workspaceId,actorUserId:actorId,
+    category:"workspace_invites",eventType:"workspace_invite",
+    title:"Workspace invitation",message:`You were invited to ${workspace.name} as ${permission}.`,
+    severity:"info",metadata:{permission,invitationId:result.rows[0].id},
+  });
   return { ...result.rows[0], username: invited.username };
 }
 
@@ -93,7 +100,25 @@ export async function respondToWorkspaceInvitation(invitationId, userId, decisio
       [invitationId, decision === "accept" ? "accepted" : "declined"]
     );
     await query("COMMIT");
-    return { accepted: decision === "accept", workspaceId: invitation.workspace_id };
+    const user=(await query("SELECT username FROM users WHERE id=$1",[userId])).rows[0];
+    const workspace=(await query("SELECT name,owner_id FROM workspaces WHERE id=$1",[invitation.workspace_id])).rows[0];
+    const accepted=decision === "accept";
+    const eventTitle=accepted?"Member joined workspace":"Workspace invitation declined";
+    const eventMessage=accepted
+      ? `${user?.username || "A user"} joined ${workspace?.name || "the workspace"} as ${invitation.permission}.`
+      : `${user?.username || "A user"} declined the invitation to ${workspace?.name || "the workspace"}.`;
+    await notifyWorkspaceOwner(invitation.workspace_id,{
+      actorUserId:userId,category:accepted?"membership_changes":"workspace_invites",
+      eventType:accepted?"workspace_joined":"workspace_invite_declined",
+      title:eventTitle,message:eventMessage,severity:accepted?"success":"info",
+    });
+    if(invitation.invited_by && String(invitation.invited_by)!==String(workspace?.owner_id)){
+      await createNotification({recipientUserId:invitation.invited_by,workspaceId:invitation.workspace_id,
+        actorUserId:userId,category:accepted?"membership_changes":"workspace_invites",
+        eventType:accepted?"workspace_joined":"workspace_invite_declined",title:eventTitle,message:eventMessage,
+        severity:accepted?"success":"info"});
+    }
+    return { accepted, workspaceId: invitation.workspace_id };
   } catch (error) {
     await query("ROLLBACK");
     throw error;
@@ -101,12 +126,15 @@ export async function respondToWorkspaceInvitation(invitationId, userId, decisio
 }
 
 export async function revokeWorkspaceInvitation(invitationId, actorId, systemRole, allowManageMembers=false) {
-  const result = await query("SELECT workspace_id FROM workspace_invitations WHERE id=$1", [invitationId]);
+  const result = await query("SELECT i.workspace_id,i.invited_user_id,w.name AS workspace_name FROM workspace_invitations i JOIN workspaces w ON w.id=i.workspace_id WHERE i.id=$1", [invitationId]);
   if (!result.rows[0]) throw new Error("Invitation not found");
   await requireWorkspaceManager(result.rows[0].workspace_id, actorId, systemRole, allowManageMembers);
   await query(
     "UPDATE workspace_invitations SET status='revoked',responded_at=now() WHERE id=$1 AND status='pending'",
     [invitationId]
   );
+  await createNotification({recipientUserId:result.rows[0].invited_user_id,workspaceId:result.rows[0].workspace_id,
+    actorUserId:actorId,category:"workspace_invites",eventType:"workspace_invite_revoked",
+    title:"Workspace invitation revoked",message:`Your invitation to ${result.rows[0].workspace_name} was revoked.`,severity:"warning"});
   return { ok: true };
 }

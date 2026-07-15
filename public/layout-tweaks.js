@@ -14,13 +14,14 @@
   function install() {
     loadScriptOnce("drive-upload.js", "data-orbit-drive-upload");
     loadScriptOnce("page-refresh.js", "data-orbit-page-refresh");
-    loadScriptOnce("stable-admin-layout.js", "data-orbit-stable-admin-layout");
-    loadScriptOnce("nav-workspace-cleanup.js", "data-orbit-nav-workspace-cleanup");
+    loadScriptOnce("stable-admin-layout.js?v=20260715-notifications", "data-orbit-stable-admin-layout");
+    loadScriptOnce("nav-workspace-cleanup.js?v=20260715-notifications", "data-orbit-nav-workspace-cleanup");
     loadScriptOnce("mobile-sorter-header.js", "data-orbit-mobile-sorter-header");
-    loadScriptOnce("workspace-permission-editor.js", "data-orbit-workspace-permission-editor");
+    loadScriptOnce("workspace-permission-editor.js?v=20260715-notifications", "data-orbit-workspace-permission-editor");
     loadScriptOnce("sorter-settings-ui.js", "data-orbit-sorter-settings-ui");
     loadScriptOnce("startup-config-cleanup.js", "data-orbit-startup-config-cleanup");
     loadScriptOnce("hive-health-ui.js", "data-orbit-hive-health-ui");
+    loadScriptOnce("notification-center.js?v=20260715-notifications", "data-orbit-notification-center");
   }
 
   if (document.readyState === "loading") {

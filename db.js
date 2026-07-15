@@ -140,10 +140,55 @@ async function ensureWorkspaceSettings(client) {
     can_edit_settings boolean NOT NULL DEFAULT false,
     can_manage_members boolean NOT NULL DEFAULT false,
     can_manage_permissions boolean NOT NULL DEFAULT false,
+    can_send_messages boolean NOT NULL DEFAULT false,
     can_delete_workspace boolean NOT NULL DEFAULT false,
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY(workspace_id,workspace_role)
   )`);
+  await client.query(`ALTER TABLE workspace_role_admin_permissions ADD COLUMN IF NOT EXISTS can_send_messages boolean NOT NULL DEFAULT false`);
+  await client.query(`CREATE TABLE IF NOT EXISTS notification_preferences(
+    user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    workspace_invites boolean NOT NULL DEFAULT true,
+    membership_changes boolean NOT NULL DEFAULT true,
+    role_changes boolean NOT NULL DEFAULT true,
+    workspace_status boolean NOT NULL DEFAULT true,
+    workspace_messages boolean NOT NULL DEFAULT true,
+    global_messages boolean NOT NULL DEFAULT true,
+    lifecycle_warnings boolean NOT NULL DEFAULT true,
+    ownership_changes boolean NOT NULL DEFAULT true,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  await client.query(`CREATE TABLE IF NOT EXISTS notification_messages(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    audience_type text NOT NULL CHECK(audience_type IN ('global','workspace')),
+    workspace_id uuid REFERENCES workspaces(id) ON DELETE CASCADE,
+    sender_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    title text NOT NULL,
+    body text NOT NULL,
+    severity text NOT NULL DEFAULT 'info' CHECK(severity IN ('info','success','warning','critical')),
+    audience_filter text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  await client.query(`CREATE TABLE IF NOT EXISTS notifications(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    recipient_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id uuid REFERENCES workspaces(id) ON DELETE CASCADE,
+    actor_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    message_id uuid REFERENCES notification_messages(id) ON DELETE SET NULL,
+    category text NOT NULL,
+    event_type text NOT NULL,
+    title text NOT NULL,
+    message text NOT NULL,
+    severity text NOT NULL DEFAULT 'info' CHECK(severity IN ('info','success','warning','critical')),
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    dedup_key text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    read_at timestamptz,
+    dismissed_at timestamptz
+  )`);
+  await client.query(`CREATE INDEX IF NOT EXISTS notifications_recipient_created_idx ON notifications(recipient_user_id,created_at DESC)`);
+  await client.query(`CREATE INDEX IF NOT EXISTS notifications_recipient_unread_idx ON notifications(recipient_user_id,read_at) WHERE dismissed_at IS NULL`);
+  await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS notifications_recipient_dedup_idx ON notifications(recipient_user_id,dedup_key) WHERE dedup_key IS NOT NULL`);
   await client.query(`CREATE TABLE IF NOT EXISTS workspace_trash_events(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,

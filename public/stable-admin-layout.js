@@ -25,7 +25,7 @@
       button.type = "button";
       button.className = "tab-btn";
       button.dataset.tab = "config";
-      button.textContent = "⚙️ Configuration";
+      button.textContent = "\u2699\uFE0F Config";
       nav.insertBefore(button, systemButton);
       button.addEventListener("click", () => {
         if (typeof switchTab === "function") switchTab("config");

@@ -363,12 +363,15 @@ async function loadFiles() {
 
 function renderRow(list, entry) {
   const full = state.subpath ? `${state.subpath}/${entry.name}` : entry.name;
+  const protectedRoot = isProtectedRootFolderPath(full, entry.type);
   const li = document.createElement("li");
   li.className = entry.type;
   const select = document.createElement("input");
   select.type = "checkbox";
   select.className = "file-select";
   select.checked = state.selectedFiles.has(full);
+  select.disabled = protectedRoot;
+  if (protectedRoot) select.title = "Protected system folder";
   select.addEventListener("change",()=>{
     if(select.checked) state.selectedFiles.set(full,{path:full,type:entry.type,size:Number(entry.size||0)});
     else state.selectedFiles.delete(full);
@@ -413,7 +416,7 @@ function renderRow(list, entry) {
     actions.appendChild(dl);
   }
 
-  if (permissions.move) {
+  if (permissions.move && !protectedRoot) {
     const mv = document.createElement("button");
     mv.className = "icon-btn";
     mv.textContent = "↦";
@@ -421,9 +424,8 @@ function renderRow(list, entry) {
     mv.addEventListener("click", (e) => { e.stopPropagation(); openMovePicker(full); });
     actions.appendChild(mv);
   }
-  if (isProtectedRootFolderPath(full, entry.type)) actions.querySelector(".icon-btn")?.remove();
 
-  if (permissions.delete) {
+  if (permissions.delete && !protectedRoot) {
     const del = document.createElement("button");
     del.className = "icon-btn danger";
     del.textContent = "🗑";
@@ -431,7 +433,6 @@ function renderRow(list, entry) {
     del.addEventListener("click", (e) => { e.stopPropagation(); trashPath(full); });
     actions.appendChild(del);
   }
-  if (isProtectedRootFolderPath(full, entry.type)) actions.querySelector(".icon-btn.danger")?.remove();
 
   li.appendChild(actions);
   list.appendChild(li);
@@ -2025,7 +2026,7 @@ setInterval(() => {
 // adds X-Workspace-Id to existing fetch/XHR calls.
 {
   const workspaceScript = document.createElement("script");
-  workspaceScript.src = "workspace-ui.js";
+  workspaceScript.src = "workspace-ui.js?v=20260715-notifications";
   workspaceScript.defer = true;
   document.body.appendChild(workspaceScript);
 }

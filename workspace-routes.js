@@ -8,6 +8,7 @@ import { beginDownload } from "./download-limits.js";
 import { WORKSPACE_ACTIONS,WORKSPACE_ROLES,WORKSPACE_ADMIN_ACTIONS,effectiveWorkspacePermissions,effectiveWorkspaceAdminPermissions,fullWorkspaceAdminPermissions,workspaceAdminRoleDefaults,normalizeWorkspacePath,roleDefaults } from "./workspace-permissions.js";
 import { requestWorkspaceTransfer,listTransferRequests,respondTransferRequest,cancelTransferRequest,listWorkspaceUserDirectory } from "./workspace-transfers.js";
 import { inviteWorkspaceUser,listPendingInvitations,listWorkspaceInvitations,respondToWorkspaceInvitation,revokeWorkspaceInvitation } from "./workspace-invitations.js";
+import { listNotifications,unreadNotificationCount,markNotificationRead,markAllNotificationsRead,dismissNotification,getNotificationPreferences,updateNotificationPreferences,sendGlobalNotification,sendWorkspaceNotification,listNotificationMessages,notifyWorkspaceOwner } from "./notifications.js";
 import {
   listUserWorkspaces, getWorkspaceForUser, createWorkspace, updateWorkspace, deleteWorkspace, setMainWorkspaceVisibility,
   listWorkspaceMembers, setWorkspaceMember, removeWorkspaceMember, transferWorkspaceOwner,
@@ -138,7 +139,7 @@ async function branched(req, res, next) {
       return res.status(423).json({ error:"Drive offline", driveOffline:true, deletionDueAt:workspace.deletion_due_at, notice:workspace.lifecycle_notice });
     }
     if (workspace.status === "suspended" && req.role !== "admin") {
-      return res.status(423).json({ error:"Workspace suspended", suspended:true, reason:workspace.suspension_reason || null });
+      return res.status(423).json({ error:"Workspace suspended", suspended:true, reason:workspace.permission==="owner" ? (workspace.suspension_reason || null) : null });
     }
     req.workspace = workspace;
     req.workspaceOps = makeLocalOps(req.workspace.filesystem_root);
@@ -185,12 +186,61 @@ export function workspaceRouter() {
     } catch(error) { res.status(400).json({error:error.message}); }
   });
 
+  router.get("/notifications",async(req,res)=>{
+    try{res.json({notifications:await listNotifications(req.userId,{limit:req.query.limit,unreadOnly:req.query.unreadOnly==="true"}),unreadCount:await unreadNotificationCount(req.userId)});}
+    catch(error){res.status(400).json({error:error.message});}
+  });
+  router.get("/notifications/unread-count",async(req,res)=>{
+    try{res.json({unreadCount:await unreadNotificationCount(req.userId)});}
+    catch(error){res.status(400).json({error:error.message});}
+  });
+  router.patch("/notifications/:id/read",async(req,res)=>{
+    try{res.json(await markNotificationRead(req.userId,req.params.id));}
+    catch(error){res.status(400).json({error:error.message});}
+  });
+  router.post("/notifications/read-all",async(req,res)=>{
+    try{res.json(await markAllNotificationsRead(req.userId));}
+    catch(error){res.status(400).json({error:error.message});}
+  });
+  router.delete("/notifications/:id",async(req,res)=>{
+    try{res.json(await dismissNotification(req.userId,req.params.id));}
+    catch(error){res.status(400).json({error:error.message});}
+  });
+  router.get("/notification-preferences",async(req,res)=>{
+    try{res.json({preferences:await getNotificationPreferences(req.userId)});}
+    catch(error){res.status(400).json({error:error.message});}
+  });
+  router.patch("/notification-preferences",express.json(),async(req,res)=>{
+    try{res.json({preferences:await updateNotificationPreferences(req.userId,req.body||{})});}
+    catch(error){res.status(400).json({error:error.message});}
+  });
+  router.get("/admin/notification-messages",async(req,res)=>{
+    if(req.role!=="admin") return res.status(403).json({error:"Admin access required"});
+    try{res.json({messages:await listNotificationMessages(req.query.limit)});}
+    catch(error){res.status(400).json({error:error.message});}
+  });
+  router.post("/admin/notifications/global",express.json(),async(req,res)=>{
+    if(req.role!=="admin") return res.status(403).json({error:"Admin access required"});
+    try{res.status(201).json(await sendGlobalNotification({senderId:req.userId,audience:req.body?.audience,title:req.body?.title,body:req.body?.message,severity:req.body?.severity}));}
+    catch(error){res.status(400).json({error:error.message});}
+  });
+  router.post("/workspaces/:id/messages",express.json(),async(req,res)=>{
+    try{
+      const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role);
+      if(!workspace) throw new Error("Workspace not found or access denied");
+      if(workspace.is_main){if(req.role!=="admin") throw new Error("Admin access required");}
+      else await assertWorkspaceAdminAction(req,workspace,"send_messages");
+      const severity=req.role==="admin"?req.body?.severity:(req.body?.severity==="warning"?"warning":"info");
+      res.status(201).json(await sendWorkspaceNotification({workspaceId:workspace.id,senderId:req.userId,title:req.body?.title,body:req.body?.message,severity}));
+    }catch(error){res.status(error.status||400).json({error:error.message});}
+  });
   router.get("/workspaces", async (req,res) => {
     try {
       await evaluateWorkspaceLifecycle();
       const workspaces = await listUserWorkspaces(req.userId,req.role);
       const enrichedWorkspaces = await Promise.all(workspaces.map(async workspace => ({
         ...workspace,
+        suspension_reason:(req.role==="admin"||workspace.permission==="owner")?workspace.suspension_reason:null,
         management_permissions: await workspaceAdminPermissionsFor(req,workspace),
       })));
       const settings = { ...(await getWorkspaceCreationSettings()), ...(await getWorkspaceLifecycleSettings()), workspaceModeEnabled:await workspaceModeEnabled() };
@@ -279,9 +329,9 @@ export function workspaceRouter() {
       if(req.role!=="admin"&&workspace.permission!=="owner") throw new Error("Owner access required");
       const role=String(req.body?.role||""); if(!WORKSPACE_ROLES.includes(role)) throw new Error("Invalid workspace role");
       const input=req.body?.permissions||{}; const values=WORKSPACE_ADMIN_ACTIONS.map(action=>!!input[action]);
-      await query(`INSERT INTO workspace_role_admin_permissions(workspace_id,workspace_role,can_view_settings,can_edit_settings,can_manage_members,can_manage_permissions,can_delete_workspace)
-        VALUES($1,$2,$3,$4,$5,$6,$7)
-        ON CONFLICT(workspace_id,workspace_role) DO UPDATE SET can_view_settings=EXCLUDED.can_view_settings,can_edit_settings=EXCLUDED.can_edit_settings,can_manage_members=EXCLUDED.can_manage_members,can_manage_permissions=EXCLUDED.can_manage_permissions,can_delete_workspace=EXCLUDED.can_delete_workspace,updated_at=now()`,[workspace.id,role,...values]);
+      await query(`INSERT INTO workspace_role_admin_permissions(workspace_id,workspace_role,can_view_settings,can_edit_settings,can_manage_members,can_manage_permissions,can_send_messages,can_delete_workspace)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+        ON CONFLICT(workspace_id,workspace_role) DO UPDATE SET can_view_settings=EXCLUDED.can_view_settings,can_edit_settings=EXCLUDED.can_edit_settings,can_manage_members=EXCLUDED.can_manage_members,can_manage_permissions=EXCLUDED.can_manage_permissions,can_send_messages=EXCLUDED.can_send_messages,can_delete_workspace=EXCLUDED.can_delete_workspace,updated_at=now()`,[workspace.id,role,...values]);
       res.json({ok:true,permissions:await effectiveWorkspaceAdminPermissions(workspace.id,role)});
     }catch(error){res.status(error.status||400).json({error:error.message});}
   });
@@ -386,6 +436,7 @@ export function workspaceRouter() {
       if(String(workspace.owner_id)===String(req.userId) || workspace.permission==="owner") throw new Error("Transfer ownership before leaving this workspace");
       const removed=await query("DELETE FROM workspace_members WHERE workspace_id=$1 AND user_id=$2 RETURNING user_id",[workspace.id,req.userId]);
       if(!removed.rowCount) throw new Error("You are not a member of this workspace");
+      await notifyWorkspaceOwner(workspace.id,{actorUserId:req.userId,category:"membership_changes",eventType:"workspace_member_left",title:"Member left workspace",message:`${req.username} left ${workspace.name}.`,severity:"info"});
       res.json({ok:true});
     } catch(error) { res.status(400).json({error:error.message}); }
   });

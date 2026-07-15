@@ -291,3 +291,113 @@
 .workspace-trash-meter{height:4px;margin-top:5px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
 .workspace-trash-meter span{display:block;height:100%;border-radius:inherit;background:currentColor}
 @media(max-width:600px){.workspace-trash-line{font-size:.74rem}.workspace-trash-line span{font-size:.68rem}}
+
+/* 2026 workspace mobile redesign */
+.workspace-page-shell{width:min(100%,620px);margin:0 auto}
+.workspace-eyebrow{display:block;color:var(--accent);font-size:.66rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;margin-bottom:.2rem}
+.workspace-list-section{display:grid;gap:.65rem}
+.workspace-list-heading{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.workspace-list-heading h3{margin:.1rem 0 0;font-size:1rem}
+.workspace-manager-card>summary{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.workspace-manager-card>summary small{color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 55%,var(--border));border-radius:999px;padding:.12rem .45rem;font-size:.64rem}
+.workspace-setting-group{border:1px solid var(--border);border-radius:10px;margin-top:.6rem;padding:.2rem .65rem;background:var(--bg)}
+.workspace-setting-group>summary{font-size:.8rem;padding:.55rem 0}
+.workspace-setting-group[open]>summary{margin-bottom:.25rem}
+.workspace-lifecycle-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+.workspace-lifecycle-form label{display:grid;grid-template-columns:1fr auto;gap:.3rem;align-items:end}
+.workspace-lifecycle-form label input{grid-column:1/2}
+.workspace-lifecycle-form label span{grid-column:2/3;grid-row:2;color:var(--muted);font-size:.68rem;padding-bottom:.55rem}
+.workspace-lifecycle-form button,.workspace-lifecycle-form small,.workspace-lifecycle-form p{grid-column:1/-1}
+.workspace-invitations-card:has(.workspace-invitations-list:empty){display:none}
+
+.workspace-admin-card{padding:.78rem .82rem;background:linear-gradient(180deg,color-mix(in srgb,var(--panel) 94%,var(--accent) 6%),var(--panel))}
+.workspace-admin-head>div{min-width:0}
+.workspace-admin-head>div>strong{display:flex;align-items:center;gap:.38rem;min-width:0;font-size:.94rem}
+.workspace-admin-head>div>span{font-size:.7rem;text-transform:none}
+.workspace-state-badge{display:inline-flex!important;width:max-content;border-radius:999px;padding:.12rem .38rem;font-size:.58rem!important;font-weight:700;text-transform:uppercase!important;color:var(--accent)!important;background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.workspace-state-badge[data-state="active"]{color:var(--ok)!important;background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.workspace-state-badge[data-state="offline"],.workspace-state-badge[data-state="suspended"]{color:#e0a63b!important;background:rgba(224,166,59,.12)}
+.workspace-card-description{margin:.55rem 0 0;color:var(--muted);font-size:.74rem;line-height:1.4}
+.workspace-card-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.45rem;margin:.7rem 0 .45rem}
+.workspace-card-meta>span{display:flex;flex-direction:column;min-width:0}
+.workspace-card-meta small{color:var(--muted);font-size:.6rem;text-transform:uppercase;letter-spacing:.04em}
+.workspace-card-meta strong{font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:capitalize}
+.workspace-admin-actions{gap:.38rem;flex-wrap:wrap}
+.workspace-admin-actions button{min-height:32px;padding:.35rem .58rem;font-size:.72rem}
+.workspace-detail-heading{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;margin-bottom:.65rem}
+.workspace-detail-heading p{margin:.2rem 0 0}
+.workspace-detail-collapse,.workspace-detail-close{min-height:30px;padding:.3rem .55rem;font-size:.7rem}
+
+.workspace-permission-tabs{display:grid;grid-template-columns:1fr 1fr;gap:.3rem;padding:.3rem;border:1px solid var(--border);border-radius:10px;background:var(--bg);margin-bottom:.7rem}
+.workspace-permission-tabs button{border:0;background:transparent;min-height:34px;font-size:.72rem}
+.workspace-permission-tabs button.active{background:color-mix(in srgb,var(--accent) 16%,var(--panel));color:var(--accent)}
+.workspace-permission-pane{display:grid;gap:.6rem}
+.workspace-admin-permission-grid{display:grid;gap:.4rem}
+.workspace-admin-permission-grid label{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.62rem;border:1px solid var(--border);border-radius:9px;background:var(--bg)}
+.workspace-admin-permission-grid label>span{display:flex;flex-direction:column;gap:.1rem}
+.workspace-admin-permission-grid label strong{font-size:.76rem}
+.workspace-admin-permission-grid label small{color:var(--muted);font-size:.64rem;text-transform:capitalize}
+.workspace-admin-permission-grid input{flex:0 0 auto}
+.permission-locked{opacity:.55}
+.permission-locked::after{content:"Protected";margin-left:auto;color:var(--muted);font-size:.6rem}
+
+@media(max-width:520px){
+  .workspace-panel{padding:.42rem .28rem}
+  .workspace-page-shell{width:calc(100% - 10px);max-width:390px}
+  .workspace-page-header{margin-bottom:.65rem}
+  .workspace-page-header h2{font-size:1.12rem}
+  .workspace-page-header p{font-size:.7rem;line-height:1.35}
+  .workspace-list-heading{align-items:end}
+  .workspace-list-heading .primary{min-height:32px;padding:.35rem .62rem}
+  .workspace-admin-summary{font-size:.68rem}
+}
+@media(max-width:520px){
+  .workspace-manager-card,.workspace-admin-card,.workspace-invitations-card{width:calc(100% - 6px);margin-left:auto;margin-right:auto}
+  .workspace-manager-card{padding:.62rem}
+  .workspace-setting-group{padding:.15rem .52rem}
+  .workspace-limit-form{padding:.52rem;margin:.45rem 0 .65rem;gap:.42rem}
+  .workspace-lifecycle-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .workspace-admin-card{padding:.68rem}
+  .workspace-admin-head{align-items:flex-start}
+  .workspace-open-btn{min-width:64px}
+  .workspace-card-meta{gap:.28rem}
+  .workspace-card-meta small{font-size:.56rem}
+  .workspace-card-meta strong{font-size:.69rem}
+  .workspace-admin-detail{margin-top:.58rem;padding-top:.58rem}
+  .workspace-permission-form .perm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .workspace-permission-form .perm-grid label{padding:.52rem;font-size:.69rem}
+  .workspace-storage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .workspace-settings-form input,.workspace-settings-form textarea,.workspace-settings-form select{width:100%;min-width:0}
+  .workspace-member-controls{grid-template-columns:1fr}
+  .workspace-member-controls select{grid-column:auto}
+}
+
+/* Global workspace selector only belongs on Files. Sorter uses its own selector. */
+body:not(:has(#tab-files.active)) #workspace-bar{display:none!important}
+
+.workspace-card-summary{gap:.45rem}
+.workspace-card-toggle{display:flex;align-items:center;justify-content:space-between;gap:.65rem;flex:1;min-width:0;text-align:left;background:transparent;border:0;padding:0;min-height:38px}
+.workspace-card-toggle:hover{border-color:transparent;background:transparent}
+.workspace-card-title{display:flex;flex-direction:column;gap:.14rem;min-width:0}
+.workspace-card-title>strong{display:flex;align-items:center;gap:.35rem;min-width:0;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-card-title>small{color:var(--muted);font-size:.66rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-card-summary-meta{display:flex;align-items:center;gap:.5rem;flex:0 0 auto;color:var(--muted)}
+.workspace-card-summary-meta small{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.65rem}
+.workspace-card-summary-meta span{font-size:.9rem;color:var(--accent)}
+.workspace-card-body{padding-top:.65rem;margin-top:.55rem;border-top:1px solid var(--border)}
+.workspace-card-collapsed{padding-top:.56rem;padding-bottom:.56rem}
+.workspace-card-collapsed .workspace-admin-head{align-items:center}
+
+@media(max-width:520px){
+  .workspace-card-summary{align-items:center}
+  .workspace-card-toggle{min-height:34px;gap:.4rem}
+  .workspace-card-title>strong{font-size:.82rem}
+  .workspace-card-title>small{font-size:.6rem}
+  .workspace-card-summary-meta small{display:none}
+  .workspace-open-btn{min-width:58px;padding:.32rem .5rem}
+  .workspace-card-body{padding-top:.5rem;margin-top:.45rem}
+}
+
+.workspace-suspension-reason{margin:.55rem 0;padding:.58rem .65rem;border:1px solid color-mix(in srgb,var(--danger) 58%,var(--border));border-radius:9px;background:color-mix(in srgb,var(--danger) 8%,var(--bg))}
+.workspace-suspension-reason strong{display:block;font-size:.68rem;color:var(--danger);text-transform:uppercase;letter-spacing:.04em}
+.workspace-suspension-reason p{margin:.18rem 0 0;font-size:.72rem;line-height:1.4;color:var(--text)}

@@ -1,5 +1,6 @@
 import { query, pool } from "./db.js";
 import { getWorkspaceForUser } from "./workspaces.js";
+import { createNotification } from "./notifications.js";
 
 async function activeUserByUsername(username) {
   const result = await query(
@@ -64,7 +65,7 @@ export async function respondTransferRequest(requestId, decision, actorId, syste
   try {
     await client.query("BEGIN");
     const result = await client.query(
-      `SELECT r.*,w.is_main,w.owner_id FROM workspace_transfer_requests r
+      `SELECT r.*,w.is_main,w.owner_id,w.name AS workspace_name FROM workspace_transfer_requests r
        JOIN workspaces w ON w.id=r.workspace_id
        WHERE r.id=$1 AND r.status='pending' FOR UPDATE`,
       [requestId]
@@ -88,6 +89,18 @@ export async function respondTransferRequest(requestId, decision, actorId, syste
       [requestId, decision === "approve" ? "approved" : "declined", actorId]
     );
     await client.query("COMMIT");
+    if(decision==="approve"){
+      await createNotification({recipientUserId:request.requested_by,workspaceId:request.workspace_id,actorUserId:actorId,
+        category:"ownership_changes",eventType:"workspace_transfer_approved",title:"Workspace transfer approved",
+        message:`Ownership of ${request.workspace_name} was transferred.`,severity:"warning"});
+      await createNotification({recipientUserId:request.target_user_id,workspaceId:request.workspace_id,actorUserId:actorId,
+        category:"ownership_changes",eventType:"workspace_transfer_approved",title:"You now own a workspace",
+        message:`You are now the owner of ${request.workspace_name}.`,severity:"success"});
+    } else {
+      await createNotification({recipientUserId:request.requested_by,workspaceId:request.workspace_id,actorUserId:actorId,
+        category:"ownership_changes",eventType:"workspace_transfer_declined",title:"Workspace transfer declined",
+        message:`The transfer request for ${request.workspace_name} was declined.`,severity:"info"});
+    }
     return { ok:true, approved:decision === "approve", workspaceId:request.workspace_id };
   } catch (error) {
     await client.query("ROLLBACK");
