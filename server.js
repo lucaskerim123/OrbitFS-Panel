@@ -17,6 +17,7 @@ import { evaluateWorkspaceLifecycle, getWorkspaceForUser, listUserWorkspaces } f
 import { effectiveWorkspaceAdminPermissions, fullWorkspaceAdminPermissions } from "./workspace-permissions.js";
 import { addonEnabled, addonPath, addonStatus, listAddonStatuses, attachAddon, detachAddon, initialiseAddonState } from "./addons.js";
 import { getRestrictedTabs } from "./tab-restrictions.js";
+import { query } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -204,6 +205,28 @@ app.use("/api", async (req, res, next) => {
   req.role = session.role;
   req.userId = session.userId;
   next();
+});
+
+const DEFAULT_MAINTENANCE_MESSAGE = "OrbitFS is in maintenance mode while Main Workspace files are being changed. Do not edit or upload files. Data changed during maintenance may be lost; OrbitFS is not responsible for changes made while this warning is active.";
+
+async function maintenanceStatus() {
+  const row=(await query("SELECT setting_value,updated_at FROM system_settings WHERE setting_key='maintenance_mode' LIMIT 1")).rows[0];
+  const value=row?.setting_value && typeof row.setting_value==='object' ? row.setting_value : {};
+  return { enabled:value.enabled===true, message:String(value.message||DEFAULT_MAINTENANCE_MESSAGE).trim().slice(0,2000), updatedBy:value.updatedBy||null, updatedAt:row?.updated_at||null };
+}
+
+app.get("/api/maintenance-status", async (_req,res) => {
+  try { res.json(await maintenanceStatus()); } catch(error){ res.status(500).json({error:error.message}); }
+});
+app.patch("/api/system/maintenance", requireAdmin, express.json(), async (req,res) => {
+  try {
+    const enabled=req.body?.enabled===true;
+    const message=String(req.body?.message||DEFAULT_MAINTENANCE_MESSAGE).trim().slice(0,2000)||DEFAULT_MAINTENANCE_MESSAGE;
+    const value={enabled,message,updatedBy:req.username};
+    await query("INSERT INTO system_settings(setting_key,setting_value,updated_at) VALUES('maintenance_mode',$1::jsonb,now()) ON CONFLICT(setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value,updated_at=now()",[JSON.stringify(value)]);
+    logEvent("panel.maintenance.updated",{enabled,user:req.username});
+    res.json(await maintenanceStatus());
+  } catch(error){ res.status(400).json({error:error.message}); }
 });
 
 async function currentAddonStatuses() {

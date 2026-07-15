@@ -1,0 +1,24 @@
+.orbit-maintenance-banner{display:flex;align-items:center;gap:.9rem;width:calc(100% - 1rem);margin:.35rem .5rem .75rem;padding:1rem 1.05rem;border:2px solid #e0a63b;border-radius:13px;background:linear-gradient(135deg,rgba(224,166,59,.18),rgba(255,91,106,.11));box-shadow:0 10px 28px rgba(0,0,0,.24)}
+.orbit-maintenance-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:999px;background:#e0a63b;color:#111;font-size:1.35rem;font-weight:900}
+.orbit-maintenance-copy{min-width:0;display:grid;gap:.15rem}
+.orbit-maintenance-copy>span{color:#f2ba51;font-size:.68rem;font-weight:900;letter-spacing:.13em}
+.orbit-maintenance-copy strong{font-size:1rem;line-height:1.25}
+.orbit-maintenance-copy p{margin:.12rem 0 0;color:var(--text);font-size:.78rem;line-height:1.5;white-space:pre-wrap}
+.maintenance-control-card[data-active="true"]{border-color:#e0a63b;background:color-mix(in srgb,#e0a63b 5%,var(--panel))}
+#maintenance-control-form{display:grid;gap:.65rem;margin-top:.7rem}
+#maintenance-control-form>label:not(.maintenance-toggle){display:grid;gap:.28rem;color:var(--muted);font-size:.72rem}
+#maintenance-control-form textarea{width:100%;min-height:100px;resize:vertical;padding:.65rem;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);font:inherit}
+.maintenance-toggle{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.7rem;border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+.maintenance-toggle>span{display:flex;flex-direction:column;gap:.12rem}
+.maintenance-toggle strong{font-size:.78rem}
+.maintenance-toggle small{color:var(--muted);font-size:.64rem;line-height:1.35}
+.maintenance-toggle input{flex:0 0 auto}
+.maintenance-control-message{margin:0}
+@media(max-width:520px){
+  .orbit-maintenance-banner{align-items:flex-start;gap:.65rem;width:calc(100% - .7rem);margin:.25rem .35rem .6rem;padding:.78rem .72rem;border-radius:11px}
+  .orbit-maintenance-icon{flex-basis:34px;width:34px;height:34px;font-size:1rem}
+  .orbit-maintenance-copy>span{font-size:.6rem}
+  .orbit-maintenance-copy strong{font-size:.84rem}
+  .orbit-maintenance-copy p{font-size:.7rem;line-height:1.42}
+  #maintenance-control-form button{width:100%}
+}

@@ -48,7 +48,7 @@
     if (document.querySelector('link[data-orbit-notification-style="1"]')) return;
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "/addon-assets/workspaces/notification-center.css?v=20260715-addon";
+    link.href = "/addon-assets/workspaces/notification-center.css?v=20260715-critical";
     link.dataset.orbitNotificationStyle = "1";
     document.head.appendChild(link);
   }
@@ -176,9 +176,10 @@
       banner = document.createElement("div");
       banner.id = "notification-critical-banner";
       banner.className = "notification-critical-banner";
+      banner.setAttribute("role", "alert");
       document.getElementById("current-user")?.insertAdjacentElement("afterend", banner);
     }
-    banner.innerHTML = `<div><strong>${esc(critical.title)}</strong><p>${esc(critical.message)}</p></div><button type="button">View</button>`;
+    banner.innerHTML = `<div class="notification-critical-copy"><span class="notification-critical-label">CRITICAL ALERT</span><strong>${esc(critical.title)}</strong><p>${esc(critical.message)}</p></div><button type="button">Open alert</button>`;
     banner.querySelector("button").addEventListener("click", async () => {
       await openDrawer();
       const card = document.querySelector(`[data-notification-id="${CSS.escape(String(critical.id))}"]`);

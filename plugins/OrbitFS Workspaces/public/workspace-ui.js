@@ -30,7 +30,7 @@
 
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260715-addon";
+  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260715-maintenance";
   document.head.appendChild(css);
 })();
 function workspaceFormatBytes(value) {
@@ -843,15 +843,20 @@ document.getElementById("workspace-page-create")?.addEventListener("click", open
 if (state.token) setTimeout(() => loadOrbitWorkspaces(), 0);
 
 function ensureCompactWorkspaceTrashList() {
-  if (document.getElementById("workspace-trash-compact")) return;
   const retention = document.getElementById("trash-retention-days");
   const card = retention?.closest("details.card");
-  if (!card) return;
-  const host = document.createElement("div");
-  host.id = "workspace-trash-compact";
-  host.className = "workspace-trash-compact";
-  host.innerHTML = '<div class="workspace-trash-head"><strong>Workspace trash</strong><span>Auto refresh</span></div><div id="workspace-trash-rows"></div>';
-  card.querySelector("#trash-config-message")?.insertAdjacentElement("afterend", host);
+  if (!card) return null;
+  let host = document.getElementById("workspace-trash-compact");
+  if (!host) {
+    host = document.createElement("section");
+    host.id = "workspace-trash-compact";
+    host.className = "workspace-trash-compact";
+  }
+  if (!host.querySelector("#workspace-trash-rows")) {
+    host.innerHTML = '<div class="workspace-trash-compact-head"><div><strong>Workspace trash usage</strong><span>Updated automatically</span></div></div><div id="workspace-trash-rows" class="workspace-trash-compact-rows"></div>';
+  }
+  if (host.parentElement !== card) card.appendChild(host);
+  return host;
 }
 
 function renderCompactWorkspaceTrashList() {
@@ -864,8 +869,8 @@ function renderCompactWorkspaceTrashList() {
     const limit = Number(w.trash_limit_bytes || 0);
     const pct = limit > 0 ? Math.min(100, used / limit * 100) : 0;
     const max = limit > 0 ? workspaceFormatBytes(limit) : "Unlimited";
-    return `<div class="workspace-trash-row"><div class="workspace-trash-line"><strong>${escapeWorkspaceHtml(w.name || "Workspace")}</strong><span>${workspaceFormatBytes(used)} / ${max}</span></div><div class="workspace-trash-meter"><span style="width:${pct}%"></span></div></div>`;
-  }).join("") || '<p class="muted-text">No workspaces.</p>';
+    return `<article class="workspace-trash-compact-row"><div class="workspace-trash-compact-line"><strong>${escapeWorkspaceHtml(w.name || "Workspace")}</strong><span>${workspaceFormatBytes(used)} / ${max}</span></div><div class="workspace-trash-compact-meter" aria-label="Trash usage ${pct.toFixed(1)} percent"><span style="width:${pct}%"></span></div></article>`;
+  }).join("") || '<p class="muted-text">No workspaces available.</p>';
 }
 
 async function refreshCompactWorkspaceTrashList() {

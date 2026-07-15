@@ -30,15 +30,15 @@
   }
   async function loadWorkspaceAddonAssets() {
     await loadScript(
-      "/addon-assets/workspaces/workspace-ui.js?v=20260715-addons4",
+      "/addon-assets/workspaces/workspace-ui.js?v=20260715-maintenance",
       "workspaces-ui"
     );
     await loadScript(
-      "/addon-assets/workspaces/workspace-permission-editor.js?v=20260715-addons4",
+      "/addon-assets/workspaces/workspace-permission-editor.js?v=20260715-maintenance",
       "workspaces-permissions"
     );
     await loadScript(
-      "/addon-assets/workspaces/notification-center.js?v=20260715-addons4",
+      "/addon-assets/workspaces/notification-center.js?v=20260715-maintenance",
       "workspaces-notifications"
     );
   }
@@ -151,13 +151,7 @@
       button.disabled = !sorter.attached;
       button.title = sorter.attached ? "" : "Attach the Sorter addon in Config first";
     });
-    let note = row.querySelector(".addon-system-note");
-    if (!note) {
-      note = document.createElement("small");
-      note.className = "addon-system-note muted-text";
-      row.appendChild(note);
-    }
-    note.textContent = sorter.status === "attached" ? "Addon attached" : sorter.status === "detached" ? "Addon detached - attach it in Config" : "Addon folder not installed";
+    row.querySelector(".addon-system-note")?.remove();
   }
   async function changeAddon(id, action) {
     const message = byId("addon-manager-message");
