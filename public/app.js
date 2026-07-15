@@ -2166,6 +2166,8 @@ document.getElementById("startup-config-form")?.addEventListener("submit", async
     low: startupLines("startup-files-low"),
     medium: startupLines("startup-files-medium"),
     high: startupLines("startup-files-high"),
+    custom1: startupLines("startup-files-custom1"),
+    custom2: startupLines("startup-files-custom2"),
   };
   const message = document.getElementById("startup-config-message");
   try {
