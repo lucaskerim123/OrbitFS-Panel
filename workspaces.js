@@ -161,10 +161,10 @@ export function assertWorkspaceQuota(workspace,incomingBytes=0,currentBytes=0) {
 
 export { BRANCHED_ROOT, DEFAULT_QUOTA, DEFAULT_MAX_WORKSPACES_PER_USER };
 
-export async function updateWorkspace(workspaceId, changes, actorId, systemRole) {
+export async function updateWorkspace(workspaceId, changes, actorId, systemRole, allowEditSettings=false) {
   const workspace = await getWorkspaceForUser(workspaceId, actorId, systemRole);
   if (!workspace) throw new Error("Workspace not found or access denied");
-  if (systemRole !== "admin" && workspace.permission !== "owner") throw new Error("Owner access required");
+  if (systemRole !== "admin" && workspace.permission !== "owner" && !allowEditSettings) throw new Error("Workspace settings permission required");
   const fields = [];
   const values = [];
   const add = (column, value) => { values.push(value); fields.push(`${column}=$${values.length}`); };
@@ -202,10 +202,10 @@ export async function updateWorkspace(workspaceId, changes, actorId, systemRole)
   return getWorkspaceForUser(workspaceId, actorId, systemRole);
 }
 
-export async function listWorkspaceMembers(workspaceId, actorId, systemRole) {
+export async function listWorkspaceMembers(workspaceId, actorId, systemRole, allowManageMembers=false) {
   const workspace = await getWorkspaceForUser(workspaceId, actorId, systemRole);
   if (!workspace) throw new Error("Workspace not found or access denied");
-  if (systemRole !== "admin" && String(workspace.owner_id) !== String(actorId)) throw new Error("Owner access required");
+  if (systemRole !== "admin" && String(workspace.owner_id) !== String(actorId) && !allowManageMembers) throw new Error("Manage members permission required");
   const result = await query(
     `SELECT wm.user_id,u.username,u.role AS system_role,wm.permission,wm.joined_at
      FROM workspace_members wm JOIN users u ON u.id=wm.user_id
@@ -215,10 +215,10 @@ export async function listWorkspaceMembers(workspaceId, actorId, systemRole) {
   return result.rows;
 }
 
-export async function setWorkspaceMember(workspaceId, username, permission, actorId, systemRole) {
+export async function setWorkspaceMember(workspaceId, username, permission, actorId, systemRole, allowManageMembers=false) {
   const workspace = await getWorkspaceForUser(workspaceId, actorId, systemRole);
   if (!workspace) throw new Error("Workspace not found or access denied");
-  if (systemRole !== "admin" && workspace.permission !== "owner") throw new Error("Owner access required");
+  if (systemRole !== "admin" && workspace.permission !== "owner" && !allowManageMembers) throw new Error("Manage members permission required");
   if (workspace.is_main && systemRole !== "admin") throw new Error("Only admins can manage Main Workspace members");
   if (!["owner", "editor", "contributor", "viewer"].includes(permission)) throw new Error("Invalid workspace role");
   const user = await query("SELECT id FROM users WHERE lower(username)=lower($1) AND status='active' LIMIT 1", [username]);
@@ -248,26 +248,26 @@ export async function setWorkspaceMember(workspaceId, username, permission, acto
       [workspaceId, userId, permission, actorId]
     );
   }
-  return listWorkspaceMembers(workspaceId, actorId, systemRole);
+  return listWorkspaceMembers(workspaceId, actorId, systemRole, allowManageMembers);
 }
 
-export async function removeWorkspaceMember(workspaceId, userId, actorId, systemRole) {
+export async function removeWorkspaceMember(workspaceId, userId, actorId, systemRole, allowManageMembers=false) {
   const workspace = await getWorkspaceForUser(workspaceId, actorId, systemRole);
   if (!workspace) throw new Error("Workspace not found or access denied");
-  if (systemRole !== "admin" && workspace.permission !== "owner") throw new Error("Owner access required");
+  if (systemRole !== "admin" && workspace.permission !== "owner" && !allowManageMembers) throw new Error("Manage members permission required");
   if (String(userId) === String(workspace.owner_id)) throw new Error("Transfer ownership before removing the owner");
   await query("DELETE FROM workspace_members WHERE workspace_id=$1 AND user_id=$2", [workspaceId, userId]);
   return listWorkspaceMembers(workspaceId, actorId, systemRole);
 }
 
 
-export async function deleteWorkspace(workspaceId, actorId, systemRole) {
+export async function deleteWorkspace(workspaceId, actorId, systemRole, allowDeleteWorkspace=false) {
   const result = await query("SELECT * FROM workspaces WHERE id=$1 LIMIT 1", [workspaceId]);
   const workspace = result.rows[0];
   if (!workspace) throw new Error("Workspace not found");
   if (workspace.is_main) throw new Error("Main Workspace cannot be deleted");
-  if (systemRole !== "admin" && String(workspace.owner_id) !== String(actorId)) {
-    throw new Error("Only the workspace owner or an admin can delete it");
+  if (systemRole !== "admin" && String(workspace.owner_id) !== String(actorId) && !allowDeleteWorkspace) {
+    throw new Error("Delete workspace permission required");
   }
   const root = workspace.filesystem_root ? path.resolve(workspace.filesystem_root) : null;
   await query("DELETE FROM workspaces WHERE id=$1", [workspaceId]);
@@ -350,11 +350,11 @@ export async function touchWorkspaceActivity(workspaceId) {
   await query(`UPDATE workspaces SET last_activity_at=now(),lifecycle_notice=NULL,updated_at=now() WHERE id=$1 AND is_main=false`,[workspaceId]);
 }
 
-export async function setWorkspaceDriveState(workspaceId,online,actorId,systemRole) {
+export async function setWorkspaceDriveState(workspaceId,online,actorId,systemRole,allowEditSettings=false) {
   const workspace=await getWorkspaceForUser(workspaceId,actorId,systemRole);
   if(!workspace) throw new Error('Workspace not found or access denied');
   if(workspace.is_main) throw new Error('Use the Main Workspace visibility control');
-  if(systemRole!=='admin' && workspace.permission!=='owner') throw new Error('Owner access required');
+  if(systemRole!=='admin' && workspace.permission!=='owner' && !allowEditSettings) throw new Error('Workspace settings permission required');
   const settings=await getWorkspaceLifecycleSettings();
   if(online){
     await query(`UPDATE workspaces SET drive_state='online',offline_at=NULL,deletion_due_at=NULL,lifecycle_notice=NULL,last_activity_at=now(),updated_at=now() WHERE id=$1`,[workspaceId]);

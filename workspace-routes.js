@@ -5,7 +5,7 @@ import { Readable } from "stream";
 import { query } from "./db.js";
 import { makeLocalOps } from "./local-orbitfs-ops.js";
 import { beginDownload } from "./download-limits.js";
-import { WORKSPACE_ACTIONS,WORKSPACE_ROLES,effectiveWorkspacePermissions,normalizeWorkspacePath,roleDefaults } from "./workspace-permissions.js";
+import { WORKSPACE_ACTIONS,WORKSPACE_ROLES,WORKSPACE_ADMIN_ACTIONS,effectiveWorkspacePermissions,effectiveWorkspaceAdminPermissions,fullWorkspaceAdminPermissions,workspaceAdminRoleDefaults,normalizeWorkspacePath,roleDefaults } from "./workspace-permissions.js";
 import { requestWorkspaceTransfer,listTransferRequests,respondTransferRequest,cancelTransferRequest,listWorkspaceUserDirectory } from "./workspace-transfers.js";
 import { inviteWorkspaceUser,listPendingInvitations,listWorkspaceInvitations,respondToWorkspaceInvitation,revokeWorkspaceInvitation } from "./workspace-invitations.js";
 import {
@@ -36,6 +36,16 @@ async function workspacePermissionsAt(req,filepath=''){
 async function assertWorkspaceAction(req,filepath,action){
   const effective=await workspacePermissionsAt(req,filepath);
   if(!effective[action]){ const error=new Error(`Workspace permission denied: ${action}`); error.status=403; throw error; }
+  return effective;
+}
+
+async function workspaceAdminPermissionsFor(req,workspace){
+  if(req.role==='admin'||workspace.permission==='owner') return fullWorkspaceAdminPermissions();
+  return effectiveWorkspaceAdminPermissions(workspace.id,workspace.permission);
+}
+async function assertWorkspaceAdminAction(req,workspace,action){
+  const effective=await workspaceAdminPermissionsFor(req,workspace);
+  if(!effective[action]){ const error=new Error('Workspace administration permission denied: '+action); error.status=403; throw error; }
   return effective;
 }
 
@@ -179,9 +189,13 @@ export function workspaceRouter() {
     try {
       await evaluateWorkspaceLifecycle();
       const workspaces = await listUserWorkspaces(req.userId,req.role);
+      const enrichedWorkspaces = await Promise.all(workspaces.map(async workspace => ({
+        ...workspace,
+        management_permissions: await workspaceAdminPermissionsFor(req,workspace),
+      })));
       const settings = { ...(await getWorkspaceCreationSettings()), ...(await getWorkspaceLifecycleSettings()), workspaceModeEnabled:await workspaceModeEnabled() };
       const ownedCount = await ownedWorkspaceCount(req.userId);
-      res.json({ workspaces, settings, ownedCount });
+      res.json({ workspaces:enrichedWorkspaces, settings, ownedCount });
     } catch(error) { res.status(500).json({error:error.message}); }
   });
   router.get("/workspace-user-directory", async (req,res) => {
@@ -218,7 +232,7 @@ export function workspaceRouter() {
       const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role);
       if(!workspace) throw new Error("Workspace not found or access denied");
       if(workspace.is_main) throw new Error("Main Workspace uses Simple Mode file permissions");
-      if(req.role!=="admin"&&workspace.permission!=="owner") throw new Error("Owner access required");
+      await assertWorkspaceAdminAction(req,workspace,"manage_permissions");
       const rows=(await query(`SELECT relative_path,workspace_role,can_read,can_write,can_download,can_move,can_delete,can_create
         FROM workspace_permission_overrides WHERE workspace_id=$1 ORDER BY relative_path,workspace_role`,[workspace.id])).rows;
       res.json({overrides:rows.map(row=>({path:row.relative_path,role:row.workspace_role,permissions:{read:row.can_read,write:row.can_write,download:row.can_download,move:row.can_move,delete:row.can_delete,create:row.can_create}}))});
@@ -229,7 +243,7 @@ export function workspaceRouter() {
       const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role);
       if(!workspace) throw new Error("Workspace not found or access denied");
       if(workspace.is_main) throw new Error("Main Workspace uses Simple Mode file permissions");
-      if(req.role!=="admin"&&workspace.permission!=="owner") throw new Error("Owner access required");
+      await assertWorkspaceAdminAction(req,workspace,"manage_permissions");
       const role=String(req.body?.role||""); if(!WORKSPACE_ROLES.includes(role)) throw new Error("Invalid workspace role");
       const relativePath=normalizeWorkspacePath(req.body?.path); const input=req.body?.permissions||{};
       const values=WORKSPACE_ACTIONS.map(action=>!!input[action]);
@@ -243,11 +257,35 @@ export function workspaceRouter() {
     try{
       const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role);
       if(!workspace) throw new Error("Workspace not found or access denied");
-      if(req.role!=="admin"&&workspace.permission!=="owner") throw new Error("Owner access required");
+      await assertWorkspaceAdminAction(req,workspace,"manage_permissions");
       await query(`DELETE FROM workspace_permission_overrides WHERE workspace_id=$1 AND relative_path=$2 AND workspace_role=$3`,[workspace.id,normalizeWorkspacePath(req.query.path),String(req.query.role||"")]);
       res.json({ok:true});
     }catch(error){ res.status(400).json({error:error.message}); }
-  });  router.get("/workspace-settings", async (req,res) => {
+  });
+  router.get("/workspaces/:id/admin-permissions",async(req,res)=>{
+    try{
+      const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role);
+      if(!workspace||workspace.is_main) throw new Error("Workspace not found or not configurable");
+      if(req.role!=="admin"&&workspace.permission!=="owner") throw new Error("Owner access required");
+      const permissions={};
+      for(const role of WORKSPACE_ROLES) permissions[role]=await effectiveWorkspaceAdminPermissions(workspace.id,role);
+      res.json({permissions,defaults:Object.fromEntries(WORKSPACE_ROLES.map(role=>[role,workspaceAdminRoleDefaults(role)]))});
+    }catch(error){res.status(error.status||400).json({error:error.message});}
+  });
+  router.put("/workspaces/:id/admin-permissions",express.json(),async(req,res)=>{
+    try{
+      const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role);
+      if(!workspace||workspace.is_main) throw new Error("Workspace not found or not configurable");
+      if(req.role!=="admin"&&workspace.permission!=="owner") throw new Error("Owner access required");
+      const role=String(req.body?.role||""); if(!WORKSPACE_ROLES.includes(role)) throw new Error("Invalid workspace role");
+      const input=req.body?.permissions||{}; const values=WORKSPACE_ADMIN_ACTIONS.map(action=>!!input[action]);
+      await query(`INSERT INTO workspace_role_admin_permissions(workspace_id,workspace_role,can_view_settings,can_edit_settings,can_manage_members,can_manage_permissions,can_delete_workspace)
+        VALUES($1,$2,$3,$4,$5,$6,$7)
+        ON CONFLICT(workspace_id,workspace_role) DO UPDATE SET can_view_settings=EXCLUDED.can_view_settings,can_edit_settings=EXCLUDED.can_edit_settings,can_manage_members=EXCLUDED.can_manage_members,can_manage_permissions=EXCLUDED.can_manage_permissions,can_delete_workspace=EXCLUDED.can_delete_workspace,updated_at=now()`,[workspace.id,role,...values]);
+      res.json({ok:true,permissions:await effectiveWorkspaceAdminPermissions(workspace.id,role)});
+    }catch(error){res.status(error.status||400).json({error:error.message});}
+  });
+  router.get("/workspace-settings", async (req,res) => {
     try {
       const settings = await getWorkspaceCreationSettings();
       const ownedCount = await ownedWorkspaceCount(req.userId);
@@ -293,7 +331,7 @@ export function workspaceRouter() {
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.patch("/workspaces/:id/drive-state", express.json(), async (req,res) => {
-    try { res.json({workspace:await setWorkspaceDriveState(req.params.id,!!req.body?.online,req.userId,req.role)}); }
+    try { const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role); const access=await assertWorkspaceAdminAction(req,workspace,"edit_settings"); res.json({workspace:await setWorkspaceDriveState(req.params.id,!!req.body?.online,req.userId,req.role,access.edit_settings)}); }
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.patch("/workspaces/:id/visibility", express.json(), async (req,res) => {
@@ -301,7 +339,7 @@ export function workspaceRouter() {
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.patch("/workspaces/:id", express.json(), async (req,res) => {
-    try { res.json({ workspace:await updateWorkspace(req.params.id,req.body||{},req.userId,req.role) }); }
+    try { const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role); const access=await assertWorkspaceAdminAction(req,workspace,"edit_settings"); res.json({ workspace:await updateWorkspace(req.params.id,req.body||{},req.userId,req.role,access.edit_settings) }); }
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.get("/workspaces/:id/storage", async (req,res) => {
@@ -337,7 +375,7 @@ export function workspaceRouter() {
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.delete("/workspaces/:id", async (req,res) => {
-    try { res.json(await deleteWorkspace(req.params.id,req.userId,req.role)); }
+    try { const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role); const access=await assertWorkspaceAdminAction(req,workspace,"delete_workspace"); res.json(await deleteWorkspace(req.params.id,req.userId,req.role,access.delete_workspace)); }
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.delete("/workspaces/:id/leave", async (req,res) => {
@@ -352,15 +390,15 @@ export function workspaceRouter() {
     } catch(error) { res.status(400).json({error:error.message}); }
   });
   router.get("/workspaces/:id/members", async (req,res) => {
-    try { res.json({ members:await listWorkspaceMembers(req.params.id,req.userId,req.role) }); }
+    try { const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role); const access=await assertWorkspaceAdminAction(req,workspace,"manage_members"); res.json({ members:await listWorkspaceMembers(req.params.id,req.userId,req.role,access.manage_members) }); }
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.put("/workspaces/:id/members/:username", express.json(), async (req,res) => {
-    try { res.json({ members:await setWorkspaceMember(req.params.id,req.params.username,req.body?.permission,req.userId,req.role) }); }
+    try { const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role); const access=await assertWorkspaceAdminAction(req,workspace,"manage_members"); res.json({ members:await setWorkspaceMember(req.params.id,req.params.username,req.body?.permission,req.userId,req.role,access.manage_members) }); }
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.delete("/workspaces/:id/members/:userId", async (req,res) => {
-    try { res.json({ members:await removeWorkspaceMember(req.params.id,req.params.userId,req.userId,req.role) }); }
+    try { const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role); const access=await assertWorkspaceAdminAction(req,workspace,"manage_members"); res.json({ members:await removeWorkspaceMember(req.params.id,req.params.userId,req.userId,req.role,access.manage_members) }); }
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.post("/bulk-download/validate",express.json(),branched,async(req,res)=>{

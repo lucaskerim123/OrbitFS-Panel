@@ -12,6 +12,24 @@ function isAdminUser() {
   return state.role === "admin";
 }
 
+function isBranchedWorkspaceMode() {
+  const workspace = typeof currentWorkspace === "function" ? currentWorkspace() : null;
+  return state.workspaceSettings?.workspaceModeEnabled !== false && !!workspace && !workspace.is_main;
+}
+
+function canManageCurrentPermissions() {
+  const workspace = typeof currentWorkspace === "function" ? currentWorkspace() : null;
+  return isBranchedWorkspaceMode() ? (isAdminUser() || workspace?.permission === "owner") : isAdminUser();
+}
+
+function openCurrentPermissionEditor(filepath, current = null) {
+  if (isBranchedWorkspaceMode() && typeof openWorkspacePermissionForPath === "function") {
+    openWorkspacePermissionForPath(filepath);
+    return;
+  }
+  openPermissionEditor(filepath, current);
+}
+
 function permissionSummary(permissions = {}) {
   const allowed = FILE_PERMISSION_ACTIONS.filter((action) => permissions[action]);
   if (allowed.length === FILE_PERMISSION_ACTIONS.length) return "All user actions";
@@ -149,7 +167,7 @@ function addPermissionButton(container, filepath, permissions) {
 const baseRenderRow = renderRow;
 renderRow = function renderRowWithPermissions(list, entry) {
   baseRenderRow(list, entry);
-  if (!isAdminUser()) return;
+  if (!isAdminUser() || isBranchedWorkspaceMode()) return;
   const li = list.lastElementChild;
   const actions = li?.querySelector(".row-actions");
   const full = state.subpath ? `${state.subpath}/${entry.name}` : entry.name;
@@ -162,19 +180,19 @@ loadSystem = async function loadSystemWithPermissions() {
   await loadPermissions();
 };
 
-document.getElementById("editor-permission-btn")?.addEventListener("click", () => state.openFile && openPermissionEditor(state.openFile));
-document.getElementById("preview-permission-btn")?.addEventListener("click", () => state.previewFile && openPermissionEditor(state.previewFile));
+document.getElementById("editor-permission-btn")?.addEventListener("click", () => state.openFile && openCurrentPermissionEditor(state.openFile));
+document.getElementById("preview-permission-btn")?.addEventListener("click", () => state.previewFile && openCurrentPermissionEditor(state.previewFile));
 
 const baseOpenFile = openFile;
 openFile = async function openFileWithPermissionButton(filepath) {
   await baseOpenFile(filepath);
-  document.getElementById("editor-permission-btn")?.classList.toggle("hidden", !isAdminUser());
+  document.getElementById("editor-permission-btn")?.classList.toggle("hidden", !canManageCurrentPermissions());
 };
 
 const baseOpenPreview = openPreview;
 openPreview = async function openPreviewWithPermissionButton(filepath, entry) {
   await baseOpenPreview(filepath, entry);
-  document.getElementById("preview-permission-btn")?.classList.toggle("hidden", !isAdminUser());
+  document.getElementById("preview-permission-btn")?.classList.toggle("hidden", !canManageCurrentPermissions());
 };
 
 if (isAdminUser()) loadPermissions();

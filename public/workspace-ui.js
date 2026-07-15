@@ -4,7 +4,7 @@
 
   state.workspaceId = localStorage.getItem("panelWorkspaceId") || "";
   state.workspaces = [];
-  state.workspaceSettings = { maxWorkspacesPerUser: 1, ownedCount: 0 };
+  state.workspaceSettings = { maxWorkspacesPerUser: 1, ownedCount: 0, workspaceModeEnabled: false };
 
   const nativeFetch = window.fetch.bind(window);
   window.fetch = (input, init = {}) => {
@@ -93,6 +93,8 @@ function ensureWorkspaceBar() {
 
 function renderWorkspaceBar() {
   ensureWorkspaceBar();
+  const bar = document.getElementById("workspace-bar");
+  if (bar) bar.classList.toggle("hidden", state.workspaceSettings?.workspaceModeEnabled === false);
   const select = document.getElementById("workspace-select");
   if (!select) return;
   select.innerHTML = "";
@@ -128,12 +130,15 @@ async function loadOrbitWorkspaces(preferredId = state.workspaceId) {
     const response = await api("/api/workspaces");
     state.workspaces = response.workspaces || [];
     state.workspaceSettings = { ...response.settings, maxWorkspacesPerUser: Number(response.settings?.maxWorkspacesPerUser ?? 1), ownedCount: Number(response.ownedCount ?? 0) };
-    const selected = state.workspaces.find((item) => String(item.id) === String(preferredId))
+    const workspaceModeEnabled = state.workspaceSettings.workspaceModeEnabled !== false;
+    const selected = (!workspaceModeEnabled ? state.workspaces.find((item) => item.is_main) : null)
+      || state.workspaces.find((item) => String(item.id) === String(preferredId))
       || state.workspaces.find((item) => item.is_main)
       || state.workspaces[0];
     state.workspaceId = selected ? String(selected.id) : "";
     if (state.workspaceId) localStorage.setItem("panelWorkspaceId", state.workspaceId);
     renderWorkspaceBar();
+    if (typeof applyWorkspaceModeUi === "function") applyWorkspaceModeUi();
     if (typeof sorterRenderWorkspaceSelector === "function") sorterRenderWorkspaceSelector();
     renderWorkspaceAdmin();
     renderAdminStorageOverview();
@@ -388,6 +393,32 @@ function renderWorkspaceAdmin() {
   for (const workspace of state.workspaces) list.appendChild(buildWorkspaceAdminCard(workspace));
 }
 
+function toggleWorkspaceDetail(card, view, render) {
+  const detail = card.querySelector(".workspace-admin-detail");
+  if (!detail) return;
+  if (!detail.classList.contains("hidden") && detail.dataset.view === view) {
+    detail.classList.add("hidden");
+    detail.innerHTML = "";
+    delete detail.dataset.view;
+    return;
+  }
+  detail.dataset.view = view;
+  Promise.resolve(render()).finally(() => {
+    if (detail.classList.contains("hidden") || detail.dataset.view !== view || detail.querySelector(":scope > .workspace-detail-collapse")) return;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "workspace-detail-collapse";
+    close.textContent = "Hide";
+    close.addEventListener("click", () => {
+      detail.classList.add("hidden");
+      detail.innerHTML = "";
+      delete detail.dataset.view;
+    });
+    detail.prepend(close);
+  });
+}
+window.toggleWorkspaceDetail = toggleWorkspaceDetail;
+
 function buildWorkspaceAdminCard(workspace) {
   const isOwner = workspace.permission === "owner";
   const isAdmin = state.role === "admin";
@@ -426,8 +457,8 @@ function buildWorkspaceAdminCard(workspace) {
   card.querySelector(".workspace-open-btn").addEventListener("click", () => {
     activateWorkspace(workspace.id);
   });
-  card.querySelector(".workspace-storage-btn")?.addEventListener("click", () => showWorkspaceStorage(workspace, card));
-  card.querySelector(".workspace-members-btn")?.addEventListener("click", () => showWorkspaceMembers(workspace, card));
+  card.querySelector(".workspace-storage-btn")?.addEventListener("click", () => toggleWorkspaceDetail(card,"storage",() => showWorkspaceStorage(workspace, card)));
+  card.querySelector(".workspace-members-btn")?.addEventListener("click", () => toggleWorkspaceDetail(card,"members",() => showWorkspaceMembers(workspace, card)));
   card.querySelector(".workspace-visibility-btn")?.addEventListener("click", async () => {
     try {
       await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/visibility`, {
@@ -447,7 +478,7 @@ function buildWorkspaceAdminCard(workspace) {
       await loadOrbitWorkspaces(workspace.id);
     } catch(error){ alert(error.message); }
   });
-  card.querySelector(".workspace-edit-btn")?.addEventListener("click", () => showWorkspaceSettings(workspace, card));
+  card.querySelector(".workspace-edit-btn")?.addEventListener("click", () => toggleWorkspaceDetail(card,"settings",() => showWorkspaceSettings(workspace, card)));
   return card;
 }
 

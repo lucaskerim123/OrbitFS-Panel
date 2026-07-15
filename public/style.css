@@ -1281,3 +1281,19 @@ table.data-table tr:hover td { background: var(--bg); }
   .workspace-trash-head { flex-direction: column; }
   .workspace-trash-row { grid-template-columns: 1fr; }
 }
+
+
+/* --- Workspace manager collapsible details --- */
+.workspace-admin-detail { position: relative; }
+.workspace-detail-collapse {
+  float: right;
+  margin: 0 0 0.65rem 0.65rem;
+}
+.workspace-detail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.workspace-detail-heading .workspace-detail-close { flex: 0 0 auto; }

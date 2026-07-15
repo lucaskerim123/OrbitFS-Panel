@@ -35,18 +35,17 @@
       .workspace-permission-form{display:grid;gap:10px;margin-top:12px}
       .workspace-permission-form .perm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
       .workspace-permission-form .perm-grid label{display:flex;align-items:center;gap:7px;padding:9px;border:1px solid var(--border);border-radius:9px}
-      .workspace-permission-list{display:grid;gap:8px;margin-top:12px}
-      .workspace-permission-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px;border:1px solid var(--border);border-radius:10px}
-      .workspace-permission-row small{display:block;color:var(--muted);margin-top:3px}
+      .workspace-permission-target{display:grid;gap:4px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+      .workspace-permission-target small{color:var(--muted);overflow-wrap:anywhere}
       .workspace-permission-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-      .workspace-mode-disabled .workspace-create-btn,.workspace-mode-disabled #workspace-page-create{display:none!important}
-      @media(max-width:650px){.workspace-mode-row{align-items:flex-start;flex-direction:column}.workspace-permission-form .perm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace-permission-row{grid-template-columns:1fr}}
+      .workspace-mode-disabled .workspace-create-btn,.workspace-mode-disabled #workspace-page-create,.workspace-mode-disabled #workspace-bar,.workspace-mode-disabled #tab-btn-workspaces,.workspace-mode-disabled #tab-workspaces{display:none!important}
+      @media(max-width:650px){.workspace-mode-row{align-items:flex-start;flex-direction:column}.workspace-permission-form .perm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
     `;
     document.head.appendChild(style);
   }
   function ensureModeCard() {
     if (state.role !== "admin") return;
-    const host = document.getElementById("workspace-manager-host");
+    const host = document.getElementById("admin-zone-host");
     if (!host || document.getElementById("workspace-mode-card")) return;
     const card = document.createElement("section");
     card.id = "workspace-mode-card";
@@ -88,6 +87,9 @@
     const toggle = document.getElementById("workspace-mode-toggle");
     if (toggle) toggle.checked = enabled;
 
+    const managerPanel = document.getElementById("tab-workspaces");
+    if (!enabled && managerPanel?.classList.contains("active")) switchTab("files");
+
     const picker = document.getElementById("workspace-select");
     if (picker) {
       for (const option of picker.options) {
@@ -99,20 +101,6 @@
         }
       }
     }
-
-    const cards = [...document.querySelectorAll("#workspace-admin-list .workspace-admin-card")];
-    cards.forEach((card, index) => {
-      const workspace = state.workspaces[index];
-      if (!workspace) return;
-      card.dataset.workspaceId = workspace.id;
-      card.dataset.mainWorkspace = String(!!workspace.is_main);
-      card.hidden = !enabled && !workspace.is_main && state.role !== "admin";
-      const open = card.querySelector(".workspace-open-btn");
-      if (open && !workspace.is_main) {
-        const unavailable = workspace.drive_state === "offline" || (workspace.status === "suspended" && state.role !== "admin");
-        open.disabled = !enabled || unavailable;
-      }
-    });
   }
 
   function permissionSummary(permissions) {
@@ -123,74 +111,75 @@
     return [...document.querySelectorAll("#workspace-admin-list .workspace-admin-card")]
       .find((card) => card.dataset.workspaceId === String(workspace.id));
   }
-  async function showPermissionEditor(workspace, card, initialPath = "") {
+  async function showPermissionEditor(workspace, card, initialPath = null, forceOpen = false) {
     if (!workspace || workspace.is_main || !canManage(workspace)) return;
     const detail = card.querySelector(".workspace-admin-detail");
+    const targetPath = initialPath == null
+      ? (String(state.workspaceId) === String(workspace.id) ? String(state.subpath || "") : "")
+      : String(initialPath || "").replace(/\\/g,"/").replace(/^\/+|\/+$/g,"");
+    const viewKey = `permissions:${targetPath}`;
+    if (!forceOpen && detail.dataset.view === viewKey && !detail.classList.contains("hidden")) {
+      detail.classList.add("hidden");
+      detail.innerHTML = "";
+      delete detail.dataset.view;
+      return;
+    }
+    detail.dataset.view = viewKey;
     detail.classList.remove("hidden");
-    detail.innerHTML = "Loading workspace permissions…";
+    detail.innerHTML = "Loading workspace permissions...";
     try {
       const { overrides } = await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/permission-overrides`);
+      const exact = new Map((overrides || []).filter((item) => String(item.path || "") === targetPath).map((item) => [item.role,item]));
       detail.innerHTML = `
-        <div><strong>Workspace permission editor</strong><p class="workspace-scope-note">Private to the owner and invited members. A more specific path overrides the workspace role default.</p></div>
+        <div class="workspace-detail-heading"><div><strong>Workspace permission editor</strong><p class="workspace-scope-note">Editing one selected path only.</p></div><button type="button" class="workspace-detail-close">Hide</button></div>
+        <div class="workspace-permission-target"><strong>${targetPath ? "Selected path" : "Workspace root"}</strong><small>/${esc(targetPath)}</small></div>
         <form class="workspace-permission-form">
           <label>Role<select name="role"><option value="editor">Editor</option><option value="contributor">Contributor</option><option value="viewer">Viewer</option></select></label>
-          <label>File or folder path<input name="path" type="text" value="${esc(initialPath)}" placeholder="Root workspace" autocomplete="off"></label>
-          <div class="workspace-permission-actions"><button type="button" class="permission-current-folder">Use current folder</button><button type="button" class="permission-role-defaults">Use role defaults</button></div>
           <div class="perm-grid">${ACTIONS.map((action) => `<label><input type="checkbox" name="${action}"> ${action}</label>`).join("")}</div>
-          <button type="submit" class="primary">Save override</button>
+          <div class="workspace-permission-actions"><button type="button" class="permission-role-defaults">Use role defaults</button><button type="submit" class="primary">Save override</button><button type="button" class="danger permission-remove hidden">Remove override</button></div>
           <p class="workspace-permission-message muted-text"></p>
-        </form>
-        <div class="workspace-permission-list"></div>`;
+        </form>`;
       const form = detail.querySelector("form");
-      const list = detail.querySelector(".workspace-permission-list");
-      const applyDefaults = () => {
-        const values = DEFAULTS[form.elements.role.value];
-        ACTIONS.forEach((action) => { form.elements[action].checked = !!values[action]; });
+      const message = form.querySelector(".workspace-permission-message");
+      const removeButton = form.querySelector(".permission-remove");
+      const applyValues = (values) => ACTIONS.forEach((action) => { form.elements[action].checked = !!values[action]; });
+      const loadRole = () => {
+        const existing = exact.get(form.elements.role.value);
+        applyValues(existing?.permissions || DEFAULTS[form.elements.role.value]);
+        removeButton.classList.toggle("hidden", !existing);
+        message.textContent = existing ? "Current override loaded for this path." : "No override for this role. Role defaults are shown.";
       };
-      form.elements.role.addEventListener("change", applyDefaults);
-      detail.querySelector(".permission-role-defaults").addEventListener("click", applyDefaults);
-      detail.querySelector(".permission-current-folder").addEventListener("click", () => {
-        form.elements.path.value = String(state.workspaceId) === String(workspace.id) ? state.subpath || "" : "";
+      detail.querySelector(".workspace-detail-close").addEventListener("click", () => {
+        detail.classList.add("hidden"); detail.innerHTML = ""; delete detail.dataset.view;
+      });
+      form.elements.role.addEventListener("change", loadRole);
+      form.querySelector(".permission-role-defaults").addEventListener("click", () => {
+        applyValues(DEFAULTS[form.elements.role.value]);
+        message.textContent = "Role defaults loaded. Save to create an explicit override.";
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        const message = form.querySelector(".workspace-permission-message");
         const permissions = Object.fromEntries(ACTIONS.map((action) => [action, !!form.elements[action].checked]));
         try {
           await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/permission-overrides`, {
             method:"PUT", headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({ role:form.elements.role.value, path:form.elements.path.value.trim(), permissions }),
+            body:JSON.stringify({ role:form.elements.role.value, path:targetPath, permissions }),
           });
-          message.textContent = "Permission override saved.";
-          await showPermissionEditor(workspace, card, form.elements.path.value.trim());
+          await showPermissionEditor(workspace, card, targetPath, true);
+          card.querySelector(".workspace-permission-message").textContent = "Permission override saved.";
         } catch (error) { message.textContent = error.message; }
       });
-      renderOverrideRows(list, overrides, workspace, card, form);
-      applyDefaults();
-    } catch (error) { detail.innerHTML = `<p class="error">${esc(error.message)}</p>`; }
-  }
-
-  function renderOverrideRows(list, overrides, workspace, card, form) {
-    list.innerHTML = overrides.length ? "" : '<p class="muted-text">No overrides. Workspace role defaults are active.</p>';
-    for (const item of overrides) {
-      const row = document.createElement("div");
-      row.className = "workspace-permission-row";
-      row.innerHTML = `<div><strong>${esc(item.path || "/")}</strong><small>${esc(item.role)} · ${esc(permissionSummary(item.permissions))}</small></div><div class="workspace-permission-actions"><button type="button" class="permission-edit">Edit</button><button type="button" class="danger permission-remove">Remove</button></div>`;
-      row.querySelector(".permission-edit").addEventListener("click", () => {
-        form.elements.role.value = item.role;
-        form.elements.path.value = item.path;
-        ACTIONS.forEach((action) => { form.elements[action].checked = !!item.permissions[action]; });
-        form.scrollIntoView({ behavior:"smooth", block:"nearest" });
-      });
-      row.querySelector(".permission-remove").addEventListener("click", async () => {
-        if (!confirm(`Remove the ${item.role} override for ${item.path || "/"}?`)) return;
+      removeButton.addEventListener("click", async () => {
+        const role=form.elements.role.value;
+        if (!confirm(`Remove the ${role} override for /${targetPath}?`)) return;
         try {
-          await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/permission-overrides?path=${encodeURIComponent(item.path)}&role=${encodeURIComponent(item.role)}`, { method:"DELETE" });
-          await showPermissionEditor(workspace, card);
-        } catch (error) { alert(error.message); }
+          await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/permission-overrides?path=${encodeURIComponent(targetPath)}&role=${encodeURIComponent(role)}`, { method:"DELETE" });
+          await showPermissionEditor(workspace, card, targetPath, true);
+          card.querySelector(".workspace-permission-message").textContent = "Override removed. Role defaults now apply.";
+        } catch (error) { message.textContent = error.message; }
       });
-      list.appendChild(row);
-    }
+      loadRole();
+    } catch (error) { detail.innerHTML = `<p class="error">${esc(error.message)}</p>`; }
   }
 
   function openSimplePermissions() {
@@ -231,9 +220,21 @@
     });
   }
 
+  window.openWorkspacePermissionForPath = function(filepath) {
+    const workspace = typeof currentWorkspace === "function" ? currentWorkspace() : null;
+    if (!workspace || workspace.is_main || !canManage(workspace) || !modeEnabled()) return false;
+    switchTab("workspaces");
+    setTimeout(() => {
+      decorateWorkspaceCards();
+      const card = findWorkspaceCard(workspace);
+      if (card) showPermissionEditor(workspace, card, filepath, true);
+    }, 30);
+    return true;
+  };
+
   window.addWorkspacePermissionAction = function(actions, filepath) {
     const workspace = typeof currentWorkspace === "function" ? currentWorkspace() : null;
-    if (!workspace || workspace.is_main || !canManage(workspace)) return;
+    if (!workspace || workspace.is_main || !canManage(workspace) || !modeEnabled()) return;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "icon-btn workspace-file-permission-btn";
@@ -241,15 +242,12 @@
     button.title = "Workspace permissions for this path";
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      switchTab("workspaces");
-      setTimeout(() => {
-        decorateWorkspaceCards();
-        const card = findWorkspaceCard(workspace);
-        if (card) showPermissionEditor(workspace, card, filepath);
-      }, 30);
+      window.openWorkspacePermissionForPath(filepath);
     });
     actions.appendChild(button);
   };
+  window.applyWorkspaceModeUi = applyWorkspaceModeUi;
+
   function refreshUi() {
     ensureModeCard();
     decorateWorkspaceCards();

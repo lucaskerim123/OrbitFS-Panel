@@ -133,6 +133,17 @@ async function ensureWorkspaceSettings(client) {
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY(workspace_id,relative_path,workspace_role)
   )`);
+  await client.query(`CREATE TABLE IF NOT EXISTS workspace_role_admin_permissions(
+    workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    workspace_role text NOT NULL CHECK(workspace_role IN ('editor','contributor','viewer')),
+    can_view_settings boolean NOT NULL DEFAULT false,
+    can_edit_settings boolean NOT NULL DEFAULT false,
+    can_manage_members boolean NOT NULL DEFAULT false,
+    can_manage_permissions boolean NOT NULL DEFAULT false,
+    can_delete_workspace boolean NOT NULL DEFAULT false,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY(workspace_id,workspace_role)
+  )`);
   await client.query(`CREATE TABLE IF NOT EXISTS workspace_trash_events(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,

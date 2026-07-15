@@ -3,16 +3,16 @@ import { getWorkspaceForUser, listWorkspaceMembers } from "./workspaces.js";
 
 const INVITE_ROLES = new Set(["editor", "contributor", "viewer"]);
 
-async function requireWorkspaceManager(workspaceId, actorId, systemRole) {
+async function requireWorkspaceManager(workspaceId, actorId, systemRole, allowManageMembers=false) {
   const workspace = await getWorkspaceForUser(workspaceId, actorId, systemRole);
   if (!workspace) throw new Error("Workspace not found or access denied");
   if (workspace.is_main && systemRole !== "admin") throw new Error("Only admins can invite users to Main Workspace");
-  if (systemRole !== "admin" && workspace.permission !== "owner") throw new Error("Owner access required");
+  if (systemRole !== "admin" && workspace.permission !== "owner" && !allowManageMembers) throw new Error("Manage members permission required");
   return workspace;
 }
 
-export async function inviteWorkspaceUser(workspaceId, username, permission, actorId, systemRole) {
-  await requireWorkspaceManager(workspaceId, actorId, systemRole);
+export async function inviteWorkspaceUser(workspaceId, username, permission, actorId, systemRole, allowManageMembers=false) {
+  await requireWorkspaceManager(workspaceId, actorId, systemRole, allowManageMembers);
   if (!INVITE_ROLES.has(permission)) throw new Error("Invite role must be editor, contributor, or viewer");
   const userResult = await query(
     "SELECT id,username FROM users WHERE lower(username)=lower($1) AND status='active' LIMIT 1",
@@ -54,8 +54,8 @@ export async function listPendingInvitations(userId) {
   return result.rows;
 }
 
-export async function listWorkspaceInvitations(workspaceId, actorId, systemRole) {
-  await requireWorkspaceManager(workspaceId, actorId, systemRole);
+export async function listWorkspaceInvitations(workspaceId, actorId, systemRole, allowManageMembers=false) {
+  await requireWorkspaceManager(workspaceId, actorId, systemRole, allowManageMembers);
   const result = await query(
     `SELECT i.id,i.permission,i.status,i.created_at,i.expires_at,u.username
      FROM workspace_invitations i
@@ -100,10 +100,10 @@ export async function respondToWorkspaceInvitation(invitationId, userId, decisio
   }
 }
 
-export async function revokeWorkspaceInvitation(invitationId, actorId, systemRole) {
+export async function revokeWorkspaceInvitation(invitationId, actorId, systemRole, allowManageMembers=false) {
   const result = await query("SELECT workspace_id FROM workspace_invitations WHERE id=$1", [invitationId]);
   if (!result.rows[0]) throw new Error("Invitation not found");
-  await requireWorkspaceManager(result.rows[0].workspace_id, actorId, systemRole);
+  await requireWorkspaceManager(result.rows[0].workspace_id, actorId, systemRole, allowManageMembers);
   await query(
     "UPDATE workspace_invitations SET status='revoked',responded_at=now() WHERE id=$1 AND status='pending'",
     [invitationId]
