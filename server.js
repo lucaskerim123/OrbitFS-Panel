@@ -329,6 +329,9 @@ app.use("/api/sorter", express.raw({ type: "*/*", limit: "2mb" }), async (req, r
     headers["X-Workspace-Root"] = encodeURIComponent(workspace.filesystem_root);
     headers["X-Sorter-Admin"] = String(req.role === "admin");
     headers["X-Sorter-Owner"] = String(req.role === "admin" || workspace.permission === "owner" || String(workspace.owner_id) === String(req.userId));
+    headers["X-Workspace-Role"] = String(workspace.permission || (req.role === "admin" ? "owner" : "viewer"));
+    headers["X-Workspace-Main"] = String(!!workspace.is_main);
+    headers["X-System-Role"] = String(req.role || "user");
     const resp = await fetch(`http://localhost:${port}/api${req.url}`, {
       method: req.method,
       headers,

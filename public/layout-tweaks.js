@@ -17,6 +17,8 @@
     loadScriptOnce("stable-admin-layout.js", "data-orbit-stable-admin-layout");
     loadScriptOnce("nav-workspace-cleanup.js", "data-orbit-nav-workspace-cleanup");
     loadScriptOnce("mobile-sorter-header.js", "data-orbit-mobile-sorter-header");
+    loadScriptOnce("workspace-permission-editor.js", "data-orbit-workspace-permission-editor");
+    loadScriptOnce("sorter-settings-ui.js", "data-orbit-sorter-settings-ui");
     loadScriptOnce("startup-config-cleanup.js", "data-orbit-startup-config-cleanup");
     loadScriptOnce("hive-health-ui.js", "data-orbit-hive-health-ui");
   }

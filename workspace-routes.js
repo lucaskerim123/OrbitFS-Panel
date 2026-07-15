@@ -29,9 +29,12 @@ async function setWorkspaceModeEnabled(enabled){
     ON CONFLICT(setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value,updated_at=now()`,[JSON.stringify(!!enabled)]);
   return {workspaceModeEnabled:!!enabled};
 }
-async function assertWorkspaceAction(req,filepath,action){
+async function workspacePermissionsAt(req,filepath=''){
   if(req.role==='admin'||req.workspace.permission==='owner') return roleDefaults('editor');
-  const effective=await effectiveWorkspacePermissions(req.workspace.id,req.workspace.permission,filepath);
+  return effectiveWorkspacePermissions(req.workspace.id,req.workspace.permission,filepath);
+}
+async function assertWorkspaceAction(req,filepath,action){
+  const effective=await workspacePermissionsAt(req,filepath);
   if(!effective[action]){ const error=new Error(`Workspace permission denied: ${action}`); error.status=403; throw error; }
   return effective;
 }
@@ -91,6 +94,7 @@ async function branched(req, res, next) {
       }
       return next("router");
     }
+    if (!(await workspaceModeEnabled())) return res.status(423).json({ error:"Workspace Mode is disabled by an administrator", workspaceModeDisabled:true });
     if (workspace.drive_state === "offline") {
       return res.status(423).json({ error:"Drive offline", driveOffline:true, deletionDueAt:workspace.deletion_due_at, notice:workspace.lifecycle_notice });
     }
@@ -100,7 +104,7 @@ async function branched(req, res, next) {
     req.workspace = workspace;
     req.workspaceOps = makeLocalOps(req.workspace.filesystem_root);
     await req.workspaceOps.ensureTrash();
-    req.workspacePermissions = permissions(req.workspace, req.role);
+    req.workspacePermissions = await workspacePermissionsAt(req,"");
     next();
   } catch (error) { res.status(403).json({ error:error.message }); }
 }
@@ -146,7 +150,7 @@ export function workspaceRouter() {
     try {
       await evaluateWorkspaceLifecycle();
       const workspaces = await listUserWorkspaces(req.userId,req.role);
-      const settings = { ...(await getWorkspaceCreationSettings()), ...(await getWorkspaceLifecycleSettings()) };
+      const settings = { ...(await getWorkspaceCreationSettings()), ...(await getWorkspaceLifecycleSettings()), workspaceModeEnabled:await workspaceModeEnabled() };
       const ownedCount = await ownedWorkspaceCount(req.userId);
       res.json({ workspaces, settings, ownedCount });
     } catch(error) { res.status(500).json({error:error.message}); }
@@ -325,117 +329,146 @@ export function workspaceRouter() {
       if(paths.length>3) throw new Error("Maximum 3 files per bulk download");
       let total=0;
       for(const item of paths){
-        const full=req.workspaceOps.safeResolve(item);
-        const stat=await fs.stat(full);
+        await assertWorkspaceAction(req,item,"download");
+        const stat=await fs.stat(req.workspaceOps.safeResolve(item));
         if(!stat.isFile()) throw new Error("Folders cannot be bulk downloaded");
         total+=stat.size;
       }
       if(total>262144000) throw new Error("Bulk download limit is 250 MB");
       res.json({ok:true,paths,totalBytes:total});
-    }catch(error){res.status(400).json({error:error.message});}
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.post("/bulk-move",express.json(),branched,async(req,res)=>{
     if(!req.workspace)return;
     try{
-      assertWorkspaceWrite(req.workspace);
       const paths=Array.isArray(req.body?.paths)?req.body.paths:[];
-      const destination=String(req.body?.destination||"").replace(/^\/+|\/+$/g,"");
+      const destination=normalizeWorkspacePath(req.body?.destination||"");
       if(!paths.length) throw new Error("Select at least one item");
-      const targets=paths.map(item=>({from:item,to:destination?`${destination}/${path.posix.basename(item)}`:path.posix.basename(item)}));
-      for(const item of targets){ await fs.stat(req.workspaceOps.safeResolve(item.from)); if(await req.workspaceOps.fileSize(item.to)) throw new Error(`Destination already exists: ${item.to}`); }
+      const targets=paths.map(item=>({from:normalizeWorkspacePath(item),to:destination?destination+"/"+path.posix.basename(item):path.posix.basename(item)}));
+      for(const item of targets){
+        await assertWorkspaceAction(req,item.from,"move");
+        const parent=path.posix.dirname(item.to); await assertWorkspaceAction(req,parent==='.'?'':parent,"create");
+        await fs.stat(req.workspaceOps.safeResolve(item.from));
+        if(await req.workspaceOps.fileSize(item.to)) throw new Error("Destination already exists: "+item.to);
+      }
       for(const item of targets) await req.workspaceOps.moveFile(item.from,item.to);
       res.json({ok:true,moved:targets.length});
-    }catch(error){res.status(400).json({error:error.message});}
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.post("/bulk-trash",express.json(),branched,async(req,res)=>{
     if(!req.workspace)return;
     try{
-      assertWorkspaceWrite(req.workspace);
-      const paths=Array.isArray(req.body?.paths)?req.body.paths:[];
+      const paths=Array.isArray(req.body?.paths)?req.body.paths.map(normalizeWorkspacePath):[];
       if(!paths.length) throw new Error("Select at least one item");
-      for(const item of paths) await fs.stat(req.workspaceOps.safeResolve(item));
+      for(const item of paths){ await assertWorkspaceAction(req,item,"delete"); await fs.stat(req.workspaceOps.safeResolve(item)); }
       for(const item of paths) await req.workspaceOps.moveToTrash(item,Number(req.workspace.trash_limit_bytes||209715200));
       res.json({ok:true,trashed:paths.length,workspace:await refreshWorkspaceUsage(req.workspace)});
-    }catch(error){res.status(400).json({error:error.message});}
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.get("/files",branched,async(req,res)=>{
     if(!req.workspace)return;
     try{
-      const subpath=req.query.subpath||"";
-      const entries=await req.workspaceOps.listFiles(subpath);
-      res.json({entries:entries.map((e)=>({...e,permissions:req.workspacePermissions})),folderPermissions:req.workspacePermissions,workspace:req.workspace});
-    }catch(error){res.status(400).json({error:error.message});}
+      const subpath=normalizeWorkspacePath(req.query.subpath||"");
+      const folderPermissions=await assertWorkspaceAction(req,subpath,"read");
+      const entries=await req.workspaceOps.listFiles(subpath); const visible=[];
+      for(const entry of entries){
+        const full=subpath?subpath+"/"+entry.name:entry.name;
+        const entryPermissions=await workspacePermissionsAt(req,full);
+        if(entryPermissions.read) visible.push({...entry,permissions:entryPermissions});
+      }
+      res.json({entries:visible,folderPermissions,workspace:req.workspace});
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.get("/file",branched,async(req,res)=>{
     if(!req.workspace)return;
-    try{res.json({content:await req.workspaceOps.readFile(req.query.path),permissions:req.workspacePermissions});}
-    catch(error){res.status(400).json({error:error.message});}
+    try{
+      const filepath=normalizeWorkspacePath(req.query.path);
+      const effective=await assertWorkspaceAction(req,filepath,"read");
+      res.json({content:await req.workspaceOps.readFile(filepath),permissions:effective});
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.put("/file",express.json({limit:"25mb"}),branched,async(req,res)=>{
     if(!req.workspace)return;
     try{
-      assertWorkspaceWrite(req.workspace);
-      const current=await req.workspaceOps.fileSize(req.body.path);
+      const filepath=normalizeWorkspacePath(req.body.path);
+      await assertWorkspaceAction(req,filepath,"write");
+      const current=await req.workspaceOps.fileSize(filepath);
       assertWorkspaceQuota(req.workspace,Buffer.byteLength(req.body.content||""),current);
-      await req.workspaceOps.writeFile(req.body.path,req.body.content||"");
+      await req.workspaceOps.writeFile(filepath,req.body.content||"");
       await touchWorkspaceActivity(req.workspace.id);
       await refreshWorkspaceUsage(req.workspace);
       res.json({ok:true});
-    }catch(error){res.status(400).json({error:error.message});}
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.delete("/file",branched,async(req,res)=>{
     if(!req.workspace)return;
-    try{assertWorkspaceWrite(req.workspace);await req.workspaceOps.deleteFile(req.query.path);await refreshWorkspaceUsage(req.workspace);res.json({ok:true});}
-    catch(error){res.status(400).json({error:error.message});}
+    try{
+      const filepath=normalizeWorkspacePath(req.query.path);
+      await assertWorkspaceAction(req,filepath,"delete");
+      await req.workspaceOps.deleteFile(filepath);
+      await refreshWorkspaceUsage(req.workspace);
+      res.json({ok:true});
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.post("/mkdir",express.json(),branched,async(req,res)=>{
     if(!req.workspace)return;
-    try{assertWorkspaceWrite(req.workspace);await req.workspaceOps.mkdir(req.body.path);
-      await touchWorkspaceActivity(req.workspace.id);res.json({ok:true});}
-    catch(error){res.status(400).json({error:error.message});}
+    try{
+      const target=normalizeWorkspacePath(req.body.path); const parent=path.posix.dirname(target);
+      await assertWorkspaceAction(req,parent==='.'?'':parent,"create");
+      await req.workspaceOps.mkdir(target);
+      await touchWorkspaceActivity(req.workspace.id); res.json({ok:true});
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.post("/move",express.json(),branched,async(req,res)=>{
     if(!req.workspace)return;
-    try{assertWorkspaceWrite(req.workspace);await req.workspaceOps.moveFile(req.body.from,req.body.to);
-      await touchWorkspaceActivity(req.workspace.id);res.json({ok:true});}
-    catch(error){res.status(400).json({error:error.message});}
+    try{
+      const from=normalizeWorkspacePath(req.body.from); const to=normalizeWorkspacePath(req.body.to);
+      await assertWorkspaceAction(req,from,"move");
+      const parent=path.posix.dirname(to); await assertWorkspaceAction(req,parent==="."?"":parent,"create");
+      await req.workspaceOps.moveFile(from,to);
+      await touchWorkspaceActivity(req.workspace.id); res.json({ok:true});
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.post("/trash",express.json(),branched,async(req,res)=>{
     if(!req.workspace)return;
     try{
-      assertWorkspaceWrite(req.workspace);
-      const result=await req.workspaceOps.moveToTrash(req.body.path,Number(req.workspace.trash_limit_bytes||209715200));
+      const filepath=normalizeWorkspacePath(req.body.path);
+      await assertWorkspaceAction(req,filepath,"delete");
+      const result=await req.workspaceOps.moveToTrash(filepath,Number(req.workspace.trash_limit_bytes||209715200));
       await touchWorkspaceActivity(req.workspace.id);
       const workspace=await refreshWorkspaceUsage(req.workspace);
       res.json({...result,workspace});
-    }
-    catch(error){res.status(400).json({error:error.message});}
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   for(const route of ["/preview","/download"]){
     router.get(route,branched,async(req,res)=>{
       if(!req.workspace)return;
       try{
-        const {stream,filename,size}=await req.workspaceOps.downloadStream(req.query.path);
-        const release = route === "/download" ? beginDownload(req.userId,size) : () => {};
-        res.once("finish",release);
-        res.once("close",release);
+        const filepath=normalizeWorkspacePath(req.query.path);
+        await assertWorkspaceAction(req,filepath,route==="/download"?"download":"read");
+        const {stream,filename,size}=await req.workspaceOps.downloadStream(filepath);
+        const release=route==="/download"?beginDownload(req.userId,size):()=>{};
+        res.once("finish",release); res.once("close",release);
         res.set("Content-Type","application/octet-stream");
-        res.set("Content-Disposition",route==="/preview"?"inline":`attachment; filename="${encodeURIComponent(filename)}"`);
+        res.set("Content-Disposition",route==="/preview"?"inline":"attachment; filename=\""+encodeURIComponent(filename)+"\"");
         stream.pipe(res);
-      }catch(error){res.status(400).json({error:error.message});}
+      }catch(error){res.status(error.status||400).json({error:error.message});}
     });
   }
   router.post("/upload",express.raw({type:()=>true,limit:"2gb"}),branched,async(req,res)=>{
     if(!req.workspace)return;
     try{
-      assertWorkspaceWrite(req.workspace);
-      const current=await req.workspaceOps.fileSize(req.query.path);
+      const filepath=normalizeWorkspacePath(req.query.path);
+      const exists=await fs.stat(req.workspaceOps.safeResolve(filepath)).then(()=>true).catch(()=>false);
+      const parent=path.posix.dirname(filepath);
+      await assertWorkspaceAction(req,exists?filepath:(parent==="."?"":parent),exists?"write":"create");
+      const current=await req.workspaceOps.fileSize(filepath);
       assertWorkspaceQuota(req.workspace,req.body?.length||0,current);
-      await req.workspaceOps.writeBuffer(req.query.path,req.body||Buffer.alloc(0));
+      await req.workspaceOps.writeBuffer(filepath,req.body||Buffer.alloc(0));
       await touchWorkspaceActivity(req.workspace.id);
       await refreshWorkspaceUsage(req.workspace);
       res.json({ok:true});
-    }catch(error){res.status(400).json({error:error.message});}
+    }catch(error){res.status(error.status||400).json({error:error.message});}
   });
   router.use("/file-permissions",branched,(req,res,next)=>{
     if(!req.workspace)return;

@@ -1,6 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { query } from '../../db.js';
+import { effectiveWorkspacePermissions } from '../../workspace-permissions.js';
+import { canAccessPath } from '../../permissions.js';
 
 const STOP_WORDS = new Set(['the','and','for','with','from','that','this','into','onto','file','copy','scan','page','pages','document','docs','new','final','draft']);
 const SORTER_DIR = '_sorter';
@@ -12,6 +14,22 @@ function rootOf(ctx) { if(!ctx?.root) throw new Error('Workspace root missing');
 function safeJoin(ctx,...parts) { const root=rootOf(ctx); const full=path.resolve(root,...parts); if(full!==root&&!full.startsWith(root+path.sep)) throw new Error('Path escapes workspace'); return full; }
 function rel(root,full) { return path.relative(root,full).split(path.sep).join('/'); }
 function hidden(p) { const parts=p.split('/'); return parts.includes(SORTER_DIR)||parts.includes(TRASH_DIR); }
+
+async function sorterPermissions(ctx, filepath='') {
+  if (ctx.isAdmin || ctx.isOwner) return { read:true,write:true,download:true,move:true,delete:true,create:true };
+  if (ctx.isMain) {
+    const allowed = {};
+    for (const action of ['read','write','download','move','delete','create']) allowed[action] = await canAccessPath(ctx.systemRole || 'user', filepath, action);
+    return allowed;
+  }
+  return effectiveWorkspacePermissions(ctx.workspaceId, ctx.workspaceRole || 'viewer', filepath);
+}
+
+async function assertSorterAction(ctx, filepath, action) {
+  const permissions = await sorterPermissions(ctx, filepath);
+  if (!permissions[action]) { const error = new Error(`Sorter permission denied: ${action} ${filepath || '/'}`); error.status = 403; throw error; }
+  return permissions;
+}
 
 async function walk(root,dir=root,out={folders:[],files:[]}) {
   let entries=[]; try { entries=await fs.readdir(dir,{withFileTypes:true}); } catch { return out; }
@@ -28,13 +46,27 @@ async function settings(workspaceId){
 }
 
 export async function getSorterSettings(ctx){ return settings(ctx.workspaceId); }
+export async function getSorterPolicy(ctx){
+  if(!ctx.isAdmin) throw new Error('Admin access required');
+  const current=await settings(ctx.workspaceId);
+  return { allowAutomatic:current.allowAutomatic, allowContentScanning:current.allowContentScanning };
+}
+export async function updateSorterPolicy(ctx,changes={}){
+  if(!ctx.isAdmin) throw new Error('Admin access required');
+  const values={
+    sorter_allow_automatic:!!changes.allowAutomatic,
+    sorter_allow_content_scanning:!!changes.allowContentScanning,
+  };
+  for(const [key,value] of Object.entries(values)) await query(`INSERT INTO system_settings(setting_key,setting_value,updated_at) VALUES($1,$2::jsonb,now()) ON CONFLICT(setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value,updated_at=now()`,[key,JSON.stringify(value)]);
+  return getSorterPolicy(ctx);
+}
 export async function updateSorterSettings(ctx,changes,{isAdmin=false,isOwner=false}={}){
   if(!isAdmin&&!isOwner) throw new Error('Owner access required');
   const current=await settings(ctx.workspaceId); const mode=['manual','confirm','automatic'].includes(changes.mode)?changes.mode:current.mode;
-  if(mode==='automatic'&&!current.allowAutomatic&&!isAdmin) throw new Error('Automatic sorting is disabled by admin');
+  if(mode==='automatic'&&!current.allowAutomatic) throw new Error('Automatic sorting is disabled by admin');
   const auto=Math.max(.5,Math.min(1,Number(changes.autoThreshold??current.auto_threshold)));
   const suggest=Math.max(.1,Math.min(auto,Number(changes.suggestionThreshold??current.suggestion_threshold)));
-  const scan=!!changes.contentScanning && (current.allowContentScanning||isAdmin);
+  const scan=!!changes.contentScanning && current.allowContentScanning;
   await query(`UPDATE sorter_workspace_settings SET mode=$2,auto_threshold=$3,suggestion_threshold=$4,content_scanning=$5,updated_at=now() WHERE workspace_id=$1`,[ctx.workspaceId,mode,auto,suggest,scan]);
   return settings(ctx.workspaceId);
 }
@@ -65,10 +97,14 @@ function candidates(file,index,learned){
 export async function buildFolderIndex(ctx){
   const root=rootOf(ctx); const tree=await walk(root); const folderFiles=new Map();
   for(const file of tree.files){ const dir=path.posix.dirname(file.path); if(dir==='.'||hidden(dir)) continue; if(!folderFiles.has(dir)) folderFiles.set(dir,[]); folderFiles.get(dir).push(file); }
-  const folders=tree.folders.filter(p=>!hidden(p)).map(p=>{
+  const folders=[];
+  for(const p of tree.folders){
+    if(hidden(p)) continue;
+    const permissions=await sorterPermissions(ctx,p);
+    if(!permissions.create) continue;
     const extensions={}; for(const file of folderFiles.get(p)||[]){ const ext=path.extname(file.name).toLowerCase(); if(ext) extensions[ext]=(extensions[ext]||0)+1; }
-    return {path:p,name:path.posix.basename(p),extensions,fileCount:(folderFiles.get(p)||[]).length};
-  });
+    folders.push({path:p,name:path.posix.basename(p),extensions,fileCount:(folderFiles.get(p)||[]).length});
+  }
   return {root,builtAt:new Date().toISOString(),folders,folderSet:new Set(folders.map(f=>f.path))};
 }
 
@@ -76,12 +112,14 @@ function confidence(raw){ return Math.max(0,Math.min(.99,raw/(raw+35))); }
 
 export async function startSorter(ctx){
   const cfg=await settings(ctx.workspaceId); const index=await buildFolderIndex(ctx); const learned=await learning(ctx.workspaceId);
-  const sorterPath=safeJoin(ctx,SORTER_DIR); const inbox=await walk(rootOf(ctx),sorterPath);
-  const items=inbox.files.map(file=>{
+  const sorterPath=safeJoin(ctx,SORTER_DIR); const inbox=await walk(rootOf(ctx),sorterPath); const items=[];
+  for(const file of inbox.files){
+    const sourcePermissions=await sorterPermissions(ctx,file.path);
+    if(!sourcePermissions.read||!sourcePermissions.move) continue;
     const ranked=candidates(file,index,learned).map(c=>({...c,confidence:confidence(c.raw)})); const best=ranked[0];
     const selectedDestination=best?`${best.folder}/${file.name}`:''; const auto=cfg.mode==='automatic'&&cfg.allowAutomatic&&best?.confidence>=Number(cfg.auto_threshold);
-    return {id:Buffer.from(file.path).toString('base64url'),source:file.path,name:file.name,classification:best?'Learned workspace match':'Needs destination',reason:best?.reason||'Not enough workspace history yet',confidence:best?.confidence||0,candidates:ranked,selectedDestination,approved:auto,status:selectedDestination?'preview':'needs_destination'};
-  });
+    items.push({id:Buffer.from(file.path).toString('base64url'),source:file.path,name:file.name,classification:best?'Learned workspace match':'Needs destination',reason:best?.reason||'Not enough workspace history yet',confidence:best?.confidence||0,candidates:ranked,selectedDestination,approved:auto,status:selectedDestination?'preview':'needs_destination'});
+  }
   return {status:'preview',safeMode:cfg.mode!=='automatic',startedAt:new Date().toISOString(),items,index:{...index,folderSet:undefined},settings:cfg};
 }
 
@@ -111,6 +149,9 @@ export async function confirmSorter(ctx,items){
     if(!item.approved){ skipped.push({...item,reason:'not approved'}); continue; }
     if(!item.source?.startsWith(`${SORTER_DIR}/`)){ skipped.push({...item,reason:'source not in sorter'}); continue; }
     if(!item.selectedDestination||hidden(item.selectedDestination)){ skipped.push({...item,reason:'blocked destination'}); continue; }
+    await assertSorterAction(ctx,item.source,'move');
+    const destinationFolder=path.posix.dirname(item.selectedDestination);
+    await assertSorterAction(ctx,destinationFolder==='.'?'':destinationFolder,'create');
     const src=safeJoin(ctx,item.source); const dest=await uniqueDest(safeJoin(ctx,item.selectedDestination));
     await fs.mkdir(path.dirname(dest),{recursive:true}); await fs.rename(src,dest);
     const destination=rel(rootOf(ctx),dest); await learnMove(ctx.workspaceId,item.name,destination,item.candidates);
@@ -120,6 +161,7 @@ export async function confirmSorter(ctx,items){
 }
 
 export async function resetSorterLearning(ctx){
+  if(!ctx.isAdmin&&!ctx.isOwner) throw new Error('Owner access required');
   await query(`DELETE FROM sorter_learning WHERE workspace_id=$1`,[ctx.workspaceId]);
   return {ok:true};
 }

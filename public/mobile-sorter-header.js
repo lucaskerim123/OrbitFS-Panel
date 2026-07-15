@@ -52,8 +52,9 @@
   function installStyles() {
     const style = document.createElement("style");
     style.textContent = `
-      #status-sorter{cursor:pointer}
-      @media(max-width:700px){
+      #status-sorter{cursor:pointer;display:none}
+      @media(max-width:700px),(orientation:landscape) and (max-height:600px) and (hover:none) and (pointer:coarse){
+        #status-sorter:not(.hidden){display:inline-flex!important;align-items:center;justify-content:center}
         header{gap:8px}
         header .status-pills{display:flex;align-items:center;gap:6px;flex:0 0 auto}
         #status-hive,#status-sorter{min-height:34px;height:34px;padding:5px 9px;font-size:12px}
@@ -67,7 +68,6 @@
         #tab-system .sys-subtitle,#tab-config .sys-subtitle,#tab-admin .sys-subtitle{font-size:12px;line-height:1.35;margin-top:3px}
         #tab-system .sys-refresh-btn,#tab-config .sys-refresh-btn,#tab-admin .sys-refresh-btn{flex:0 0 auto;min-height:36px;padding:7px 9px;font-size:12px}
       }
-      @media(min-width:701px){#status-sorter{display:none!important}}
     `;
     document.head.appendChild(style);
   }
