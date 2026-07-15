@@ -30,7 +30,7 @@
 
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260715-final";
+  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260716-reachfix";
   document.head.appendChild(css);
 })();
 function workspaceFormatBytes(value) {

@@ -30,8 +30,12 @@
   }
   async function loadWorkspaceAddonAssets() {
     await loadScript(
-      "/addon-assets/workspaces/workspace-ui.js?v=20260715-final",
+      "/addon-assets/workspaces/workspace-ui.js?v=20260716-reachfix",
       "workspaces-ui"
+    );
+    await loadScript(
+      "/addon-assets/workspaces/workspace-expand-fix.js?v=20260716-reachfix",
+      "workspaces-expand-fix"
     );
     await loadScript(
       "/addon-assets/workspaces/workspace-permission-editor.js?v=20260716-config",

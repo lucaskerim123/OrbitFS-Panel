@@ -420,3 +420,67 @@ body:not(:has(#tab-files.active)) #workspace-bar{display:none!important}
 .workspace-trash-compact-meter{height:5px;margin-top:.45rem;border-radius:999px;overflow:hidden;background:color-mix(in srgb,var(--border) 72%,transparent)}
 .workspace-trash-compact-meter span{display:block;height:100%;border-radius:inherit;background:var(--accent)}
 @media(max-width:520px){#trash-config-form{grid-template-columns:1fr}#trash-config-form>*{grid-column:1/-1!important}#trash-config-form button{width:100%}.workspace-trash-compact-row{padding:.58rem .62rem!important}.workspace-trash-compact-line{align-items:flex-start;flex-direction:column;gap:.18rem}.workspace-trash-compact-line span{white-space:normal}}
+
+
+/* Workspace manager bottom expansion repair */
+@media(max-width:520px){
+  body:has(#tab-workspaces.active){
+    min-height:100dvh;
+    overflow-y:auto;
+  }
+  #tab-workspaces.active{
+    display:block;
+    min-height:calc(100dvh - 96px);
+    overflow:visible!important;
+    padding-bottom:calc(260px + env(safe-area-inset-bottom,0px))!important;
+  }
+  #tab-workspaces .workspace-page-shell,
+  #tab-workspaces .workspace-list-section,
+  #workspace-admin-list{
+    overflow:visible!important;
+    max-height:none!important;
+  }
+  #workspace-admin-list{
+    padding-bottom:calc(260px + env(safe-area-inset-bottom,0px))!important;
+  }
+  #workspace-list-tail-spacer,
+  #workspace-admin-list::after{
+    height:calc(260px + env(safe-area-inset-bottom,0px))!important;
+  }
+
+
+/* Workspace manager bottom expansion repair */
+@media(max-width:520px){
+  body:has(#tab-workspaces.active){
+    min-height:100dvh;
+    overflow-y:auto;
+  }
+  #tab-workspaces.active{
+    display:block;
+    min-height:calc(100dvh - 96px);
+    overflow:visible!important;
+    padding-bottom:calc(260px + env(safe-area-inset-bottom,0px))!important;
+  }
+  #tab-workspaces .workspace-page-shell,
+  #tab-workspaces .workspace-list-section,
+  #workspace-admin-list{
+    overflow:visible!important;
+    max-height:none!important;
+  }
+  #workspace-admin-list{
+    padding-bottom:calc(260px + env(safe-area-inset-bottom,0px))!important;
+  }
+  #workspace-list-tail-spacer,
+  #workspace-admin-list::after{
+    height:calc(260px + env(safe-area-inset-bottom,0px))!important;
+  }
+  .workspace-admin-card{
+    scroll-margin-top:78px!important;
+    scroll-margin-bottom:calc(90vh + env(safe-area-inset-bottom,0px))!important;
+  }
+}
+  .workspace-admin-card{
+    scroll-margin-top:78px!important;
+    scroll-margin-bottom:calc(90vh + env(safe-area-inset-bottom,0px))!important;
+  }
+}
