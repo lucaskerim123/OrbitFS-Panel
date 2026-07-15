@@ -67,49 +67,81 @@
   }
 
   function setConnected(connected) {
-    el("drive-connect-btn").textContent = connected ? "Reconnect Drive" : "Connect Google Drive";
+    // Once connected, the "Connect" step gets out of the way entirely -
+    // what's left visible is just the Drive browser itself.
+    el("drive-connect-btn").classList.toggle("hidden", connected);
     el("drive-browser").classList.toggle("hidden", !connected);
   }
 
-  async function connectDrive() {
+  let pendingConnect = null; // { resolve, silent } - the in-flight requestAccessToken call, if any
+
+  async function ensureTokenClient(id) {
+    if (tokenClient) return;
+    await loadGoogleIdentity();
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: id,
+      scope: "https://www.googleapis.com/auth/drive.readonly",
+      callback: async (response) => {
+        const pending = pendingConnect;
+        pendingConnect = null;
+        if (response.error) {
+          if (pending && !pending.silent) setStatus(response.error, true);
+          pending?.resolve(false);
+          return;
+        }
+        accessToken = response.access_token;
+        setConnected(true);
+        if (pending && !pending.silent) setStatus("Google Drive connected.");
+        folderStack = [];
+        currentFolderId = "root";
+        currentFolderName = "My Drive";
+        await loadDriveFolder();
+        pending?.resolve(true);
+      },
+    });
+  }
+
+  // silent=true: try to reuse the existing Google session/consent with no
+  // visible prompt (used when the Drive tab opens) - fails quietly if the
+  // user has never connected or Google needs fresh consent, leaving the
+  // "Connect Google Drive" button for a one-time manual click. That one
+  // manual grant is what makes every future visit silent and prompt-free.
+  async function connectDrive(silent = false) {
     const id = await getClientId();
     if (!id) {
+      if (silent) return false;
       if (state.role === "admin") {
         el("drive-setup").classList.remove("hidden");
         setStatus("Add the Google OAuth client ID once, then connect.");
       } else {
         setStatus("Google Drive isn't set up yet. Ask an admin to add the client ID.", true);
       }
-      return;
+      return false;
     }
     try {
-      await loadGoogleIdentity();
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: id,
-        scope: "https://www.googleapis.com/auth/drive.readonly",
-        callback: async (response) => {
-          if (response.error) return setStatus(response.error, true);
-          accessToken = response.access_token;
-          setConnected(true);
-          setStatus("Google Drive connected.");
-          folderStack = [];
-          currentFolderId = "root";
-          currentFolderName = "My Drive";
-          await loadDriveFolder();
-        },
+      await ensureTokenClient(id);
+      return await new Promise((resolve) => {
+        pendingConnect = { resolve, silent };
+        tokenClient.requestAccessToken({ prompt: silent ? "" : (accessToken ? "" : "consent") });
       });
-      tokenClient.requestAccessToken({ prompt: accessToken ? "" : "consent" });
     } catch (error) {
-      setStatus(error.message, true);
+      if (!silent) setStatus(error.message, true);
+      return false;
     }
   }
 
   async function driveFetch(url) {
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    let response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (response.status === 401) {
       accessToken = "";
-      setConnected(false);
-      throw new Error("Google Drive session expired. Connect again.");
+      // Access tokens expire (~1hr); try a silent reconnect before bothering
+      // the user with a manual "Connect Drive" click.
+      if (await connectDrive(true)) {
+        response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      } else {
+        setConnected(false);
+        throw new Error("Google Drive session expired. Connect again.");
+      }
     }
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
@@ -325,9 +357,15 @@
       el("upload-source-device").classList.remove("active");
       drivePanel.classList.remove("hidden");
       dropzone.classList.add("hidden");
-      if (!(await getClientId()) && state.role === "admin") el("drive-setup").classList.remove("hidden");
+      if (accessToken) return; // already connected this session
+      const id = await getClientId();
+      if (!id) {
+        if (state.role === "admin") el("drive-setup").classList.remove("hidden");
+        return;
+      }
+      await connectDrive(true); // reuse prior consent silently; falls back to a visible "Connect" button if that fails
     });
-    el("drive-connect-btn").addEventListener("click", connectDrive);
+    el("drive-connect-btn").addEventListener("click", () => connectDrive(false));
     el("drive-change-client-btn").addEventListener("click", () => {
       el("drive-client-id").value = "";
       el("drive-setup").classList.remove("hidden");

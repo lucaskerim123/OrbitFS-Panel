@@ -12,7 +12,7 @@
   }
 
   function install() {
-    loadScriptOnce("drive-upload.js", "data-orbit-drive-upload");
+    loadScriptOnce("drive-upload.js?v=20260715-silentreconnect", "data-orbit-drive-upload");
     loadScriptOnce("page-refresh.js", "data-orbit-page-refresh");
     loadScriptOnce("stable-admin-layout.js?v=20260715-addons4", "data-orbit-stable-admin-layout");
     loadScriptOnce("nav-workspace-cleanup.js?v=20260715-notifications", "data-orbit-nav-workspace-cleanup");
