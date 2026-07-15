@@ -92,14 +92,7 @@
       telemetry.appendChild(serverControls);
     }
 
-    if (!q("#service-meta", system) && telemetry) {
-      const meta = document.createElement("details");
-      meta.id = "service-meta";
-      meta.className = "card";
-      meta.open = false;
-      meta.innerHTML = `<summary>Service timing</summary><div class="service-meta-grid"><div><span>Uptime</span><strong id="service-uptime">—</strong></div><div><span>Last checked</span><strong id="service-last-checked">—</strong></div></div>`;
-      telemetry.appendChild(meta);
-    }
+    q("#service-meta", system)?.remove();
 
     let sessions = q("#system-sessions-clients", system);
     if (!sessions) {
