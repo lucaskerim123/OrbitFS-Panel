@@ -155,19 +155,23 @@ function logout() {
 
 async function checkSorterAvailable() {
   let online = false;
+  let access = { useSorter:false, accessSorterSettings:false };
   try {
-    ({ online } = await api("/api/sorter-available"));
+    const [availability, permission] = await Promise.all([
+      api("/api/sorter-available"),
+      api("/api/sorter-access"),
+    ]);
+    online = !!availability.online;
+    access = permission || access;
   } catch {
-    // panel unreachable or check failed - treat as offline
+    online = false;
   }
-  // The Sorter tab only exists while the sorter service is actually answering.
-  document.getElementById("tab-btn-sorter").classList.toggle("hidden", !online);
-  // If the sorter dies while its tab is open, bounce back to Files.
-  if (!online && document.getElementById("tab-sorter").classList.contains("active")) switchTab("files");
-  // System-tab controls stay visible either way, so it can be started from there.
-  document.getElementById("infra-item-sorter").classList.remove("hidden");
-  document.getElementById("service-row-sorter").classList.remove("hidden");
-  return online;
+  state.sorterAccess = access;
+  if ((!online || !access.useSorter) && document.getElementById("tab-sorter")?.classList.contains("active")) switchTab("files");
+  if (typeof refreshSorterHeader === "function") refreshSorterHeader();
+  document.getElementById("infra-item-sorter")?.classList.remove("hidden");
+  document.getElementById("service-row-sorter")?.classList.remove("hidden");
+  return online && !!access.useSorter;
 }
 
 function showApp() {
@@ -230,6 +234,7 @@ document.getElementById("pin-toggle").addEventListener("click", () => {
 // --- Tabs --------------------------------------------------------------
 function switchTab(tabName) {
   if (state.role !== "admin" && ["system", "admin", "config"].includes(tabName)) tabName = "files";
+  if (tabName === "sorter" && state.sorterAccess?.useSorter === false) tabName = "files";
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${tabName}`));
   if (tabName === "system" || tabName === "admin") loadSystem();
@@ -1118,6 +1123,19 @@ document.getElementById("new-folder-btn").addEventListener("click", async () => 
 // destination picker for the selected item on the right. Nothing moves on
 // disk until Confirm.
 const sorter = { session: null, folders: [], selected: -1, filter: "" };
+function sorterWorkspaceCanUse(workspace) {
+  if (!workspace) return false;
+  if (state.role === "admin" || workspace.permission === "owner" || workspace.is_main) return true;
+  return !!workspace.management_permissions?.use_sorter;
+}
+function sorterWorkspaceCanManageSettings(workspace) {
+  if (!workspace) return false;
+  if (state.role === "admin" || workspace.permission === "owner") return true;
+  if (workspace.is_main) return false;
+  return !!workspace.management_permissions?.manage_sorter_settings;
+}
+window.sorterWorkspaceCanUse = sorterWorkspaceCanUse;
+window.sorterWorkspaceCanManageSettings = sorterWorkspaceCanManageSettings;
 function sorterRenderWorkspaceSelector() {
   const select = document.getElementById("sorter-workspace-select");
   const name = document.getElementById("sorter-workspace-name");
@@ -1125,14 +1143,14 @@ function sorterRenderWorkspaceSelector() {
   const workspaces = Array.isArray(state.workspaces) ? state.workspaces : [];
   const selected = workspaces.find((item) => String(item.id) === String(state.workspaceId));
   select.innerHTML = "";
-  for (const workspace of workspaces) {
+  for (const workspace of workspaces.filter(sorterWorkspaceCanUse)) {
     const option = document.createElement("option");
     option.value = workspace.id;
     option.textContent = workspace.is_main ? `Main Workspace — ${workspace.name}` : workspace.name;
     option.disabled = (!workspace.is_main && workspace.drive_state === "offline") || (workspace.status === "suspended" && state.role !== "admin");
     select.appendChild(option);
   }
-  select.value = state.workspaceId || "";
+  select.value = sorterWorkspaceCanUse(selected) ? (state.workspaceId || "") : (select.options[0]?.value || "");
   name.textContent = selected ? `${selected.name}${selected.is_main ? " · Simple Mode" : " · Workspace Mode"}` : "No workspace selected";
 }
 
@@ -1247,6 +1265,7 @@ function sorterRenderDetail() {
 }
 
 async function sorterLoad() {
+  if (!sorterWorkspaceCanUse(state.workspaces?.find((workspace) => String(workspace.id) === String(state.workspaceId)))) { sorterSetStatus("Sorter access is not enabled for this workspace role."); return; }
   try {
     const [session, foldersResp] = await Promise.all([
       sorterApi("/session"),
@@ -2029,7 +2048,7 @@ setInterval(() => {
 // adds X-Workspace-Id to existing fetch/XHR calls.
 {
   const workspaceScript = document.createElement("script");
-  workspaceScript.src = "workspace-ui.js?v=20260715-accesslock";
+  workspaceScript.src = "workspace-ui.js?v=20260715-sorterpermnav2";
   workspaceScript.defer = true;
   document.body.appendChild(workspaceScript);
 }

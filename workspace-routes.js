@@ -186,6 +186,19 @@ export function workspaceRouter() {
     } catch(error) { res.status(400).json({error:error.message}); }
   });
 
+  router.get("/sorter-access",async(req,res)=>{
+    try{
+      const workspace=await selectedWorkspace(req);
+      let permissions;
+      if(req.role==="admin"||workspace.permission==="owner"||String(workspace.owner_id)===String(req.userId)) permissions=fullWorkspaceAdminPermissions();
+      else if(workspace.is_main){
+        const restricted=await tabRestrictionsForUser(req.userId);
+        permissions={use_sorter:!restricted.includes("sorter"),manage_sorter_settings:false};
+      } else permissions=await effectiveWorkspaceAdminPermissions(workspace.id,workspace.permission);
+      if(req.role!=="admin"&&(await tabRestrictionsForUser(req.userId)).includes("sorter")){permissions.use_sorter=false;permissions.manage_sorter_settings=false;}
+      res.json({workspaceId:workspace.id,useSorter:!!permissions.use_sorter,accessSorterSettings:!!permissions.use_sorter&&!!permissions.manage_sorter_settings});
+    }catch(error){res.status(error.status||400).json({error:error.message});}
+  });
   router.get("/notifications",async(req,res)=>{
     try{res.json({notifications:await listNotifications(req.userId,{limit:req.query.limit,unreadOnly:req.query.unreadOnly==="true"}),unreadCount:await unreadNotificationCount(req.userId)});}
     catch(error){res.status(400).json({error:error.message});}
@@ -329,9 +342,9 @@ export function workspaceRouter() {
       if(req.role!=="admin"&&workspace.permission!=="owner") throw new Error("Owner access required");
       const role=String(req.body?.role||""); if(!WORKSPACE_ROLES.includes(role)) throw new Error("Invalid workspace role");
       const input=req.body?.permissions||{}; const values=WORKSPACE_ADMIN_ACTIONS.map(action=>!!input[action]);
-      await query(`INSERT INTO workspace_role_admin_permissions(workspace_id,workspace_role,can_view_settings,can_edit_settings,can_manage_members,can_manage_permissions,can_send_messages,can_delete_workspace)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8)
-        ON CONFLICT(workspace_id,workspace_role) DO UPDATE SET can_view_settings=EXCLUDED.can_view_settings,can_edit_settings=EXCLUDED.can_edit_settings,can_manage_members=EXCLUDED.can_manage_members,can_manage_permissions=EXCLUDED.can_manage_permissions,can_send_messages=EXCLUDED.can_send_messages,can_delete_workspace=EXCLUDED.can_delete_workspace,updated_at=now()`,[workspace.id,role,...values]);
+      await query(`INSERT INTO workspace_role_admin_permissions(workspace_id,workspace_role,can_view_settings,can_edit_settings,can_manage_members,can_manage_permissions,can_send_messages,can_use_sorter,can_manage_sorter_settings,can_delete_workspace)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        ON CONFLICT(workspace_id,workspace_role) DO UPDATE SET can_view_settings=EXCLUDED.can_view_settings,can_edit_settings=EXCLUDED.can_edit_settings,can_manage_members=EXCLUDED.can_manage_members,can_manage_permissions=EXCLUDED.can_manage_permissions,can_send_messages=EXCLUDED.can_send_messages,can_use_sorter=EXCLUDED.can_use_sorter,can_manage_sorter_settings=EXCLUDED.can_manage_sorter_settings,can_delete_workspace=EXCLUDED.can_delete_workspace,updated_at=now()`,[workspace.id,role,...values]);
       res.json({ok:true,permissions:await effectiveWorkspaceAdminPermissions(workspace.id,role)});
     }catch(error){res.status(error.status||400).json({error:error.message});}
   });

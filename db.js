@@ -141,11 +141,15 @@ async function ensureWorkspaceSettings(client) {
     can_manage_members boolean NOT NULL DEFAULT false,
     can_manage_permissions boolean NOT NULL DEFAULT false,
     can_send_messages boolean NOT NULL DEFAULT false,
+    can_use_sorter boolean NOT NULL DEFAULT false,
+    can_manage_sorter_settings boolean NOT NULL DEFAULT false,
     can_delete_workspace boolean NOT NULL DEFAULT false,
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY(workspace_id,workspace_role)
   )`);
   await client.query(`ALTER TABLE workspace_role_admin_permissions ADD COLUMN IF NOT EXISTS can_send_messages boolean NOT NULL DEFAULT false`);
+  await client.query(`ALTER TABLE workspace_role_admin_permissions ADD COLUMN IF NOT EXISTS can_use_sorter boolean NOT NULL DEFAULT false`);
+  await client.query(`ALTER TABLE workspace_role_admin_permissions ADD COLUMN IF NOT EXISTS can_manage_sorter_settings boolean NOT NULL DEFAULT false`);
   await client.query(`CREATE TABLE IF NOT EXISTS notification_preferences(
     user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     workspace_invites boolean NOT NULL DEFAULT true,

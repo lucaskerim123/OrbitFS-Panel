@@ -3,8 +3,8 @@
   window.__orbitWorkspacePermissionEditorLoaded = true;
 
   const ACTIONS = ["read", "write", "download", "move", "delete", "create"];
-  const ADMIN_ACTIONS = ["view_settings", "edit_settings", "manage_members", "manage_permissions", "send_messages", "delete_workspace"];
-  const ADMIN_LABELS = { view_settings:"View workspace settings", edit_settings:"Edit workspace settings", manage_members:"Manage members", manage_permissions:"Manage permissions", send_messages:"Send workspace messages", delete_workspace:"Delete workspace" };
+  const ADMIN_ACTIONS = ["view_settings", "edit_settings", "manage_members", "manage_permissions", "send_messages", "use_sorter", "manage_sorter_settings", "delete_workspace"];
+  const ADMIN_LABELS = { view_settings:"View workspace settings", edit_settings:"Edit workspace settings", manage_members:"Manage members", manage_permissions:"Manage permissions", send_messages:"Send workspace messages", use_sorter:"Use Sorter", manage_sorter_settings:"Access Sorter settings", delete_workspace:"Delete workspace" };
   const ROLES = ["editor", "contributor", "viewer"];
   const DEFAULTS = {
     editor: { read:true, write:true, download:true, move:true, delete:true, create:true },
@@ -181,9 +181,12 @@
       if (combinedView) {
         const adminForm=detail.querySelector(".workspace-admin-permission-form");
         const adminMessage=adminForm.querySelector(".workspace-admin-permission-message");
-        const loadAdminRole=()=>{const role=adminForm.elements.role.value; const values=adminResult.permissions?.[role]||adminResult.defaults?.[role]||{}; ADMIN_ACTIONS.forEach(action=>adminForm.elements[action].checked=!!values[action]); adminMessage.textContent="Current workspace administration permissions loaded.";};
+        const syncSorterPermissionDependency=()=>{const use=adminForm.elements.use_sorter; const settings=adminForm.elements.manage_sorter_settings; if(!use||!settings)return; if(!use.checked) settings.checked=false; settings.disabled=!use.checked;};
+        const loadAdminRole=()=>{const role=adminForm.elements.role.value; const values=adminResult.permissions?.[role]||adminResult.defaults?.[role]||{}; ADMIN_ACTIONS.forEach(action=>adminForm.elements[action].checked=!!values[action]); syncSorterPermissionDependency(); adminMessage.textContent="Current workspace administration permissions loaded.";};
         adminForm.elements.role.addEventListener("change",loadAdminRole);
-        adminForm.querySelector(".admin-permission-defaults").addEventListener("click",()=>{const values=adminResult.defaults?.[adminForm.elements.role.value]||{}; ADMIN_ACTIONS.forEach(action=>adminForm.elements[action].checked=!!values[action]); adminMessage.textContent="Defaults loaded. Save to apply.";});
+        adminForm.elements.use_sorter?.addEventListener("change",syncSorterPermissionDependency);
+        adminForm.elements.manage_sorter_settings?.addEventListener("change",()=>{if(adminForm.elements.manage_sorter_settings.checked) adminForm.elements.use_sorter.checked=true; syncSorterPermissionDependency();});
+        adminForm.querySelector(".admin-permission-defaults").addEventListener("click",()=>{const values=adminResult.defaults?.[adminForm.elements.role.value]||{}; ADMIN_ACTIONS.forEach(action=>adminForm.elements[action].checked=!!values[action]); syncSorterPermissionDependency(); adminMessage.textContent="Defaults loaded. Save to apply.";});
         adminForm.addEventListener("submit",async event=>{event.preventDefault(); const permissions=Object.fromEntries(ADMIN_ACTIONS.map(action=>[action,!!adminForm.elements[action].checked])); try{const result=await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/admin-permissions`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({role:adminForm.elements.role.value,permissions})}); adminResult.permissions[adminForm.elements.role.value]=result.permissions; adminMessage.textContent="Workspace permissions saved."; await loadOrbitWorkspaces(workspace.id);}catch(error){adminMessage.textContent=error.message;}});
         loadAdminRole();
       }

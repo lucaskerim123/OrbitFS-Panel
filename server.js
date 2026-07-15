@@ -14,6 +14,7 @@ import { needsSetup, runSetup, tryStartOrbitFSServer } from "./setup.js";
 import { workspaceRouter } from "./workspace-routes.js";
 import { beginDownload } from "./download-limits.js";
 import { evaluateWorkspaceLifecycle, getWorkspaceForUser, listUserWorkspaces } from "./workspaces.js";
+import { effectiveWorkspaceAdminPermissions } from "./workspace-permissions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -325,6 +326,18 @@ app.use("/api/sorter", express.raw({ type: "*/*", limit: "2mb" }), async (req, r
       ? await getWorkspaceForUser(requested, req.userId, req.role)
       : (available.find((item) => item.is_main) || available[0]);
     if (!workspace) return res.status(403).json({ error: "Workspace not found or access denied" });
+    const sorterPath=String(req.url||"").split("?")[0];
+    let sorterAccess={use_sorter:true,manage_sorter_settings:true};
+    const ownsWorkspace=workspace.permission==="owner"||String(workspace.owner_id)===String(req.userId);
+    if(req.role!=="admin"&&!ownsWorkspace){
+      sorterAccess=workspace.is_main
+        ? {use_sorter:true,manage_sorter_settings:false}
+        : await effectiveWorkspaceAdminPermissions(workspace.id,workspace.permission);
+    }
+    if(!sorterAccess.use_sorter) return res.status(403).json({error:"Sorter access is not enabled for your workspace role"});
+    const settingsRequest=sorterPath==="/settings"||sorterPath.startsWith("/settings/")||(sorterPath==="/learning"&&req.method==="DELETE");
+    if(settingsRequest&&!sorterAccess.manage_sorter_settings) return res.status(403).json({error:"Sorter settings access is not enabled for your workspace role"});
+    if((sorterPath==="/policy"||sorterPath.startsWith("/policy/"))&&req.role!=="admin") return res.status(403).json({error:"Admin access required"});
     headers["X-Workspace-Id"] = String(workspace.id);
     headers["X-Workspace-Root"] = encodeURIComponent(workspace.filesystem_root);
     headers["X-Sorter-Admin"] = String(req.role === "admin");

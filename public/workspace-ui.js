@@ -30,7 +30,7 @@
 
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "workspace-ui.css?v=20260715-accesslock";
+  css.href = "workspace-ui.css?v=20260715-sorterpermnav2";
   document.head.appendChild(css);
 })();
 function workspaceFormatBytes(value) {
@@ -140,6 +140,8 @@ async function loadOrbitWorkspaces(preferredId = state.workspaceId) {
     renderWorkspaceBar();
     if (typeof applyWorkspaceModeUi === "function") applyWorkspaceModeUi();
     if (typeof sorterRenderWorkspaceSelector === "function") sorterRenderWorkspaceSelector();
+    if (typeof refreshSorterHeader === "function") refreshSorterHeader();
+    if (typeof refreshSorterAccessUi === "function") refreshSorterAccessUi();
     renderWorkspaceAdmin();
     renderAdminStorageOverview();
     renderCompactWorkspaceTrashList();
