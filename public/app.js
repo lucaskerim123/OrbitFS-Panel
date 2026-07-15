@@ -178,6 +178,8 @@ function showApp() {
     : state.username;
   document.getElementById("tab-btn-system").classList.toggle("hidden", state.role !== "admin");
   document.getElementById("tab-btn-admin")?.classList.toggle("hidden", state.role !== "admin");
+  document.querySelector('.tab-btn[data-tab="config"]')?.classList.toggle("hidden", state.role !== "admin");
+  document.getElementById("tab-config")?.classList.toggle("hidden", state.role !== "admin");
   const adminZone = document.querySelector("#tab-system .sys-zone-admin");
   const adminHost = document.getElementById("admin-zone-host");
   if (adminZone && adminHost && adminZone.parentElement !== adminHost) adminHost.appendChild(adminZone);
@@ -227,6 +229,7 @@ document.getElementById("pin-toggle").addEventListener("click", () => {
 
 // --- Tabs --------------------------------------------------------------
 function switchTab(tabName) {
+  if (state.role !== "admin" && ["system", "admin", "config"].includes(tabName)) tabName = "files";
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${tabName}`));
   if (tabName === "system" || tabName === "admin") loadSystem();
@@ -2026,7 +2029,7 @@ setInterval(() => {
 // adds X-Workspace-Id to existing fetch/XHR calls.
 {
   const workspaceScript = document.createElement("script");
-  workspaceScript.src = "workspace-ui.js?v=20260715-notifications";
+  workspaceScript.src = "workspace-ui.js?v=20260715-accesslock";
   workspaceScript.defer = true;
   document.body.appendChild(workspaceScript);
 }
