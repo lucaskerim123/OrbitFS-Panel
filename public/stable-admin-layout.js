@@ -15,6 +15,15 @@
   }
 
   function ensureConfigTab() {
+    const existingButton = q('.tab-btn[data-tab="config"]');
+    const existingPanel = q("#tab-config");
+    if (typeof state !== "undefined" && state.role !== "admin") {
+      existingButton?.classList.add("hidden");
+      existingButton?.classList.remove("active");
+      existingPanel?.classList.add("hidden");
+      existingPanel?.classList.remove("active");
+      return null;
+    }
     const nav = q("nav");
     const systemButton = q('.tab-btn[data-tab="system"]');
     if (!nav || !systemButton) return null;
@@ -31,6 +40,7 @@
         if (typeof switchTab === "function") switchTab("config");
       });
     }
+    button.classList.remove("hidden");
 
     let panel = q("#tab-config");
     if (!panel) {
@@ -46,6 +56,7 @@
       const admin = q("#tab-admin");
       admin?.parentElement?.insertBefore(panel, admin);
     }
+    panel.classList.remove("hidden");
     return panel;
   }
 
@@ -146,14 +157,7 @@
     const host = q("#admin-zone-host");
     if (!host) return;
 
-    if (!q("#system-role-definitions", host)) {
-      const roles = document.createElement("details");
-      roles.id = "system-role-definitions";
-      roles.className = "card";
-      roles.open = false;
-      roles.innerHTML = `<summary>System role definitions</summary><div class="role-definition-grid"><article><strong>User</strong><p>Uses assigned tabs, files and actions.</p></article><article><strong>Admin</strong><p>Manages users, permissions, restrictions, configuration and infrastructure.</p></article></div>`;
-      host.prepend(roles);
-    }
+    q("#system-role-definitions")?.remove();
 
     q("#admin-login-security", host)?.remove();
     q("#admin-audit-log", host)?.remove();
