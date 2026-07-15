@@ -1189,9 +1189,12 @@ app.get(["/", "/index.html"], async (req, res, next) => {
   try {
     const indexPath = path.join(__dirname, "public", "index.html");
     const html = await fs.readFile(indexPath, "utf-8");
-    const injected = html.includes("permissions.js")
+    let injected = html.includes("permissions.js")
       ? html
       : html.replace("</body>", "  <script src=\"permissions.js\"></script>\n</body>");
+    if (!injected.includes("workspace-expand-fix.js")) {
+      injected = injected.replace("</body>", "  <script src=\"workspace-expand-fix.js?v=20260716-expandfix1\"></script>\n</body>");
+    }
     res.set("Cache-Control", "no-store");
     res.type("html").send(injected);
   } catch (err) {

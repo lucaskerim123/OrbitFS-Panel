@@ -420,3 +420,57 @@ body:not(:has(#tab-files.active)) #workspace-bar{display:none!important}
 .workspace-trash-compact-meter{height:5px;margin-top:.45rem;border-radius:999px;overflow:hidden;background:color-mix(in srgb,var(--border) 72%,transparent)}
 .workspace-trash-compact-meter span{display:block;height:100%;border-radius:inherit;background:var(--accent)}
 @media(max-width:520px){#trash-config-form{grid-template-columns:1fr}#trash-config-form>*{grid-column:1/-1!important}#trash-config-form button{width:100%}.workspace-trash-compact-row{padding:.58rem .62rem!important}.workspace-trash-compact-line{align-items:flex-start;flex-direction:column;gap:.18rem}.workspace-trash-compact-line span{white-space:normal}}
+
+/* Mobile bottom reachability: keep workspace cards above Android/Chrome bottom controls. */
+@media(max-width:520px){
+  #tab-workspaces,
+  .workspace-panel{
+    min-height:100dvh;
+    padding-bottom:calc(160px + env(safe-area-inset-bottom,0px))!important;
+    scroll-padding-bottom:calc(160px + env(safe-area-inset-bottom,0px));
+  }
+  .workspace-page-shell{
+    padding-bottom:calc(120px + env(safe-area-inset-bottom,0px));
+  }
+  .workspace-list-section{
+    padding-bottom:calc(120px + env(safe-area-inset-bottom,0px));
+  }
+  .workspace-admin-list::after{
+    content:"";
+    display:block;
+    height:calc(120px + env(safe-area-inset-bottom,0px));
+  }
+  .workspace-open-btn{
+    min-height:42px;
+    touch-action:manipulation;
+    position:relative;
+    z-index:2;
+  }
+}
+
+/* Workspace Manager accordion list: bottom cards must have room to expand. */
+@media(max-width:520px){
+  #workspace-admin-list,
+  .workspace-admin-list{
+    display:grid;
+    gap:.65rem;
+    overflow:visible!important;
+    padding-bottom:0!important;
+  }
+  #workspace-list-tail-spacer{
+    display:block;
+    height:24px;
+    transition:height .18s ease;
+  }
+  .workspace-admin-card{
+    scroll-margin-top:72px;
+    scroll-margin-bottom:calc(58vh + env(safe-area-inset-bottom,0px));
+  }
+  .workspace-card-summary,
+  .workspace-card-toggle{
+    cursor:pointer;
+  }
+  .workspace-card-toggle{
+    min-height:48px;
+  }
+}
