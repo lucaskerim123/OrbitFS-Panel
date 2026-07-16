@@ -491,26 +491,29 @@
       <div class="sys-zone sys-zone-controls">
         <div class="sys-zone-label"><span class="sys-zone-dot"></span>Controls</div>
 
-        <details class="card" open id="system-license-card">
-          <summary>OrbitFS licence</summary>
+        <details class="card compact-license-card" open id="system-license-card">
+          <summary><span>OrbitFS licence</span><small id="system-license-summary">Checking</small></summary>
           <div class="license-status-head">
             <div><strong id="system-license-label">Checking licence...</strong><p id="system-license-message" class="muted-text"></p></div>
             <span id="system-license-pill" class="pill unknown">checking</span>
           </div>
-          <div class="license-detail-grid">
-            <div><span>Installation</span><strong id="system-license-installation">-</strong></div>
+          <div id="system-license-components" class="license-component-grid compact"></div>
+          <div class="license-detail-grid compact">
+            <div><span>Install</span><strong id="system-license-installation">-</strong></div>
             <div><span>Expiry</span><strong id="system-license-expiry">-</strong></div>
-            <div><span>Last validation</span><strong id="system-license-checked">-</strong></div>
+            <div><span>Checked</span><strong id="system-license-checked">-</strong></div>
           </div>
-          <div id="system-license-components" class="license-component-grid"></div>
-          <div class="license-actions">
-            <button id="system-license-refresh" type="button">Refresh status</button>
+          <div class="license-actions compact">
+            <button id="system-license-refresh" type="button">Refresh licence</button>
+            <button id="system-license-change-toggle" type="button">Install or replace key</button>
+          </div>
+          <div id="system-license-change-panel" class="license-change-panel hidden">
             <input id="system-license-replace-key" type="text" maxlength="24" placeholder="OFS-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-            <button id="system-license-activate" type="button" class="primary">Activate replacement key</button>
+            <button id="system-license-activate" type="button" class="primary">Install / Activate key</button>
+            <p class="field-hint">Enter a licence key to bind this Panel. The installed key is never displayed here.</p>
           </div>
           <p id="system-license-action-message" class="muted-text"></p>
         </details>
-
         <details class="card" open>
           <summary>Startup Load Control</summary>
           <p class="muted-text">No default project. Configure the real OrbitFS files loaded by each project preset. One OrbitFS-relative file path per line. Archive remains excluded.</p>

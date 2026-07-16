@@ -1355,3 +1355,16 @@ table.data-table tr:hover td { background: var(--bg); }
 .license-blocked-actions { display: grid; gap: 0.55rem; margin: 1rem 0 0.65rem; }
 .license-blocked-actions input { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 @media (max-width: 600px) { .license-actions { grid-template-columns: 1fr; } .license-detail-grid { grid-template-columns: 1fr 1fr; } }
+
+.compact-license-card .license-status-head{align-items:flex-start;gap:10px}
+.compact-license-card summary{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.compact-license-card summary small{color:var(--muted);font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.license-detail-grid.compact{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.license-detail-grid.compact div{padding:8px;min-width:0}
+.license-detail-grid.compact strong{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.license-component-grid.compact{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.license-component-row.ok{border-color:rgba(44,211,159,.35)}
+.license-component-row.blocked{border-color:rgba(255,107,107,.35)}
+.license-actions.compact{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.license-change-panel{display:grid;gap:8px;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.03)}
+@media(max-width:650px){.license-detail-grid.compact,.license-component-grid.compact{grid-template-columns:1fr}.license-actions.compact button{flex:1}}

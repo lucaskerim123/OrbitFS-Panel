@@ -1521,10 +1521,11 @@ async function loadLicensePanel(refresh = false) {
     const enforcementOff = summary.enforcement === false;
     setPill("system-license-pill", licensed, enforcementOff ? "development" : licensed ? "active" : "blocked");
     document.getElementById("system-license-label").textContent = summary.label || (enforcementOff ? "Licence enforcement disabled" : "OrbitFS licence");
+    const summaryEl = document.getElementById("system-license-summary");
+    if (summaryEl) summaryEl.textContent = enforcementOff ? "Dev" : licensed ? "Active" : "Blocked";
     document.getElementById("system-license-message").textContent = summary.offlineGrace
-      ? "Using temporary offline grace. Live validation is currently unavailable."
-      : summary.reason ? `Status: ${summary.reason}` : "Validated against the OrbitFS licence service.";
-    document.getElementById("system-license-key").textContent = summary.keyHint || (enforcementOff ? "Not required" : "Not activated");
+      ? "Offline grace is active. Refresh when the licence API is reachable."
+      : summary.reason ? `Status: ${summary.reason}` : "Panel is validated. Add-ons are controlled by Azure Licence Manager.";
     document.getElementById("system-license-installation").textContent = summary.installationId || "-";
     document.getElementById("system-license-expiry").textContent = summary.expiresAt
       ? new Date(summary.expiresAt).toLocaleDateString() : "No expiry";
@@ -1535,11 +1536,11 @@ async function loadLicensePanel(refresh = false) {
     components.innerHTML = "";
     Object.entries(LICENSE_COMPONENT_LABELS).forEach(([name, label]) => {
       const item = summary.components?.[name] || {};
-      const allowed = enforcementOff || (item.allowed === true && item.state === "locked" && item.lockedToThisInstallation === true);
+      const allowed = enforcementOff || item.licensed === true || (item.allowed === true && item.lockedToThisInstallation !== false && item.state !== "blocked");
       const row = document.createElement("div");
-      row.className = "license-component-row";
-      const detail = item.reason || item.state || (enforcementOff ? "development" : "not included");
-      row.innerHTML = `<span>${label}</span><strong class="${allowed ? "license-ok" : "license-down"}">${allowed ? "Available" : detail}</strong>`;
+      row.className = `license-component-row ${allowed ? "ok" : "blocked"}`;
+      const detail = allowed ? "On" : (item.reason || item.state || "Off");
+      row.innerHTML = `<span>${label}</span><strong class="${allowed ? "license-ok" : "license-down"}">${detail}</strong>`;
       components.appendChild(row);
     });
 
@@ -1591,6 +1592,9 @@ async function activatePanelLicense(inputId, messageId) {
 
 // --- System tab ------------------------------------------------------------
 document.getElementById("system-refresh-btn").addEventListener("click", loadSystem);
+document.getElementById("system-license-change-toggle")?.addEventListener("click", () => {
+  document.getElementById("system-license-change-panel")?.classList.toggle("hidden");
+});
 document.getElementById("system-license-refresh")?.addEventListener("click", () => loadLicensePanel(true));
 document.getElementById("system-license-activate")?.addEventListener("click", () =>
   activatePanelLicense("system-license-replace-key", "system-license-action-message"));
@@ -1602,7 +1606,6 @@ for (const id of ["system-license-replace-key", "license-blocked-key"]) {
     event.target.value = normaliseLicenseKey(event.target.value);
   });
 }
-document.getElementById("system-license-refresh")?.addEventListener("click", () => loadLicensePanel(true));
 document.getElementById("system-license-activate")?.addEventListener("click", () =>
   activatePanelLicense("system-license-replace-key", "system-license-action-message"));
 document.getElementById("license-blocked-activate")?.addEventListener("click", () =>
