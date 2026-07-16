@@ -5,7 +5,8 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --check server.js && node --check setup.js && node --check license.js && node --check public/app.js && node --check public/addon-manager.js && node --check \"plugins/OrbitFS Sorter/server.js\" && node test-license.mjs && node test-license-ui.mjs"
   },
   "license": "ISC",
   "dependencies": {

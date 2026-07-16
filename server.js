@@ -19,6 +19,7 @@ import { addonEnabled, addonPath, addonStatus, listAddonStatuses, attachAddon, d
 import { getRestrictedTabs } from "./tab-restrictions.js";
 import { resolveMcpIdentity } from "./workspace-mcp.js";
 import { query } from "./db.js";
+import { COMPONENTS, activateComponents, assertComponentLicensed, getComponentStatus, getLicenseSummary, isLicenseEnforced, licenseGuard, startLicenseHeartbeat } from "./license.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,6 +32,7 @@ function withTimeout(promise, ms, message = "Operation timed out") {
 }
 dotenv.config({ path: path.join(__dirname, ".env") });
 await initialiseAddonState();
+startLicenseHeartbeat();
 const PORT = process.env.PANEL_PORT || 4000;
 const LOG_DIR = path.join(__dirname, "logs");
 const WORKSPACE_ROOT = path.dirname(__dirname);
@@ -127,6 +129,33 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+const ADDON_LICENSE_COMPONENTS = Object.freeze({
+  workspaces: COMPONENTS.WORKSPACES,
+  sorter: COMPONENTS.SORTER,
+});
+
+async function requireLicensedRoute(res, component, options = {}) {
+  try {
+    await assertComponentLicensed(component, options);
+    return true;
+  } catch (error) {
+    res.status(error.status || 403).json({
+      error: error.message,
+      code: error.code || "LICENSE_REQUIRED",
+      license: error.license || null,
+    });
+    return false;
+  }
+}
+
+function isWorkspaceOnlyPath(pathname = "") {
+  return [
+    "/workspaces", "/workspace-", "/notifications",
+    "/notification-preferences", "/admin/notifications",
+    "/tab-restrictions", "/bulk-download", "/bulk-move", "/bulk-trash",
+  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 async function requireFileAccess(req, res, filepath, action = "read") {
   if (await canAccessPath(req.role, filepath, action)) return true;
   res.status(403).json({ error: `${action[0].toUpperCase()}${action.slice(1)} permission denied for ${normalizeFilePath(filepath) || "/"}` });
@@ -162,6 +191,43 @@ app.post("/api/logout", async (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Licensing -----------------------------------------------------------
+
+app.get("/api/license/status", async (req, res) => {
+  try {
+    const session = await sessionOf(req);
+    if (!session) return res.status(401).json({ error: "Unauthorized" });
+    res.json(await getLicenseSummary({ refresh: req.query.refresh === "1" }));
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message, code: error.code });
+  }
+});
+
+app.post("/api/license/activate", express.json(), async (req, res) => {
+  try {
+    if (!(await needsSetup())) {
+      const session = await sessionOf(req);
+      if (!session) return res.status(401).json({ error: "Unauthorized" });
+      if (session.role !== "admin") return res.status(403).json({ error: "Admin access required" });
+    }
+    const components = new Set(Array.isArray(req.body?.components)
+      ? req.body.components
+      : [COMPONENTS.PANEL, COMPONENTS.MCP]);
+    if (await addonEnabled("workspaces")) components.add(COMPONENTS.WORKSPACES);
+    if (await addonEnabled("sorter")) components.add(COMPONENTS.SORTER);
+    const activationComponents = [...components];
+    const license = await activateComponents(req.body?.licenseKey, activationComponents);
+    logEvent("panel.license.activated", { components: activationComponents, keyHint: license.keyHint });
+    res.json({ ok: true, license });
+  } catch (error) {
+    res.status(error.status || 500).json({
+      error: error.message,
+      code: error.code || "LICENSE_ACTIVATION_FAILED",
+      license: error.license || null,
+    });
+  }
+});
+
 // --- First-run setup -----------------------------------------------------
 // Unauthenticated on purpose (there's no admin to authenticate as yet), but
 // runSetup() itself refuses to do anything once an account already exists.
@@ -192,16 +258,21 @@ app.post("/api/setup", express.json(), async (req, res) => {
       mcpUrl: result.mcpUrl,
       hiveApiKey: result.hiveApiKey,
       oauthConfigured: result.oauthConfigured,
+      license: result.license,
     });
   } catch (err) {
     if (!err.status) logError("panel.setup.error", err);
-    res.status(err.status || 500).json({ error: err.message });
+    res.status(err.status || 500).json({
+      error: err.message,
+      code: err.code || "SETUP_FAILED",
+      license: err.license || null,
+    });
   }
 });
 
 app.use("/api", async (req, res, next) => {
   res.set("Cache-Control", "no-store");
-  if (req.path === "/login" || req.path === "/logout") return next();
+  if (req.path === "/login" || req.path === "/logout" || req.path.startsWith("/license/")) return next();
   const session = await sessionOf(req);
   if (!session) return res.status(401).json({ error: "Unauthorized" });
   req.username = session.username;
@@ -218,10 +289,21 @@ app.get("/internal/mcp-identity", async (req, res) => {
   if (!MCP_INTERNAL_KEY || req.get("X-Internal-Key") !== MCP_INTERNAL_KEY) return res.status(401).json({ error: "Unauthorized" });
   const email = String(req.query.email || "").trim();
   if (!email) return res.status(400).json({ error: "email is required" });
-  try { res.json(await resolveMcpIdentity(email)); }
-  catch (error) { res.status(500).json({ error: error.message }); }
+  try {
+    await assertComponentLicensed(COMPONENTS.MCP);
+    const identity = await resolveMcpIdentity(email);
+    if (identity.role === "member") await assertComponentLicensed(COMPONENTS.WORKSPACES);
+    res.json(identity);
+  } catch (error) {
+    res.status(error.status || 403).json({
+      error: error.message,
+      code: error.code || "LICENSE_REQUIRED",
+      license: error.license || null,
+    });
+  }
 });
 
+app.use("/api", licenseGuard(COMPONENTS.PANEL));
 const DEFAULT_MAINTENANCE_MESSAGE = "OrbitFS is in maintenance mode while Main Workspace files are being changed. Do not edit or upload files. Data changed during maintenance may be lost; OrbitFS is not responsible for changes made while this warning is active.";
 
 async function maintenanceStatus() {
@@ -313,6 +395,8 @@ app.get("/api/addons", requireAdmin, async (req,res) => {
 });
 app.post("/api/addons/:id/attach", requireAdmin, async (req,res) => {
   try {
+    const component = ADDON_LICENSE_COMPONENTS[req.params.id];
+    if (component && isLicenseEnforced()) await activateComponents(null, [component]);
     const addon = await attachAddon(req.params.id);
     logEvent("panel.addon.attached", { addon:req.params.id, user:req.username });
     res.json({ addon, addons:await currentAddonStatuses() });
@@ -341,8 +425,20 @@ const workspaceAddonRouter = workspaceRouter();
 app.use("/api", async (req,res,next) => {
   try {
     if (!(await addonEnabled("workspaces"))) return next();
+    const license = await getComponentStatus(COMPONENTS.WORKSPACES);
+    if (!license.licensed) {
+      if (!isWorkspaceOnlyPath(req.path)) return next();
+      return res.status(403).json({ error: "OrbitFS Workspaces licence is blocked or not activated", code: "LICENSE_REQUIRED", license });
+    }
     return workspaceAddonRouter(req,res,next);
-  } catch (error) { return next(); }
+  } catch (error) {
+    if (!isWorkspaceOnlyPath(req.path)) return next();
+    return res.status(error.status || 503).json({
+      error: error.message,
+      code: error.code || "WORKSPACES_UNAVAILABLE",
+      license: error.license || null,
+    });
+  }
 });
 
 app.use("/api", (req, res, next) => {
@@ -467,10 +563,11 @@ async function sorterOnlineWithRetry(port, attempts = 3) {
 app.get("/api/sorter-available", async (req, res) => {
   const enabled = process.env.SORTER_ENABLED !== "false";
   const addon = await addonStatus("sorter");
+  const license = await getComponentStatus(COMPONENTS.SORTER);
   const attached = enabled && addon.attached;
   const port = attached ? await resolveSorterPort() : null;
-  const online = attached && (await sorterOnlineWithRetry(port || 0));
-  res.json({ available:addon.installed, installed:addon.installed, attached, status:addon.status, online, url:port ? `http://localhost:${port}` : SORTER_URL });
+  const online = attached && license.licensed && (await sorterOnlineWithRetry(port || 0));
+  res.json({ available:addon.installed && license.licensed, installed:addon.installed, attached, status:addon.status, online, license, url:port ? `http://localhost:${port}` : SORTER_URL });
 });
 
 app.use("/api/sorter", express.raw({ type: "*/*", limit: "2mb" }), async (req, res) => {
@@ -479,6 +576,7 @@ app.use("/api/sorter", express.raw({ type: "*/*", limit: "2mb" }), async (req, r
     if (!addon.attached || process.env.SORTER_ENABLED === "false") {
       return res.status(404).json({ error:"Sorter addon is not attached", addonStatus:addon.status });
     }
+    if (!(await requireLicensedRoute(res, COMPONENTS.SORTER))) return;
     const access = await sorterAccessForRequest(req);
     if (!access.useSorter) return res.status(403).json({ error:"Sorter access is not enabled for your workspace role" });
     const workspace = access.workspace;

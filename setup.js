@@ -7,6 +7,8 @@ import fsSync from "fs";
 import path from "path";
 import crypto from "crypto";
 import { upsertUser, listUsers } from "./auth.js";
+import { activateComponents, COMPONENTS } from "./license.js";
+import { addonEnabled } from "./addons.js";
 
 function randomSecret(bytes = 32) {
   return crypto.randomBytes(bytes).toString("hex");
@@ -18,6 +20,7 @@ function randomSecret(bytes = 32) {
 // (installers, other projects) without them getting mixed into OrbitFS's
 // own _system/_sorter/_trash structure.
 const HIVE_SUBFOLDER_NAME = "The Orbit FS";
+const LICENSE_KEY_PATTERN = /^OFS-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}$/;
 
 // Merges `overrides` into an .env file's KEY=value lines. If the file
 // doesn't exist yet, starts from `templatePath` (usually .env.example).
@@ -48,6 +51,18 @@ function readEnvValue(envPath, key) {
     return match ? match[1].trim() : "";
   } catch {
     return "";
+  }
+}
+
+async function removeEnvKey(envPath, key) {
+  try {
+    const content = await fs.readFile(envPath, "utf-8");
+    const filtered = content.split(/\r?\n/)
+      .filter((line) => !line.startsWith(`${key}=`))
+      .join("\n");
+    await fs.writeFile(envPath, `${filtered.trimEnd()}\n`, "utf-8");
+  } catch {
+    // Missing optional env files are handled by the normal setup writes.
   }
 }
 
@@ -130,6 +145,35 @@ export async function runSetup(input, { panelDir, hiveServerDir, panelPort }) {
     throw err;
   }
 
+  const licenseApiUrl = String(input.licenseApiUrl || process.env.ORBITFS_LICENSE_API_URL || "").trim().replace(/\/+$/, "");
+  const licenseKey = String(input.licenseKey || "").trim().toUpperCase();
+  if (licenseKey && !LICENSE_KEY_PATTERN.test(licenseKey)) {
+    const err = new Error("Licence key must use OFS-XXXX-XXXX-XXXX-XXXX format");
+    err.status = 400;
+    err.code = "INVALID_LICENSE_KEY_FORMAT";
+    throw err;
+  }
+  if (licenseKey && !/^https:\/\//i.test(licenseApiUrl)) {
+    const err = new Error("A secure Licence API URL is required when a licence key is entered");
+    err.status = 400;
+    throw err;
+  }
+  const licenseOverrides = licenseKey ? {
+    ORBITFS_LICENSE_ENFORCE: "true",
+    ORBITFS_LICENSE_API_URL: licenseApiUrl,
+    ORBITFS_LICENSE_VALIDATE_PATH: "/api/license/validate",
+  } : { ORBITFS_LICENSE_ENFORCE: "false" };
+  let licenseActivation = null;
+  if (licenseKey) {
+    process.env.ORBITFS_LICENSE_API_URL = licenseApiUrl;
+    process.env.ORBITFS_LICENSE_KEY = licenseKey;
+    process.env.ORBITFS_LICENSE_ENFORCE = "true";
+    const activationComponents = [COMPONENTS.PANEL, COMPONENTS.MCP];
+    if (await addonEnabled("workspaces")) activationComponents.push(COMPONENTS.WORKSPACES);
+    if (await addonEnabled("sorter")) activationComponents.push(COMPONENTS.SORTER);
+    licenseActivation = await activateComponents(licenseKey, activationComponents);
+  }
+
   const sorterDir = path.join(panelDir, "plugins", "OrbitFS Sorter");
 
   try {
@@ -185,6 +229,7 @@ export async function runSetup(input, { panelDir, hiveServerDir, panelPort }) {
     PORT: hivePort,
     PUBLIC_BASE_URL: publicBaseUrl,
     ...oauthOverrides,
+    ...licenseOverrides,
   });
 
   const panelEnvPath = path.join(panelDir, ".env");
@@ -196,12 +241,26 @@ export async function runSetup(input, { panelDir, hiveServerDir, panelPort }) {
     HIVE_SERVER_DIR: hiveServerDir,
     HIVE_LOG_DIR: path.join(hiveServerDir, "logs"),
     SORTER_DIR: sorterDir,
+    ...licenseOverrides,
   });
 
   await upsertEnvFile(sorterEnvPath, sorterEnvExample, {
     HIVE_API_KEY: hiveApiKey,
     SORTER_HIVE_ROOT: dataFolder,
+    ...licenseOverrides,
   });
+
+  await Promise.all([
+    removeEnvKey(hiveEnvPath, "ORBITFS_LICENSE_KEY"),
+    removeEnvKey(panelEnvPath, "ORBITFS_LICENSE_KEY"),
+    removeEnvKey(sorterEnvPath, "ORBITFS_LICENSE_KEY"),
+  ]);
+
+  await Promise.all([
+    removeEnvKey(hiveEnvPath, "ORBITFS_LICENSE_KEY"),
+    removeEnvKey(panelEnvPath, "ORBITFS_LICENSE_KEY"),
+    removeEnvKey(sorterEnvPath, "ORBITFS_LICENSE_KEY"),
+  ]);
 
   await upsertUser(adminUsername, adminPin, "admin");
 
@@ -211,6 +270,14 @@ export async function runSetup(input, { panelDir, hiveServerDir, panelPort }) {
     dataFolder,
     mcpUrl: `${publicBaseUrl.replace(/\/+$/, "")}/mcp`,
     oauthConfigured,
+    licenseActivated: Boolean(licenseKey),
+    license: licenseActivation ? {
+      keyHint: licenseActivation.keyHint || null,
+      installationId: licenseActivation.installationId || null,
+      label: licenseActivation.label || null,
+      expiresAt: licenseActivation.expiresAt || null,
+      components: licenseActivation.components || {},
+    } : null,
   };
 }
 

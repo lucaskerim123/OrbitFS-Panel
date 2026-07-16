@@ -47,6 +47,18 @@
       <input id="setup-public-url" type="text" placeholder="https://your-domain.example.com" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
       <p class="field-hint">The address Claude/ChatGPT will connect to. Leave blank to keep whatever's already configured, or set it later.</p>
 
+      <label class="field-label" for="setup-license-key">OrbitFS licence key</label>
+      <input id="setup-license-key" type="text" placeholder="OFS-XXXX-XXXX-XXXX-XXXX" pattern="OFS-[A-Za-z0-9]{4}(-[A-Za-z0-9]{4}){3}" maxlength="24" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" />
+      <p class="field-hint">The key is validated and Panel plus MCP are bound to this installation during setup.</p>
+
+      <button type="button" id="setup-license-server-toggle" class="link-btn setup-advanced-toggle">? Advanced: licence server</button>
+      <div id="setup-license-server-fields" class="hidden">
+        <label class="field-label" for="setup-license-api-url">Licence API URL</label>
+        <input id="setup-license-api-url" type="url" value="https://orbitfs-licence-admin-function.azurewebsites.net" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <p class="field-hint">Only change this when using a different OrbitFS licence server.</p>
+      </div>
+
+
       <button type="button" id="setup-oauth-toggle" class="link-btn setup-advanced-toggle">> Advanced: OAuth login for Claude/ChatGPT (optional)</button>
       <div id="setup-oauth-fields" class="hidden">
         <p class="field-hint">Only needed if you want Claude/ChatGPT to connect with a one-click login instead of pasting an API key. Requires a Cloudflare Access application already set up. Leave all blank to skip - the API key still works either way.</p>
@@ -91,6 +103,15 @@
       <label class="field-label" id="setup-done-key-label">API key (bearer token)</label>
       <input id="setup-done-key" type="text" readonly />
       <p id="setup-done-oauth-note" class="field-hint hidden">OAuth is also configured - Claude/ChatGPT can connect with a one-click login instead of pasting the key above.</p>
+      <div id="setup-done-license" class="setup-license-summary hidden">
+        <strong>Licence activated</strong>
+        <dl>
+          <div><dt>Key</dt><dd id="setup-done-license-key">-</dd></div>
+          <div><dt>Installation</dt><dd id="setup-done-installation">-</dd></div>
+          <div><dt>Expiry</dt><dd id="setup-done-expiry">-</dd></div>
+          <div><dt>Components</dt><dd id="setup-done-components">-</dd></div>
+        </dl>
+      </div>
       <button type="button" id="setup-done-continue" class="primary">Continue to login</button>
     </div>
   </div>
@@ -470,6 +491,27 @@
       <div class="sys-zone sys-zone-controls">
         <div class="sys-zone-label"><span class="sys-zone-dot"></span>Controls</div>
 
+        <details class="card" open id="system-license-card">
+          <summary>OrbitFS licence</summary>
+          <div class="license-status-head">
+            <div><strong id="system-license-label">Checking licence...</strong><p id="system-license-message" class="muted-text"></p></div>
+            <span id="system-license-pill" class="pill unknown">checking</span>
+          </div>
+          <div class="license-detail-grid">
+            <div><span>Key</span><strong id="system-license-key">-</strong></div>
+            <div><span>Installation</span><strong id="system-license-installation">-</strong></div>
+            <div><span>Expiry</span><strong id="system-license-expiry">-</strong></div>
+            <div><span>Last validation</span><strong id="system-license-checked">-</strong></div>
+          </div>
+          <div id="system-license-components" class="license-component-grid"></div>
+          <div class="license-actions">
+            <button id="system-license-refresh" type="button">Refresh status</button>
+            <input id="system-license-replace-key" type="text" maxlength="24" placeholder="OFS-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+            <button id="system-license-activate" type="button" class="primary">Activate replacement key</button>
+          </div>
+          <p id="system-license-action-message" class="muted-text"></p>
+        </details>
+
         <details class="card" open>
           <summary>Startup Load Control</summary>
           <p class="muted-text">No default project. Configure the real OrbitFS files loaded by each project preset. One OrbitFS-relative file path per line. Archive remains excluded.</p>
@@ -618,6 +660,21 @@
         </details>
       </div>
     </section>
+  </div>
+
+  <div id="license-blocked-overlay" class="license-blocked-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="license-blocked-title">
+    <div class="license-blocked-box">
+      <span class="brand-mark">&#129504;</span>
+      <h2 id="license-blocked-title">OrbitFS licence required</h2>
+      <p id="license-blocked-message">This installation cannot access OrbitFS because its licence is blocked, expired, deleted, or invalid.</p>
+      <p id="license-blocked-detail" class="muted-text"></p>
+      <div id="license-blocked-admin-actions" class="license-blocked-actions hidden">
+        <input id="license-blocked-key" type="text" maxlength="24" placeholder="OFS-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+        <button id="license-blocked-activate" type="button" class="primary">Activate licence</button>
+      </div>
+      <button id="license-blocked-logout" type="button">Log out</button>
+      <p id="license-blocked-error" class="error"></p>
+    </div>
   </div>
 
   <div id="move-picker-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="move-picker-title">

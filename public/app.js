@@ -110,9 +110,60 @@ function api(path, opts = {}) {
       throw new Error("Unauthorized");
     }
     const body = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(body.error || `Request failed: ${resp.status}`);
+    if (!resp.ok) {
+      const error = new Error(body.error || `Request failed: ${resp.status}`);
+      error.code = body.code || "REQUEST_FAILED";
+      error.status = resp.status;
+      error.license = body.license || null;
+      if (resp.status === 403 && error.code === "LICENSE_REQUIRED"
+          && (!error.license?.component || error.license.component === "orbitfs_panel")) {
+        showPanelLicenseBlocked(error.license || { reason: body.error });
+      }
+      throw error;
+    }
     return body;
   });
+}
+
+const LICENSE_COMPONENT_LABELS = Object.freeze({
+  orbitfs_panel: "Panel",
+  orbitfs_mcp: "MCP",
+  orbitfs_workspaces: "Workspaces",
+  orbitfs_sorter: "Sorter",
+});
+
+function normaliseLicenseKey(value) {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function panelLicensed(summary) {
+  if (summary?.enforcement === false) return true;
+  const panel = summary?.components?.orbitfs_panel;
+  return summary?.valid === true && panel?.state === "locked"
+    && panel?.allowed === true && panel?.lockedToThisInstallation === true;
+}
+
+function showPanelLicenseBlocked(license = {}) {
+  const overlay = document.getElementById("license-blocked-overlay");
+  if (!overlay) return;
+  const reasons = {
+    not_found: "This licence key has been deleted or does not exist.",
+    blocked: "This licence has been blocked by the administrator.",
+    expired: "This licence has expired.",
+    locked_elsewhere: "This licence is locked to another OrbitFS installation.",
+    not_activated: "This installation has not been activated.",
+  };
+  document.getElementById("license-blocked-message").textContent =
+    reasons[license.reason] || "This installation cannot access OrbitFS with its current licence.";
+  document.getElementById("license-blocked-detail").textContent = license.installationId
+    ? `Installation: ${license.installationId}` : "";
+  document.getElementById("license-blocked-admin-actions").classList.toggle("hidden", state.role !== "admin");
+  document.getElementById("license-blocked-error").textContent = "";
+  overlay.classList.remove("hidden");
+}
+
+function hidePanelLicenseBlocked() {
+  document.getElementById("license-blocked-overlay")?.classList.add("hidden");
 }
 
 function setSystemControlMessage(message, tone = "muted") {
@@ -200,6 +251,7 @@ function showApp() {
   refreshStatus();
   loadFiles();
   checkSorterAvailable();
+  loadLicensePanel(false);
 }
 
 document.getElementById("login-form").addEventListener("submit", async (e) => {
@@ -1473,8 +1525,106 @@ document.getElementById("upload-start-btn").addEventListener("click", async () =
   uploadState.running = false; renderUploadQueue(); await loadFiles();
 });
 
+async function loadLicensePanel(refresh = false) {
+  try {
+    const summary = await api(`/api/license/status${refresh ? "?refresh=1" : ""}`);
+    state.license = summary;
+    const licensed = panelLicensed(summary);
+    const enforcementOff = summary.enforcement === false;
+    setPill("system-license-pill", licensed, enforcementOff ? "development" : licensed ? "active" : "blocked");
+    document.getElementById("system-license-label").textContent = summary.label || (enforcementOff ? "Licence enforcement disabled" : "OrbitFS licence");
+    document.getElementById("system-license-message").textContent = summary.offlineGrace
+      ? "Using temporary offline grace. Live validation is currently unavailable."
+      : summary.reason ? `Status: ${summary.reason}` : "Validated against the OrbitFS licence service.";
+    document.getElementById("system-license-key").textContent = summary.keyHint || (enforcementOff ? "Not required" : "Not activated");
+    document.getElementById("system-license-installation").textContent = summary.installationId || "-";
+    document.getElementById("system-license-expiry").textContent = summary.expiresAt
+      ? new Date(summary.expiresAt).toLocaleDateString() : "No expiry";
+    document.getElementById("system-license-checked").textContent = summary.lastCheckedAt
+      ? new Date(summary.lastCheckedAt).toLocaleString() : "Never";
+
+    const components = document.getElementById("system-license-components");
+    components.innerHTML = "";
+    Object.entries(LICENSE_COMPONENT_LABELS).forEach(([name, label]) => {
+      const item = summary.components?.[name] || {};
+      const allowed = enforcementOff || (item.allowed === true && item.state === "locked" && item.lockedToThisInstallation === true);
+      const row = document.createElement("div");
+      row.className = "license-component-row";
+      const detail = item.reason || item.state || (enforcementOff ? "development" : "not included");
+      row.innerHTML = `<span>${label}</span><strong class="${allowed ? "license-ok" : "license-down"}">${allowed ? "Available" : detail}</strong>`;
+      components.appendChild(row);
+    });
+
+    if (licensed) hidePanelLicenseBlocked();
+    else if (!enforcementOff) showPanelLicenseBlocked({
+      reason: summary.reason || summary.components?.orbitfs_panel?.reason,
+      installationId: summary.installationId,
+    });
+    if (typeof refreshAddonManager === "function") {
+      refreshAddonManager(true).catch(() => {});
+    }
+    return summary;
+  } catch (error) {
+    const message = document.getElementById("system-license-message");
+    if (message) message.textContent = error.message;
+    return null;
+  }
+}
+
+async function activatePanelLicense(inputId, messageId) {
+  const input = document.getElementById(inputId);
+  const message = document.getElementById(messageId);
+  const licenseKey = normaliseLicenseKey(input?.value);
+  if (!/^OFS-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}$/.test(licenseKey)) {
+    if (message) message.textContent = "Use OFS-XXXX-XXXX-XXXX-XXXX format.";
+    input?.focus();
+    return;
+  }
+  if (message) message.textContent = "Validating and binding licence...";
+  try {
+    await api("/api/license/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        licenseKey,
+        components: ["orbitfs_panel", "orbitfs_mcp"],
+      }),
+    });
+    if (input) input.value = "";
+    if (message) message.textContent = "Licence activated.";
+    hidePanelLicenseBlocked();
+    await loadLicensePanel(true);
+    loadFiles();
+    refreshStatus();
+  } catch (error) {
+    if (message) message.textContent = error.message;
+  }
+}
+
 // --- System tab ------------------------------------------------------------
 document.getElementById("system-refresh-btn").addEventListener("click", loadSystem);
+document.getElementById("system-license-refresh")?.addEventListener("click", () => loadLicensePanel(true));
+document.getElementById("system-license-activate")?.addEventListener("click", () =>
+  activatePanelLicense("system-license-replace-key", "system-license-action-message"));
+document.getElementById("license-blocked-activate")?.addEventListener("click", () =>
+  activatePanelLicense("license-blocked-key", "license-blocked-error"));
+document.getElementById("license-blocked-logout")?.addEventListener("click", logout);
+for (const id of ["system-license-replace-key", "license-blocked-key"]) {
+  document.getElementById(id)?.addEventListener("input", (event) => {
+    event.target.value = normaliseLicenseKey(event.target.value);
+  });
+}
+document.getElementById("system-license-refresh")?.addEventListener("click", () => loadLicensePanel(true));
+document.getElementById("system-license-activate")?.addEventListener("click", () =>
+  activatePanelLicense("system-license-replace-key", "system-license-action-message"));
+document.getElementById("license-blocked-activate")?.addEventListener("click", () =>
+  activatePanelLicense("license-blocked-key", "license-blocked-error"));
+document.getElementById("license-blocked-logout")?.addEventListener("click", logout);
+for (const id of ["system-license-replace-key", "license-blocked-key"]) {
+  document.getElementById(id)?.addEventListener("input", (event) => {
+    event.target.value = normaliseLicenseKey(event.target.value);
+  });
+}
 
 document.querySelectorAll(".control-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
@@ -1683,6 +1833,7 @@ async function loadStartupConfig() {
 }
 
 async function loadSystem() {
+  loadLicensePanel(false);
   loadStartupConfig();
   let hiveRunning = false;
   try {
@@ -1942,6 +2093,18 @@ document.getElementById("setup-pin-toggle").addEventListener("click", () => {
   btn.setAttribute("aria-label", showing ? "Show PIN" : "Hide PIN");
 });
 
+document.getElementById("setup-license-server-toggle").addEventListener("click", () => {
+  const fields = document.getElementById("setup-license-server-fields");
+  const btn = document.getElementById("setup-license-server-toggle");
+  const opening = fields.classList.contains("hidden");
+  fields.classList.toggle("hidden", !opening);
+  btn.textContent = opening ? "? Advanced: licence server" : "? Advanced: licence server";
+});
+
+document.getElementById("setup-license-key").addEventListener("input", (event) => {
+  event.target.value = event.target.value.toUpperCase().replace(/\s+/g, "");
+});
+
 document.getElementById("setup-oauth-toggle").addEventListener("click", () => {
   const fields = document.getElementById("setup-oauth-fields");
   const btn = document.getElementById("setup-oauth-toggle");
@@ -1954,6 +2117,35 @@ document.getElementById("setup-oauth-toggle").addEventListener("click", () => {
 
 let setupLoginCreds = null;
 
+function setupLicenseError(body = {}) {
+  const messages = {
+    INVALID_LICENSE_KEY_FORMAT: "Use a key formatted as OFS-XXXX-XXXX-XXXX-XXXX.",
+    LICENSE_KEY_REQUIRED: "Enter an OrbitFS licence key.",
+    LICENSE_NOT_FOUND: "That licence key is invalid or has been deleted.",
+    LICENSE_BLOCKED: "This licence has been blocked by the administrator.",
+    LICENSE_EXPIRED: "This licence has expired.",
+    locked_elsewhere: "This licence is already locked to another installation.",
+    LICENSE_COMPONENT_DENIED: "This licence does not include Panel and MCP.",
+  };
+  return messages[body.code] || body.error || "Setup failed";
+}
+
+function renderSetupLicenseSummary(license) {
+  const wrap = document.getElementById("setup-done-license");
+  wrap.classList.toggle("hidden", !license);
+  if (!license) return;
+  const names = { orbitfs_panel: "Panel", orbitfs_mcp: "MCP", orbitfs_workspaces: "Workspaces", orbitfs_sorter: "Sorter" };
+  const enabled = Object.entries(license.components || {})
+    .filter(([, item]) => item?.allowed === true)
+    .map(([name]) => names[name] || name);
+  document.getElementById("setup-done-license-key").textContent = license.keyHint || "Activated";
+  document.getElementById("setup-done-installation").textContent = license.installationId || "-";
+  document.getElementById("setup-done-expiry").textContent = license.expiresAt
+    ? new Date(license.expiresAt).toLocaleDateString()
+    : "No expiry";
+  document.getElementById("setup-done-components").textContent = enabled.join(", ") || "Panel, MCP";
+}
+
 document.getElementById("setup-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const errorEl = document.getElementById("setup-error");
@@ -1964,6 +2156,8 @@ document.getElementById("setup-form").addEventListener("submit", async (e) => {
   const dataFolder = document.getElementById("setup-data-folder").value.trim();
   const hivePort = document.getElementById("setup-hive-port").value.trim() || "3939";
   const publicBaseUrl = document.getElementById("setup-public-url").value.trim();
+  const licenseApiUrl = document.getElementById("setup-license-api-url").value.trim();
+  const licenseKey = document.getElementById("setup-license-key").value.trim().toUpperCase();
   const cfClientId = document.getElementById("setup-cf-client-id").value.trim();
   const cfClientSecret = document.getElementById("setup-cf-client-secret").value.trim();
   const cfAuthorizeUrl = document.getElementById("setup-cf-authorize-url").value.trim();
@@ -1971,25 +2165,34 @@ document.getElementById("setup-form").addEventListener("submit", async (e) => {
   const adminUsername = document.getElementById("setup-admin-username").value.trim();
   const adminPin = document.getElementById("setup-admin-pin").value.trim();
 
+  if (licenseKey && !/^OFS-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}$/.test(licenseKey)) {
+    errorEl.textContent = "Use a key formatted as OFS-XXXX-XXXX-XXXX-XXXX.";
+    document.getElementById("setup-license-key").focus();
+    return;
+  }
+
   submitBtn.disabled = true;
-  statusEl.textContent = "Setting up...";
+  submitBtn.textContent = licenseKey ? "Activating licence..." : "Setting up...";
+  statusEl.textContent = licenseKey ? "Validating and binding licence..." : "Setting up...";
   try {
     const resp = await fetch("/api/setup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        dataFolder, hivePort, publicBaseUrl,
+        dataFolder, hivePort, publicBaseUrl, licenseApiUrl, licenseKey,
         cfClientId, cfClientSecret, cfAuthorizeUrl, cfTokenUrl,
         adminUsername, adminPin,
       }),
     });
     const body = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(body.error || "Setup failed");
+    if (!resp.ok) throw new Error(setupLicenseError(body));
 
     setupLoginCreds = { username: adminUsername, pin: adminPin };
     document.getElementById("setup-done-url").value = body.mcpUrl || "";
     document.getElementById("setup-done-key").value = body.hiveApiKey || "";
     document.getElementById("setup-done-oauth-note").classList.toggle("hidden", !body.oauthConfigured);
+    renderSetupLicenseSummary(body.license || null);
+    renderSetupLicenseSummary(body.license || null);
     document.getElementById("setup-form").classList.add("hidden");
     document.getElementById("setup-done").classList.remove("hidden");
   } catch (err) {
@@ -1997,6 +2200,7 @@ document.getElementById("setup-form").addEventListener("submit", async (e) => {
     errorEl.textContent = err.message;
   } finally {
     submitBtn.disabled = false;
+    submitBtn.textContent = "Finish setup";
   }
 });
 

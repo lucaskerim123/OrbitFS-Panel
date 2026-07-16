@@ -138,6 +138,20 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+#setup-license-server-fields { display: flex; flex-direction: column; gap: 0.6rem; }
+.setup-license-summary {
+  border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--border));
+  background: color-mix(in srgb, var(--ok) 7%, var(--panel));
+  border-radius: 9px;
+  padding: 0.75rem;
+  margin: 0.25rem 0;
+}
+.setup-license-summary > strong { color: var(--ok); font-size: 0.88rem; }
+.setup-license-summary dl { margin: 0.6rem 0 0; display: grid; gap: 0.4rem; }
+.setup-license-summary dl div { display: grid; grid-template-columns: 85px 1fr; gap: 0.5rem; }
+.setup-license-summary dt { color: var(--muted); font-size: 0.74rem; }
+.setup-license-summary dd { margin: 0; font-size: 0.78rem; overflow-wrap: anywhere; }
+
 /* --- Buttons --- */
 button {
   cursor: pointer;
@@ -1318,3 +1332,26 @@ table.data-table tr:hover td { background: var(--bg); }
   select,input,textarea,button{max-width:100%}
   .sys-panel{border-radius:0}
 }
+
+
+/* --- Licence controls and blocked state -------------------------------- */
+.license-status-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.license-status-head p { margin: 0.2rem 0 0; }
+.license-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.55rem; margin: 0.75rem 0; }
+.license-detail-grid > div { padding: 0.55rem 0.65rem; border: 1px solid var(--sys-line); border-radius: 8px; background: var(--sys-void); min-width: 0; }
+.license-detail-grid span { display: block; color: var(--sys-dim); font-size: 0.68rem; margin-bottom: 0.2rem; }
+.license-detail-grid strong { display: block; font-family: var(--sys-mono); font-size: 0.76rem; overflow-wrap: anywhere; }
+.license-component-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 0.45rem; }
+.license-component-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border: 1px solid var(--sys-line); border-radius: 8px; padding: 0.5rem 0.6rem; font-size: 0.78rem; }
+.license-component-row strong { font-family: var(--sys-mono); font-size: 0.68rem; text-align: right; overflow-wrap: anywhere; }
+.license-ok { color: var(--ok); }
+.license-down { color: var(--danger); }
+.license-actions { display: grid; grid-template-columns: auto minmax(180px, 1fr) auto; gap: 0.5rem; margin-top: 0.75rem; }
+.license-actions input { min-width: 0; background: var(--sys-void); color: var(--sys-text); border-color: var(--sys-line); font-family: var(--sys-mono); }
+.license-blocked-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem; background: rgba(5, 6, 8, 0.96); }
+.license-blocked-box { width: min(430px, 100%); border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--border)); border-radius: 14px; padding: 1.3rem; background: var(--panel); text-align: center; box-shadow: 0 18px 60px rgba(0,0,0,0.5); }
+.license-blocked-box h2 { margin: 0.55rem 0; }
+.license-blocked-box p { line-height: 1.45; }
+.license-blocked-actions { display: grid; gap: 0.55rem; margin: 1rem 0 0.65rem; }
+.license-blocked-actions input { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+@media (max-width: 600px) { .license-actions { grid-template-columns: 1fr; } .license-detail-grid { grid-template-columns: 1fr 1fr; } }

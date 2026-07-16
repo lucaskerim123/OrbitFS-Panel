@@ -3,9 +3,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import { COMPONENTS, assertComponentLicensed, getComponentStatus, startLicenseHeartbeat } from '../../license.js';
 import { startSorter,confirmSorter,buildFolderIndex,getSorterSettings,updateSorterSettings,getSorterPolicy,updateSorterPolicy,resetSorterLearning } from './sorter-core.js';
 
 const APP_DIR=path.dirname(fileURLToPath(import.meta.url));
+startLicenseHeartbeat();
 dotenv.config({path:path.join(APP_DIR,'.env')});
 const config=JSON.parse(await fs.readFile(path.join(APP_DIR,'config.json'),'utf8'));
 const PORT=Number(process.env.SORTER_PORT||process.env.PORT||config.port||4055);
@@ -30,7 +32,8 @@ function send(res,code,data){ res.writeHead(code,{'Content-Type':'application/js
 async function body(req){ const chunks=[]; for await(const c of req) chunks.push(c); const raw=Buffer.concat(chunks).toString('utf8'); return raw?JSON.parse(raw):{}; }
 async function api(req,res){
   const url=new URL(req.url,'http://localhost');
-  if(req.method==='GET'&&url.pathname==='/api/status') return send(res,200,{ok:true});
+  if(req.method==='GET'&&url.pathname==='/api/status'){ const license=await getComponentStatus(COMPONENTS.SORTER); return send(res,200,{ok:true,license}); }
+  await assertComponentLicensed(COMPONENTS.SORTER);
   const ctx=context(req); const state=states.get(ctx.workspaceId)||{status:'idle',safeMode:true,items:[],lastRun:null};
   if(req.method==='GET'&&url.pathname==='/api/session') return send(res,200,state);
   if(req.method==='GET'&&url.pathname==='/api/folders'){ const index=await buildFolderIndex(ctx); return send(res,200,{folders:index.folders}); }

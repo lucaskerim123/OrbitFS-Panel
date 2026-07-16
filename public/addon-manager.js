@@ -8,6 +8,18 @@
 
   function byId(id) { return document.getElementById(id); }
   function addon(id) { return state.addons?.[id] || null; }
+  function componentLicensed(name) {
+    if (state.license?.enforcement === false) return true;
+    const item = state.license?.components?.[name];
+    return state.license?.valid === true && item?.state === "locked"
+      && item?.allowed === true && item?.lockedToThisInstallation === true;
+  }
+  function componentLicensed(name) {
+    if (state.license?.enforcement === false) return true;
+    const item = state.license?.components?.[name];
+    return state.license?.valid === true && item?.state === "locked"
+      && item?.allowed === true && item?.lockedToThisInstallation === true;
+  }
   function esc(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({
       "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;",
@@ -48,10 +60,12 @@
   }
 
   function applyWorkspaceAvailability(info) {
-    const enabled = info?.attached === true;
+    const licensed = componentLicensed("orbitfs_workspaces");
+    const enabled = info?.attached === true && licensed;
     const button = byId("tab-btn-workspaces");
     const panel = byId("tab-workspaces");
     button?.classList.toggle("hidden", !enabled);
+    if (button) button.title = licensed ? "" : "Workspaces licence is blocked or not activated";
     panel?.classList.toggle("addon-unavailable", !enabled);
     panel?.classList.toggle("hidden", !enabled);
     if (!enabled) {
@@ -69,7 +83,11 @@
   }
 
   function applySorterAvailability(info) {
-    const enabled = info?.attached === true;
+    const licensed = componentLicensed("orbitfs_sorter");
+    const enabled = info?.attached === true && licensed;
+    const sorterButton = document.querySelector('.tab-btn[data-tab="sorter"]');
+    sorterButton?.classList.toggle("hidden", !enabled);
+    if (sorterButton) sorterButton.title = licensed ? "" : "Sorter licence is blocked or not activated";
     if (!enabled && byId("tab-sorter")?.classList.contains("active")) switchTab("files");
     if (typeof refreshSorterHeader === "function") refreshSorterHeader();
   }
