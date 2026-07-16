@@ -147,6 +147,7 @@
         <button type="button" class="notification-dismiss" aria-label="Dismiss">x</button>
         <div class="notification-item-head"><strong>${esc(item.title)}</strong><time datetime="${esc(item.created_at)}">${esc(relativeTime(item.created_at))}</time></div>
         <p>${esc(item.message)}</p>
+        ${connectLinkHtml(item)}
         <div class="notification-item-meta"><span>${esc(CATEGORY_LABELS[item.category] || item.category)}</span>${item.workspace_name ? `<span>${esc(item.workspace_name)}</span>` : ""}<span>From ${esc(notificationSource(item))}</span></div>
         <div class="notification-item-actions">${item.workspace_id ? `<button type="button" class="notification-open-workspace">Open workspace</button>` : ""}${!item.read_at ? `<button type="button" class="notification-mark-read">Mark read</button>` : ""}</div>
       </article>`).join("");
@@ -154,10 +155,25 @@
     renderCriticalBanner(notifications);
   }
 
+  function connectLinkHtml(item) {
+    const url = item?.metadata?.connectUrl;
+    if (!url) return "";
+    return `<div class="notification-connect-link"><code>${esc(url)}</code><button type="button" class="notification-copy-link" data-url="${esc(url)}">Copy link</button></div>`;
+  }
+
   function wireNotificationCard(card) {
     const id = card.dataset.notificationId;
     card.querySelector(".notification-mark-read")?.addEventListener("click", () => markRead(id));
     card.querySelector(".notification-dismiss")?.addEventListener("click", () => dismissNotificationItem(id));
+    card.querySelector(".notification-copy-link")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      try {
+        await navigator.clipboard.writeText(button.dataset.url);
+        const original = button.textContent;
+        button.textContent = "Copied";
+        setTimeout(() => { button.textContent = original; }, 1500);
+      } catch { window.prompt("Copy this link:", button.dataset.url); }
+    });
     card.querySelector(".notification-open-workspace")?.addEventListener("click", async () => {
       const item = notifications.find((entry) => String(entry.id) === String(id));
       if (!item?.workspace_id) return;

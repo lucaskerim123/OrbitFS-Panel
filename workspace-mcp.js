@@ -3,6 +3,8 @@ import { getWorkspaceForUser } from "./workspaces.js";
 import { addMemberEmail, removeMemberEmail } from "./cloudflare-access.js";
 import { createNotification } from "./notifications.js";
 
+const MCP_PUBLIC_URL = process.env.MCP_PUBLIC_URL || "https://hive.incendiarynetworks.cc/mcp";
+
 function assertOwnerOrAdmin(workspace, systemRole) {
   if (systemRole !== "admin" && workspace.permission !== "owner") throw new Error("Workspace owner access required");
 }
@@ -43,7 +45,8 @@ export async function grantWorkspaceMcpAccess(workspaceId, targetUserId, actorId
   await createNotification({
     recipientUserId: targetUserId, workspaceId, actorUserId: actorId,
     category: "membership_changes", eventType: "mcp_access_granted", title: "MCP access granted",
-    message: `You were granted MCP access to ${workspace.name}. Connect Claude or ChatGPT to link it.`, severity: "success",
+    message: `You were granted MCP access to ${workspace.name}. Connect Claude or ChatGPT using this link: ${MCP_PUBLIC_URL}`,
+    severity: "success", metadata: { connectUrl: MCP_PUBLIC_URL },
   });
   return listWorkspaceMcpGrants(workspaceId, actorId, systemRole);
 }

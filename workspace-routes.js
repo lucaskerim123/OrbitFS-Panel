@@ -23,7 +23,7 @@ import { cfConfigured } from "./cloudflare-access.js";
 
 const FULL = { read:true,write:true,download:true,move:true,delete:true,create:true };
 const READ = { read:true,write:false,download:true,move:false,delete:false,create:false };
-const MCP_PUBLIC_URL = process.env.MCP_PUBLIC_URL || "https://mcp.incendiarynetworks.cc/mcp";
+const MCP_PUBLIC_URL = process.env.MCP_PUBLIC_URL || "https://hive.incendiarynetworks.cc/mcp";
 const RESTRICTABLE_TABS = new Set(["sorter"]);
 async function workspaceModeEnabled(){
   const row=(await query("SELECT setting_value FROM system_settings WHERE setting_key='workspace_mode_enabled' LIMIT 1")).rows[0];

@@ -22,6 +22,9 @@
 .notification-item-head strong{font-size:.82rem;line-height:1.3}
 .notification-item-head time{font-size:.6rem;color:var(--muted);white-space:nowrap}
 .notification-item p{margin:0;font-size:.73rem;line-height:1.45;color:var(--muted);white-space:pre-wrap}
+.notification-connect-link{display:flex;align-items:center;gap:.4rem;margin:.3rem 0;padding:.32rem .5rem;border:1px solid var(--border);border-radius:6px;background:var(--panel-alt,rgba(127,127,127,.08))}
+.notification-connect-link code{flex:1;font-size:.68rem;overflow-x:auto;white-space:nowrap;color:var(--text)}
+.notification-connect-link button{min-height:26px;padding:.2rem .46rem;font-size:.62rem;white-space:nowrap}
 .notification-item-meta{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;font-size:.61rem;color:var(--muted)}
 .notification-item-meta span{border:1px solid var(--border);border-radius:999px;padding:.12rem .38rem}
 .notification-item-actions{display:flex;gap:.35rem;flex-wrap:wrap}
