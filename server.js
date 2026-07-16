@@ -17,6 +17,7 @@ import { evaluateWorkspaceLifecycle, getWorkspaceForUser, listUserWorkspaces } f
 import { effectiveWorkspaceAdminPermissions, fullWorkspaceAdminPermissions } from "./workspace-permissions.js";
 import { addonEnabled, addonPath, addonStatus, listAddonStatuses, attachAddon, detachAddon, initialiseAddonState, isPathInParkedAddons } from "./addons.js";
 import { getRestrictedTabs } from "./tab-restrictions.js";
+import { resolveMcpIdentity } from "./workspace-mcp.js";
 import { query } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -207,6 +208,18 @@ app.use("/api", async (req, res, next) => {
   req.role = session.role;
   req.userId = session.userId;
   next();
+});
+
+// Server-to-server only (orbitfs-mcp calls this to resolve a Cloudflare
+// Access email into a role/workspace) - not under /api, not session-gated,
+// gated on its own shared secret instead. MCP_INTERNAL_KEY unset = disabled.
+const MCP_INTERNAL_KEY = process.env.MCP_INTERNAL_KEY || "";
+app.get("/internal/mcp-identity", async (req, res) => {
+  if (!MCP_INTERNAL_KEY || req.get("X-Internal-Key") !== MCP_INTERNAL_KEY) return res.status(401).json({ error: "Unauthorized" });
+  const email = String(req.query.email || "").trim();
+  if (!email) return res.status(400).json({ error: "email is required" });
+  try { res.json(await resolveMcpIdentity(email)); }
+  catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 const DEFAULT_MAINTENANCE_MESSAGE = "OrbitFS is in maintenance mode while Main Workspace files are being changed. Do not edit or upload files. Data changed during maintenance may be lost; OrbitFS is not responsible for changes made while this warning is active.";

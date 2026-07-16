@@ -27,7 +27,7 @@ export async function listUserWorkspaces(userId, systemRole) {
     `SELECT w.id,w.slug,w.name,w.description,w.status,w.storage_quota_mode,w.storage_quota_bytes,
             w.storage_used_bytes,w.filesystem_root,w.is_main,w.owner_id,w.suspension_reason,
             w.storage_last_scanned_at,w.file_count,w.folder_count,w.trash_used_bytes,w.trash_limit_bytes,w.is_visible,
-            w.drive_state,w.last_activity_at,w.offline_at,w.deletion_due_at,w.lifecycle_notice,
+            w.drive_state,w.last_activity_at,w.offline_at,w.deletion_due_at,w.lifecycle_notice,w.mcp_ui_enabled,
             CASE WHEN w.is_main OR w.drive_state='offline' THEN 0 ELSE COALESCE(w.storage_quota_bytes,0) END AS allocated_bytes,
             CASE WHEN w.owner_id=$1 THEN 'owner' ELSE wm.permission END AS permission,
             u.username AS owner_username
@@ -378,6 +378,14 @@ export async function transferWorkspaceOwner(workspaceId, username, actorId, sys
   return getWorkspaceForUser(workspaceId,actorId,systemRole);
 }
 
+
+export async function setWorkspaceMcpEnabled(workspaceId, enabled, actorId, systemRole) {
+  if (systemRole !== "admin") throw new Error("Admin access required");
+  const result = await query("SELECT id FROM workspaces WHERE id=$1 LIMIT 1", [workspaceId]);
+  if (!result.rows[0]) throw new Error("Workspace not found");
+  await query("UPDATE workspaces SET mcp_ui_enabled=$2,updated_at=now() WHERE id=$1", [workspaceId, !!enabled]);
+  return getWorkspaceForUser(workspaceId, actorId, systemRole);
+}
 
 export async function setMainWorkspaceVisibility(workspaceId, visible, actorId, systemRole) {
   const result = await query("SELECT id,is_main,owner_id FROM workspaces WHERE id=$1 LIMIT 1",[workspaceId]);

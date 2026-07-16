@@ -212,6 +212,6 @@ startupPickerScript.async = false;
 document.body.appendChild(startupPickerScript);
 
 const layoutTweaksScript = document.createElement("script");
-layoutTweaksScript.src = "layout-tweaks.js?v=20260715-silentreconnect";
+layoutTweaksScript.src = "layout-tweaks.js?v=20260716-mcplink2";
 layoutTweaksScript.async = false;
 document.body.appendChild(layoutTweaksScript);

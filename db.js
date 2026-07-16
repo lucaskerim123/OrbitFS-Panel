@@ -241,6 +241,16 @@ async function ensureWorkspaceSettings(client) {
   )`);
   await client.query(`CREATE INDEX IF NOT EXISTS workspace_storage_requests_status_idx ON workspace_storage_requests(status,created_at DESC)`);
   await client.query(`INSERT INTO system_settings(setting_key,setting_value) VALUES('max_workspaces_per_user','1'::jsonb) ON CONFLICT(setting_key) DO NOTHING`);
+  await client.query(`ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS mcp_ui_enabled boolean NOT NULL DEFAULT false`);
+  await client.query(`CREATE TABLE IF NOT EXISTS workspace_mcp_grants(
+    workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    granted_by uuid REFERENCES users(id) ON DELETE SET NULL,
+    granted_at timestamptz NOT NULL DEFAULT now(),
+    revoked_at timestamptz,
+    PRIMARY KEY(workspace_id,user_id)
+  )`);
+  await client.query(`CREATE INDEX IF NOT EXISTS workspace_mcp_grants_active_idx ON workspace_mcp_grants(user_id) WHERE revoked_at IS NULL`);
 }
 
 export async function ensureDatabase() {

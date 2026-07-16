@@ -30,7 +30,7 @@
   }
   async function loadWorkspaceAddonAssets() {
     await loadScript(
-      "/addon-assets/workspaces/workspace-ui.js?v=20260716-mcplink-storagevisible",
+      "/addon-assets/workspaces/workspace-ui.js?v=20260716-mcplink2",
       "workspaces-ui"
     );
     await loadScript(

@@ -16,11 +16,14 @@ import {
   getWorkspaceCreationSettings, setMaxWorkspacesPerUser, ownedWorkspaceCount,
   refreshWorkspaceUsage, getWorkspaceStorage, assertWorkspaceWrite, assertWorkspaceQuota,
   setWorkspaceDriveState,getWorkspaceLifecycleSettings,setWorkspaceLifecycleSettings,
-  evaluateWorkspaceLifecycle,touchWorkspaceActivity,
+  evaluateWorkspaceLifecycle,touchWorkspaceActivity,setWorkspaceMcpEnabled,
 } from "./workspaces.js";
+import { listWorkspaceMcpGrants, grantWorkspaceMcpAccess, revokeWorkspaceMcpAccess, revokeAllWorkspaceMcpGrants } from "./workspace-mcp.js";
+import { cfConfigured } from "./cloudflare-access.js";
 
 const FULL = { read:true,write:true,download:true,move:true,delete:true,create:true };
 const READ = { read:true,write:false,download:true,move:false,delete:false,create:false };
+const MCP_PUBLIC_URL = process.env.MCP_PUBLIC_URL || "https://mcp.incendiarynetworks.cc/mcp";
 const RESTRICTABLE_TABS = new Set(["sorter"]);
 async function workspaceModeEnabled(){
   const row=(await query("SELECT setting_value FROM system_settings WHERE setting_key='workspace_mode_enabled' LIMIT 1")).rows[0];
@@ -481,6 +484,41 @@ export function workspaceRouter() {
   router.delete("/workspaces/:id/members/:userId", async (req,res) => {
     try { const workspace=await getWorkspaceForUser(req.params.id,req.userId,req.role); const access=await assertWorkspaceAdminAction(req,workspace,"manage_members"); res.json({ members:await removeWorkspaceMember(req.params.id,req.params.userId,req.userId,req.role,access.manage_members) }); }
     catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.patch("/workspaces/:id/mcp-enabled", express.json(), async (req,res) => {
+    try {
+      if (req.role !== "admin") throw new Error("Admin access required");
+      const workspace = await setWorkspaceMcpEnabled(req.params.id, !!req.body?.enabled, req.userId, req.role);
+      const cascade = workspace.mcp_ui_enabled ? null : await revokeAllWorkspaceMcpGrants(req.params.id);
+      res.json({ workspace, cascade });
+    } catch (error) { res.status(400).json({ error: error.message }); }
+  });
+  router.get("/workspaces/:id/mcp-grants", async (req,res) => {
+    try {
+      const workspace = await getWorkspaceForUser(req.params.id, req.userId, req.role);
+      if (!workspace) throw new Error("Workspace not found or access denied");
+      if (req.role !== "admin" && workspace.permission !== "owner") throw new Error("Workspace owner access required");
+      res.json({ grants: await listWorkspaceMcpGrants(req.params.id, req.userId, req.role), mcpEnabled: !!workspace.mcp_ui_enabled, cfConfigured: cfConfigured() });
+    } catch (error) { res.status(400).json({ error: error.message }); }
+  });
+  router.put("/workspaces/:id/mcp-grants/:userId", async (req,res) => {
+    try { res.json({ grants: await grantWorkspaceMcpAccess(req.params.id, req.params.userId, req.userId, req.role) }); }
+    catch (error) { res.status(400).json({ error: error.message }); }
+  });
+  router.delete("/workspaces/:id/mcp-grants/:userId", async (req,res) => {
+    try { res.json({ grants: await revokeWorkspaceMcpAccess(req.params.id, req.params.userId, req.userId, req.role) }); }
+    catch (error) { res.status(400).json({ error: error.message }); }
+  });
+  router.get("/workspaces/:id/mcp-grants/me", async (req,res) => {
+    try {
+      const workspace = await getWorkspaceForUser(req.params.id, req.userId, req.role);
+      if (!workspace) throw new Error("Workspace not found or access denied");
+      const grant = (await query(
+        `SELECT granted_at FROM workspace_mcp_grants WHERE workspace_id=$1 AND user_id=$2 AND revoked_at IS NULL`,
+        [req.params.id, req.userId]
+      )).rows[0];
+      res.json({ mcpEnabled: !!workspace.mcp_ui_enabled, granted: !!grant, grantedAt: grant?.granted_at || null, connectUrl: MCP_PUBLIC_URL });
+    } catch (error) { res.status(400).json({ error: error.message }); }
   });
   router.post("/bulk-download/validate",express.json(),branched,async(req,res)=>{
     if(!req.workspace)return;

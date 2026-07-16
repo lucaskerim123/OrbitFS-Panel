@@ -30,7 +30,7 @@
 
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260716-mcplink-storagevisible";
+  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260716-mcplink2";
   document.head.appendChild(css);
 })();
 function workspaceFormatBytes(value) {
@@ -473,6 +473,7 @@ function buildWorkspaceAdminCard(workspace) {
         ${workspace.is_main && (isAdmin || isOwner) ? `<button type="button" class="workspace-visibility-btn">${mainOffline ? "Bring online" : "Hide drive"}</button>` : ""}
         ${!workspace.is_main && canEditSettings ? `<button type="button" class="workspace-drive-state-btn">${branchOffline ? "Bring online" : "Take offline"}</button>` : ""}
         ${!workspace.is_main && canViewSettings ? '<button type="button" class="workspace-edit-btn">Settings</button>' : ""}
+        ${!workspace.is_main && isAdmin ? `<button type="button" class="workspace-mcp-enable-btn">${workspace.mcp_ui_enabled ? "Disable MCP" : "Enable MCP"}</button>` : ""}
         ${canViewSettings ? '<button type="button" class="workspace-mcp-link-btn">MCP Link</button>' : ""}
         ${canLeave ? '<button type="button" class="danger workspace-leave-btn">Leave workspace</button>' : ""}
       </div>
@@ -501,6 +502,15 @@ function buildWorkspaceAdminCard(workspace) {
     catch(error){ alert(error.message); }
   });
   card.querySelector(".workspace-edit-btn")?.addEventListener("click", () => { setExpanded(true); toggleWorkspaceDetail(card,"settings",() => showWorkspaceSettings(workspace, card)); });
+  card.querySelector(".workspace-mcp-enable-btn")?.addEventListener("click", async () => {
+    const nextEnabled = !workspace.mcp_ui_enabled;
+    if (!nextEnabled && !confirm("Disable MCP for this workspace? This revokes every member's MCP access immediately.")) return;
+    try {
+      const result = await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/mcp-enabled`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ enabled: nextEnabled }) });
+      if (result.cascade?.failed?.length) alert(`MCP disabled, but Cloudflare access couldn't be revoked for: ${result.cascade.failed.join(", ")}. Remove them manually in the Cloudflare dashboard.`);
+      await loadOrbitWorkspaces(workspace.id);
+    } catch (error) { alert(error.message); }
+  });
   card.querySelector(".workspace-mcp-link-btn")?.addEventListener("click", () => { setExpanded(true); toggleWorkspaceDetail(card,"mcplink",() => showWorkspaceMcpLink(workspace, card)); });
   card.querySelector(".workspace-leave-btn")?.addEventListener("click", async () => {
     if (!confirm(`Leave workspace "${workspace.name}"? You will lose access until invited again.`)) return;
@@ -595,6 +605,12 @@ async function showWorkspaceMembers(workspace, card) {
   try {
     const { members } = await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/members`);
     const canManage = state.role === "admin" || workspace.permission === "owner" || !!workspace.management_permissions?.manage_members;
+    const canGrantMcp = workspace.mcp_ui_enabled && (state.role === "admin" || workspace.permission === "owner");
+    let mcpGrantedUserIds = new Set();
+    if (canGrantMcp) {
+      try { mcpGrantedUserIds = new Set((await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/mcp-grants`)).grants.map((g) => String(g.user_id))); }
+      catch { /* non-fatal - MCP column just won't render */ }
+    }
     detail.innerHTML = `
       <div class="workspace-member-list"></div>
       ${canManage ? `<form class="workspace-member-form">
@@ -603,32 +619,44 @@ async function showWorkspaceMembers(workspace, card) {
         <button type="submit" class="primary">Send invite</button>
       </form>` : ""}
       <p class="error workspace-detail-error"></p>`;
-    renderWorkspaceMembers(detail.querySelector(".workspace-member-list"), members, workspace, card, canManage);
+    renderWorkspaceMembers(detail.querySelector(".workspace-member-list"), members, workspace, card, canManage, canGrantMcp, mcpGrantedUserIds);
     detail.querySelector(".workspace-member-form")?.addEventListener("submit", (event) => inviteWorkspaceMember(event, workspace, card));
   } catch (error) {
     detail.textContent = error.message;
   }
 }
 
-function renderWorkspaceMembers(container, members, workspace, card, canManage) {
+function renderWorkspaceMembers(container, members, workspace, card, canManage, canGrantMcp, mcpGrantedUserIds) {
   container.innerHTML = "";
   for (const member of members) {
     const row = document.createElement("div");
     row.className = "workspace-member-row";
     const canEditRole = canManage && member.permission !== "owner";
+    const showMcpToggle = canGrantMcp && member.permission !== "owner";
+    const mcpGranted = mcpGrantedUserIds?.has(String(member.user_id));
     row.innerHTML = `
       <span class="workspace-member-identity"><strong>${escapeWorkspaceHtml(member.username)}</strong><small>${escapeWorkspaceHtml(member.permission)}</small></span>
-      ${canEditRole ? `<div class="workspace-member-controls">
+      <div class="workspace-member-controls">
+        ${showMcpToggle ? `<span class="workspace-state-badge" data-state="${mcpGranted ? "active" : "offline"}">${mcpGranted ? "MCP on" : "MCP off"}</span><button type="button" class="${mcpGranted ? "danger" : "primary"} workspace-member-mcp-toggle">${mcpGranted ? "Revoke MCP" : "Grant MCP"}</button>` : ""}
+        ${canEditRole ? `
         <select class="workspace-member-role" aria-label="Role for ${escapeWorkspaceHtml(member.username)}">
           <option value="viewer">Viewer</option>
           <option value="contributor">Contributor</option>
           <option value="editor">Editor</option>
         </select>
         <button type="button" class="primary workspace-member-save">Save role</button>
-        <button type="button" class="danger workspace-member-remove">Remove</button>
-      </div>` : ""}`;
+        <button type="button" class="danger workspace-member-remove">Remove</button>` : ""}
+      </div>`;
     const roleSelect = row.querySelector(".workspace-member-role");
     if (roleSelect) roleSelect.value = member.permission;
+    row.querySelector(".workspace-member-mcp-toggle")?.addEventListener("click", async () => {
+      const button = row.querySelector(".workspace-member-mcp-toggle");
+      button.disabled = true;
+      try {
+        await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/mcp-grants/${encodeURIComponent(member.user_id)}`, { method: mcpGranted ? "DELETE" : "PUT" });
+        await showWorkspaceMembers(workspace, card);
+      } catch (error) { alert(error.message); button.disabled = false; }
+    });
     row.querySelector(".workspace-member-save")?.addEventListener("click", async () => {
       const button = row.querySelector(".workspace-member-save");
       button.disabled = true;
@@ -711,79 +739,44 @@ async function saveWorkspaceMember(event, workspace, card) {
   } catch (err) { error.textContent = err.message; }
 }
 
-const MCP_CLIENT_TYPES = [
-  { id: "claude", label: "Claude", hint: "Anthropic MCP connector" },
-  { id: "chatgpt", label: "ChatGPT / Codex", hint: "OpenAI Apps SDK connector" },
-];
-
-function mcpLinkStorageKey(workspaceId) { return `orbitfsMcpLinkPreview:${workspaceId}`; }
-
-function loadMcpLinkState(workspaceId) {
-  try { return JSON.parse(localStorage.getItem(mcpLinkStorageKey(workspaceId)) || "{}"); }
-  catch { return {}; }
-}
-
-function saveMcpLinkState(workspaceId, data) {
-  localStorage.setItem(mcpLinkStorageKey(workspaceId), JSON.stringify(data));
-}
-
-function generateMcpPairingCode() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const part = () => Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
-  return `ORBIT-${part()}-${part()}`;
-}
-
-function showWorkspaceMcpLink(workspace, card) {
+async function showWorkspaceMcpLink(workspace, card) {
   const detail = card.querySelector(".workspace-admin-detail");
   detail.classList.remove("hidden");
-  const linkState = loadMcpLinkState(workspace.id);
-  if (!linkState.pairingCode) { linkState.pairingCode = generateMcpPairingCode(); saveMcpLinkState(workspace.id, linkState); }
-  const rows = MCP_CLIENT_TYPES.map((client) => {
-    const linked = !!linkState[client.id]?.linked;
-    return `
-      <div class="workspace-member-row workspace-mcp-client-row" data-client="${client.id}">
-        <span><strong>${escapeWorkspaceHtml(client.label)}</strong><small>${escapeWorkspaceHtml(client.hint)}</small></span>
-        <div class="workspace-mcp-client-controls">
-          <span class="workspace-state-badge" data-state="${linked ? "active" : "offline"}">${linked ? "Linked" : "Not linked"}</span>
-          <button type="button" class="${linked ? "danger" : "primary"} workspace-mcp-toggle-btn">${linked ? "Unlink" : "Link"}</button>
-        </div>
-      </div>`;
-  }).join("");
-  detail.innerHTML = `
-    <div class="workspace-mcp-link-preview">
-      <p class="muted-text">Preview only &mdash; linking a client here doesn't talk to the MCP server yet. This is a look at how routing an MCP client to a workspace other than Main would work.</p>
-      <div class="workspace-mcp-pairing">
-        <label>Pairing code
-          <div class="workspace-mcp-code-row">
-            <code class="workspace-mcp-code">${linkState.pairingCode}</code>
-            <button type="button" class="workspace-mcp-copy-btn">Copy</button>
-            <button type="button" class="workspace-mcp-regen-btn">New code</button>
-          </div>
-        </label>
-        <small class="muted-text">A client would enter this in its OrbitFS connection settings to link to &ldquo;${escapeWorkspaceHtml(workspace.name)}&rdquo; instead of Main.</small>
-      </div>
-      <div class="workspace-mcp-client-list">${rows}</div>
-    </div>`;
-  detail.querySelector(".workspace-mcp-copy-btn").addEventListener("click", async () => {
-    const btn = detail.querySelector(".workspace-mcp-copy-btn");
-    try { await navigator.clipboard.writeText(linkState.pairingCode); btn.textContent = "Copied"; }
-    catch { btn.textContent = "Copy failed"; }
-    setTimeout(() => { if (btn.isConnected) btn.textContent = "Copy"; }, 1200);
-  });
-  detail.querySelector(".workspace-mcp-regen-btn").addEventListener("click", () => {
-    saveMcpLinkState(workspace.id, { ...loadMcpLinkState(workspace.id), pairingCode: generateMcpPairingCode() });
-    showWorkspaceMcpLink(workspace, card);
-  });
-  detail.querySelectorAll(".workspace-mcp-toggle-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const clientId = btn.closest(".workspace-mcp-client-row").dataset.client;
-      const current = loadMcpLinkState(workspace.id);
-      const wasLinked = !!current[clientId]?.linked;
-      current[clientId] = { linked: !wasLinked, linkedAt: !wasLinked ? new Date().toISOString() : null };
-      saveMcpLinkState(workspace.id, current);
-      showWorkspaceMcpLink(workspace, card);
+  detail.innerHTML = "Loading...";
+  try {
+    const me = await api(`/api/workspaces/${encodeURIComponent(workspace.id)}/mcp-grants/me`);
+    if (!me.mcpEnabled) {
+      detail.innerHTML = `<p class="muted-text">MCP access isn't enabled for this workspace yet. An admin needs to turn it on before anyone can be granted access.</p>`;
+      return;
+    }
+    const canManage = state.role === "admin" || workspace.permission === "owner";
+    const parts = [];
+    if (me.granted) {
+      parts.push(`
+        <div class="workspace-mcp-pairing">
+          <span class="workspace-state-badge" data-state="active">MCP access granted</span>
+          <label>Connection URL
+            <div class="workspace-mcp-code-row">
+              <code class="workspace-mcp-code">${escapeWorkspaceHtml(me.connectUrl)}</code>
+              <button type="button" class="workspace-mcp-copy-btn">Copy</button>
+            </div>
+          </label>
+          <small class="muted-text">Add this as a custom connector in Claude or ChatGPT. You'll sign in with the same email this account uses (Cloudflare Access), then land in a scoped OrbitFS UI for &ldquo;${escapeWorkspaceHtml(workspace.name)}&rdquo;.</small>
+        </div>`);
+    } else {
+      parts.push(`<p class="muted-text">You don't have MCP access on this workspace${canManage ? " yet. Grant it to yourself or a member from the Members panel." : ". Ask the workspace owner to grant it to you."}</p>`);
+    }
+    if (canManage) parts.push(`<p class="muted-text">Manage who has MCP access in the <strong>Members</strong> panel above.</p>`);
+    detail.innerHTML = parts.join("");
+    detail.querySelector(".workspace-mcp-copy-btn")?.addEventListener("click", async () => {
+      const btn = detail.querySelector(".workspace-mcp-copy-btn");
+      try { await navigator.clipboard.writeText(me.connectUrl); btn.textContent = "Copied"; }
+      catch { btn.textContent = "Copy failed"; }
+      setTimeout(() => { if (btn.isConnected) btn.textContent = "Copy"; }, 1200);
     });
-  });
+  } catch (error) {
+    detail.innerHTML = `<p class="error">${escapeWorkspaceHtml(error.message)}</p>`;
+  }
 }
 
 async function showWorkspaceSettings(workspace, card) {
