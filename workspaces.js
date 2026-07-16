@@ -164,6 +164,7 @@ export { BRANCHED_ROOT, DEFAULT_QUOTA, DEFAULT_MAX_WORKSPACES_PER_USER };
 
 export async function updateWorkspace(workspaceId, changes, actorId, systemRole, allowEditSettings=false) {
   const workspace = await getWorkspaceForUser(workspaceId, actorId, systemRole);
+  const previousQuotaBytes = workspace ? Number(workspace.storage_quota_bytes || 0) : null;
   if (!workspace) throw new Error("Workspace not found or access denied");
   if (systemRole !== "admin" && workspace.permission !== "owner" && !allowEditSettings) throw new Error("Workspace settings permission required");
   const fields = [];
@@ -201,6 +202,15 @@ export async function updateWorkspace(workspaceId, changes, actorId, systemRole,
   values.push(workspaceId);
   await query(`UPDATE workspaces SET ${fields.join(",")},updated_at=now() WHERE id=$${values.length}`, values);
   const updated=await getWorkspaceForUser(workspaceId, actorId, systemRole);
+  const nextQuotaBytes = Number(updated.storage_quota_bytes || 0);
+  if (!workspace.is_main && systemRole === "admin" && changes.storageQuotaBytes !== undefined && previousQuotaBytes !== nextQuotaBytes) {
+    await notifyWorkspaceOwner(workspaceId, {
+      actorUserId: actorId, category: "storage_requests", eventType: "workspace_storage_changed",
+      title: "Workspace storage changed",
+      message: `${updated.name} storage changed from ${previousQuotaBytes} bytes to ${nextQuotaBytes} bytes.`,
+      severity: "success", metadata: { previousQuotaBytes, storageQuotaBytes: nextQuotaBytes }, force: true,
+    });
+  }
   if(!workspace.is_main && workspace.status!==updated.status){
     if(updated.status==="suspended"){
       await notifyWorkspaceMembers(workspaceId,{

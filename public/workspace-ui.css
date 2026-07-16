@@ -537,3 +537,17 @@ body:not(:has(#tab-files.active)) #workspace-bar{display:none!important}
     scroll-margin-bottom:calc(90vh + env(safe-area-inset-bottom,0px))!important;
   }
 }
+
+.workspace-storage-request-form{
+  display:grid;
+  gap:.5rem;
+  margin-top:.75rem;
+  padding:.7rem;
+  border:1px solid var(--border);
+  border-radius:9px;
+  background:var(--bg);
+}
+.workspace-storage-request-form label{display:grid;gap:.25rem;color:var(--muted);font-size:.72rem;font-weight:700}
+.workspace-storage-request-form textarea{width:100%;resize:vertical;min-height:70px}
+.workspace-storage-request-form small{color:var(--muted);font-size:.68rem;line-height:1.35}
+.workspace-storage-request-row small+small{margin-top:.15rem}

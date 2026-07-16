@@ -160,8 +160,10 @@ async function ensureWorkspaceSettings(client) {
     global_messages boolean NOT NULL DEFAULT true,
     lifecycle_warnings boolean NOT NULL DEFAULT true,
     ownership_changes boolean NOT NULL DEFAULT true,
+    storage_requests boolean NOT NULL DEFAULT true,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`);
+  await client.query(`ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS storage_requests boolean NOT NULL DEFAULT true`);
   await client.query(`CREATE TABLE IF NOT EXISTS notification_messages(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     audience_type text NOT NULL CHECK(audience_type IN ('global','workspace')),
@@ -223,6 +225,21 @@ async function ensureWorkspaceSettings(client) {
     responded_at timestamptz,
     responded_by uuid REFERENCES users(id) ON DELETE SET NULL
   )`);
+  await client.query(`CREATE TABLE IF NOT EXISTS workspace_storage_requests(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    requested_by uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    current_quota_bytes bigint,
+    requested_quota_bytes bigint NOT NULL,
+    request_type text NOT NULL CHECK(request_type IN ('upgrade','downgrade','change')),
+    message text,
+    status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','denied','cancelled')),
+    admin_message text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    responded_at timestamptz,
+    responded_by uuid REFERENCES users(id) ON DELETE SET NULL
+  )`);
+  await client.query(`CREATE INDEX IF NOT EXISTS workspace_storage_requests_status_idx ON workspace_storage_requests(status,created_at DESC)`);
   await client.query(`INSERT INTO system_settings(setting_key,setting_value) VALUES('max_workspaces_per_user','1'::jsonb) ON CONFLICT(setting_key) DO NOTHING`);
 }
 

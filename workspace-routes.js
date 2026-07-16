@@ -7,6 +7,7 @@ import { makeLocalOps } from "./local-orbitfs-ops.js";
 import { beginDownload } from "./download-limits.js";
 import { WORKSPACE_ACTIONS,WORKSPACE_ROLES,WORKSPACE_ADMIN_ACTIONS,effectiveWorkspacePermissions,effectiveWorkspaceAdminPermissions,fullWorkspaceAdminPermissions,workspaceAdminRoleDefaults,normalizeWorkspacePath,roleDefaults } from "./workspace-permissions.js";
 import { requestWorkspaceTransfer,listTransferRequests,respondTransferRequest,cancelTransferRequest,listWorkspaceUserDirectory } from "./workspace-transfers.js";
+import { requestWorkspaceStorageChange,listWorkspaceStorageRequests,respondWorkspaceStorageRequest,cancelWorkspaceStorageRequest } from "./workspace-storage-requests.js";
 import { inviteWorkspaceUser,listPendingInvitations,listWorkspaceInvitations,respondToWorkspaceInvitation,revokeWorkspaceInvitation } from "./workspace-invitations.js";
 import { listNotifications,unreadNotificationCount,markNotificationRead,markAllNotificationsRead,dismissNotification,getNotificationPreferences,updateNotificationPreferences,sendGlobalNotification,sendWorkspaceNotification,listNotificationMessages,notifyWorkspaceOwner } from "./notifications.js";
 import {
@@ -267,6 +268,22 @@ export function workspaceRouter() {
   });
   router.get("/workspace-transfer-requests", async (req,res) => {
     try { res.json({ requests:await listTransferRequests(req.userId,req.role) }); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.get("/workspace-storage-requests", async (req,res) => {
+    try { res.json({ requests:await listWorkspaceStorageRequests(req.userId,req.role) }); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.post("/workspaces/:id/storage-request", express.json(), async (req,res) => {
+    try { res.status(201).json({ request:await requestWorkspaceStorageChange(req.params.id,req.body?.requestedQuotaBytes,req.body?.message,req.userId,req.role) }); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.post("/workspace-storage-requests/:id/respond", express.json(), async (req,res) => {
+    try { res.json(await respondWorkspaceStorageRequest(req.params.id,req.body?.decision,req.body?.message,req.userId,req.role)); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.delete("/workspace-storage-requests/:id", async (req,res) => {
+    try { res.json(await cancelWorkspaceStorageRequest(req.params.id,req.userId,req.role)); }
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.post("/workspaces/:id/transfer-request", express.json(), async (req,res) => {

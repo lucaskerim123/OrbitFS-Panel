@@ -9,6 +9,7 @@ export const NOTIFICATION_CATEGORIES = Object.freeze([
   "global_messages",
   "lifecycle_warnings",
   "ownership_changes",
+  "storage_requests",
 ]);
 
 const CATEGORY_COLUMNS = new Set(NOTIFICATION_CATEGORIES);
@@ -29,7 +30,7 @@ export async function getNotificationPreferences(userId) {
   await ensurePreferences(userId);
   const result = await query(
     `SELECT workspace_invites,membership_changes,role_changes,workspace_status,
-            workspace_messages,global_messages,lifecycle_warnings,ownership_changes
+            workspace_messages,global_messages,lifecycle_warnings,ownership_changes,storage_requests
      FROM notification_preferences WHERE user_id=$1`,
     [userId]
   );
