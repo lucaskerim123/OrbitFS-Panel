@@ -30,7 +30,7 @@
 
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260716-reachfix";
+  css.href = "/addon-assets/workspaces/workspace-ui.css?v=20260716-mcplink-storagevisible";
   document.head.appendChild(css);
 })();
 function workspaceFormatBytes(value) {
@@ -473,6 +473,7 @@ function buildWorkspaceAdminCard(workspace) {
         ${workspace.is_main && (isAdmin || isOwner) ? `<button type="button" class="workspace-visibility-btn">${mainOffline ? "Bring online" : "Hide drive"}</button>` : ""}
         ${!workspace.is_main && canEditSettings ? `<button type="button" class="workspace-drive-state-btn">${branchOffline ? "Bring online" : "Take offline"}</button>` : ""}
         ${!workspace.is_main && canViewSettings ? '<button type="button" class="workspace-edit-btn">Settings</button>' : ""}
+        ${canViewSettings ? '<button type="button" class="workspace-mcp-link-btn">MCP Link</button>' : ""}
         ${canLeave ? '<button type="button" class="danger workspace-leave-btn">Leave workspace</button>' : ""}
       </div>
       <div class="workspace-admin-detail hidden"></div>
@@ -500,6 +501,7 @@ function buildWorkspaceAdminCard(workspace) {
     catch(error){ alert(error.message); }
   });
   card.querySelector(".workspace-edit-btn")?.addEventListener("click", () => { setExpanded(true); toggleWorkspaceDetail(card,"settings",() => showWorkspaceSettings(workspace, card)); });
+  card.querySelector(".workspace-mcp-link-btn")?.addEventListener("click", () => { setExpanded(true); toggleWorkspaceDetail(card,"mcplink",() => showWorkspaceMcpLink(workspace, card)); });
   card.querySelector(".workspace-leave-btn")?.addEventListener("click", async () => {
     if (!confirm(`Leave workspace "${workspace.name}"? You will lose access until invited again.`)) return;
     const wasActive = String(state.workspaceId) === String(workspace.id);
@@ -707,6 +709,81 @@ async function saveWorkspaceMember(event, workspace, card) {
     await showWorkspaceMembers(workspace, card);
     await loadOrbitWorkspaces(workspace.id);
   } catch (err) { error.textContent = err.message; }
+}
+
+const MCP_CLIENT_TYPES = [
+  { id: "claude", label: "Claude", hint: "Anthropic MCP connector" },
+  { id: "chatgpt", label: "ChatGPT / Codex", hint: "OpenAI Apps SDK connector" },
+];
+
+function mcpLinkStorageKey(workspaceId) { return `orbitfsMcpLinkPreview:${workspaceId}`; }
+
+function loadMcpLinkState(workspaceId) {
+  try { return JSON.parse(localStorage.getItem(mcpLinkStorageKey(workspaceId)) || "{}"); }
+  catch { return {}; }
+}
+
+function saveMcpLinkState(workspaceId, data) {
+  localStorage.setItem(mcpLinkStorageKey(workspaceId), JSON.stringify(data));
+}
+
+function generateMcpPairingCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const part = () => Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+  return `ORBIT-${part()}-${part()}`;
+}
+
+function showWorkspaceMcpLink(workspace, card) {
+  const detail = card.querySelector(".workspace-admin-detail");
+  detail.classList.remove("hidden");
+  const linkState = loadMcpLinkState(workspace.id);
+  if (!linkState.pairingCode) { linkState.pairingCode = generateMcpPairingCode(); saveMcpLinkState(workspace.id, linkState); }
+  const rows = MCP_CLIENT_TYPES.map((client) => {
+    const linked = !!linkState[client.id]?.linked;
+    return `
+      <div class="workspace-member-row workspace-mcp-client-row" data-client="${client.id}">
+        <span><strong>${escapeWorkspaceHtml(client.label)}</strong><small>${escapeWorkspaceHtml(client.hint)}</small></span>
+        <div class="workspace-mcp-client-controls">
+          <span class="workspace-state-badge" data-state="${linked ? "active" : "offline"}">${linked ? "Linked" : "Not linked"}</span>
+          <button type="button" class="${linked ? "danger" : "primary"} workspace-mcp-toggle-btn">${linked ? "Unlink" : "Link"}</button>
+        </div>
+      </div>`;
+  }).join("");
+  detail.innerHTML = `
+    <div class="workspace-mcp-link-preview">
+      <p class="muted-text">Preview only &mdash; linking a client here doesn't talk to the MCP server yet. This is a look at how routing an MCP client to a workspace other than Main would work.</p>
+      <div class="workspace-mcp-pairing">
+        <label>Pairing code
+          <div class="workspace-mcp-code-row">
+            <code class="workspace-mcp-code">${linkState.pairingCode}</code>
+            <button type="button" class="workspace-mcp-copy-btn">Copy</button>
+            <button type="button" class="workspace-mcp-regen-btn">New code</button>
+          </div>
+        </label>
+        <small class="muted-text">A client would enter this in its OrbitFS connection settings to link to &ldquo;${escapeWorkspaceHtml(workspace.name)}&rdquo; instead of Main.</small>
+      </div>
+      <div class="workspace-mcp-client-list">${rows}</div>
+    </div>`;
+  detail.querySelector(".workspace-mcp-copy-btn").addEventListener("click", async () => {
+    const btn = detail.querySelector(".workspace-mcp-copy-btn");
+    try { await navigator.clipboard.writeText(linkState.pairingCode); btn.textContent = "Copied"; }
+    catch { btn.textContent = "Copy failed"; }
+    setTimeout(() => { if (btn.isConnected) btn.textContent = "Copy"; }, 1200);
+  });
+  detail.querySelector(".workspace-mcp-regen-btn").addEventListener("click", () => {
+    saveMcpLinkState(workspace.id, { ...loadMcpLinkState(workspace.id), pairingCode: generateMcpPairingCode() });
+    showWorkspaceMcpLink(workspace, card);
+  });
+  detail.querySelectorAll(".workspace-mcp-toggle-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const clientId = btn.closest(".workspace-mcp-client-row").dataset.client;
+      const current = loadMcpLinkState(workspace.id);
+      const wasLinked = !!current[clientId]?.linked;
+      current[clientId] = { linked: !wasLinked, linkedAt: !wasLinked ? new Date().toISOString() : null };
+      saveMcpLinkState(workspace.id, current);
+      showWorkspaceMcpLink(workspace, card);
+    });
+  });
 }
 
 async function showWorkspaceSettings(workspace, card) {
