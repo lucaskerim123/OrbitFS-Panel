@@ -51,6 +51,43 @@ export async function getWorkspaceForUser(workspaceId, userId, systemRole) {
   );
   return result.rows[0] || null;
 }
+// Archived workspaces are deliberately excluded from getWorkspaceForUser/
+// listUserWorkspaces above (status filter) so they stop showing up in normal
+// use, but the row and filesystem_root are never touched by archiving - see
+// updateWorkspace below. These two are the only read paths that can still see
+// an archived workspace, and only for its owner or an admin.
+export async function listArchivedWorkspacesForUser(actorId, systemRole) {
+  const result = await query(
+    `SELECT w.id,w.slug,w.name,w.description,w.filesystem_root,w.owner_id,w.updated_at,
+            u.username AS owner_username
+     FROM workspaces w
+     LEFT JOIN users u ON u.id=w.owner_id
+     WHERE w.status='archived' AND w.is_main=false AND ($2='admin' OR w.owner_id=$1)
+     ORDER BY w.updated_at DESC`, [actorId, systemRole]
+  );
+  return result.rows;
+}
+
+export async function getArchivedWorkspaceForOwner(workspaceId, actorId, systemRole) {
+  const result = await query(
+    `SELECT w.*,u.username AS owner_username
+     FROM workspaces w LEFT JOIN users u ON u.id=w.owner_id
+     WHERE w.id=$1 AND w.status='archived' AND ($3='admin' OR w.owner_id=$2)
+     LIMIT 1`, [workspaceId, actorId, systemRole]
+  );
+  return result.rows[0] || null;
+}
+
+export async function restoreWorkspace(workspaceId, systemRole) {
+  if (systemRole !== "admin") throw new Error("Admin access required");
+  const result = await query(
+    `UPDATE workspaces SET status='active',suspension_reason=NULL,updated_at=now()
+     WHERE id=$1 AND status='archived' RETURNING *`, [workspaceId]
+  );
+  if (!result.rowCount) throw new Error("Archived workspace not found");
+  return result.rows[0];
+}
+
 export async function getWorkspaceCreationSettings() {
   await query(`INSERT INTO system_settings(setting_key,setting_value) VALUES('max_workspaces_per_user',$1::jsonb) ON CONFLICT(setting_key) DO NOTHING`, [JSON.stringify(DEFAULT_MAX_WORKSPACES_PER_USER)]);
   const result = await query(`SELECT setting_value FROM system_settings WHERE setting_key='max_workspaces_per_user' LIMIT 1`);

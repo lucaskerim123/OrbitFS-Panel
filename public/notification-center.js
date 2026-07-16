@@ -126,8 +126,7 @@
   }
 
   function notificationSource(item) {
-    const manualMessage = item?.event_type === "global_message" || item?.event_type === "workspace_message";
-    if (manualMessage && item?.actor_username) return item.actor_username;
+    if (item?.event_type === "workspace_message" && item?.actor_username) return item.actor_username;
     return "OrbitFS System";
   }
 

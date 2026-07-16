@@ -8,6 +8,7 @@ import { beginDownload } from "./download-limits.js";
 import { WORKSPACE_ACTIONS,WORKSPACE_ROLES,WORKSPACE_ADMIN_ACTIONS,effectiveWorkspacePermissions,effectiveWorkspaceAdminPermissions,fullWorkspaceAdminPermissions,workspaceAdminRoleDefaults,normalizeWorkspacePath,roleDefaults } from "./workspace-permissions.js";
 import { requestWorkspaceTransfer,listTransferRequests,respondTransferRequest,cancelTransferRequest,listWorkspaceUserDirectory } from "./workspace-transfers.js";
 import { requestWorkspaceStorageChange,listWorkspaceStorageRequests,respondWorkspaceStorageRequest,cancelWorkspaceStorageRequest } from "./workspace-storage-requests.js";
+import { requestWorkspaceRestore,listWorkspaceRestoreRequests,respondWorkspaceRestoreRequest,cancelWorkspaceRestoreRequest } from "./workspace-restore-requests.js";
 import { inviteWorkspaceUser,listPendingInvitations,listWorkspaceInvitations,respondToWorkspaceInvitation,revokeWorkspaceInvitation } from "./workspace-invitations.js";
 import { listNotifications,unreadNotificationCount,markNotificationRead,markAllNotificationsRead,dismissNotification,getNotificationPreferences,updateNotificationPreferences,sendGlobalNotification,sendWorkspaceNotification,listNotificationMessages,notifyWorkspaceOwner } from "./notifications.js";
 import {
@@ -17,6 +18,7 @@ import {
   refreshWorkspaceUsage, getWorkspaceStorage, assertWorkspaceWrite, assertWorkspaceQuota,
   setWorkspaceDriveState,getWorkspaceLifecycleSettings,setWorkspaceLifecycleSettings,
   evaluateWorkspaceLifecycle,touchWorkspaceActivity,setWorkspaceMcpEnabled,
+  listArchivedWorkspacesForUser,
 } from "./workspaces.js";
 import { listWorkspaceMcpGrants, grantWorkspaceMcpAccess, revokeWorkspaceMcpAccess, revokeAllWorkspaceMcpGrants } from "./workspace-mcp.js";
 import { cfConfigured } from "./cloudflare-access.js";
@@ -287,6 +289,26 @@ export function workspaceRouter() {
   });
   router.delete("/workspace-storage-requests/:id", async (req,res) => {
     try { res.json(await cancelWorkspaceStorageRequest(req.params.id,req.userId,req.role)); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.get("/workspaces/archived", async (req,res) => {
+    try { res.json({ workspaces:await listArchivedWorkspacesForUser(req.userId,req.role) }); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.get("/workspace-restore-requests", async (req,res) => {
+    try { res.json({ requests:await listWorkspaceRestoreRequests(req.userId,req.role) }); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.post("/workspaces/:id/restore-request", express.json(), async (req,res) => {
+    try { res.status(201).json({ request:await requestWorkspaceRestore(req.params.id,req.body?.message,req.userId,req.role) }); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.post("/workspace-restore-requests/:id/respond", express.json(), async (req,res) => {
+    try { res.json(await respondWorkspaceRestoreRequest(req.params.id,req.body?.decision,req.body?.message,req.userId,req.role)); }
+    catch(error) { res.status(400).json({error:error.message}); }
+  });
+  router.delete("/workspace-restore-requests/:id", async (req,res) => {
+    try { res.json(await cancelWorkspaceRestoreRequest(req.params.id,req.userId,req.role)); }
     catch(error) { res.status(400).json({error:error.message}); }
   });
   router.post("/workspaces/:id/transfer-request", express.json(), async (req,res) => {

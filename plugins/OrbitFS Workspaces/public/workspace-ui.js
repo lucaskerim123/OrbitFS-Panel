@@ -147,6 +147,7 @@ async function loadOrbitWorkspaces(preferredId = state.workspaceId) {
     renderCompactWorkspaceTrashList();
     loadWorkspaceInvitations();
     loadWorkspaceStorageRequests();
+    loadWorkspaceRestoreRequests();
     loadWorkspaceTransferRequests();
   } catch (error) {
     const storage = document.getElementById("workspace-storage");
@@ -925,6 +926,72 @@ async function loadWorkspaceStorageRequests() {
         const cancel = document.createElement("button");
         cancel.type = "button"; cancel.textContent = "Cancel request";
         cancel.addEventListener("click", async () => { await api(`/api/workspace-storage-requests/${encodeURIComponent(request.id)}`, { method:"DELETE" }); await loadWorkspaceStorageRequests(); });
+        actions.appendChild(cancel);
+      }
+      list.appendChild(row);
+    }
+  } catch (error) { host.innerHTML = `<p class="error">${escapeWorkspaceHtml(error.message)}</p>`; }
+}
+
+async function loadWorkspaceRestoreRequests() {
+  const host = document.getElementById("workspace-restore-requests");
+  if (!host || !state.token) return;
+  try {
+    const [{ requests }, { workspaces: archived }] = await Promise.all([
+      api("/api/workspace-restore-requests"),
+      state.role === "admin" ? Promise.resolve({ workspaces: [] }) : api("/api/workspaces/archived"),
+    ]);
+    const pendingWorkspaceIds = new Set(requests.filter((request) => request.status === "pending").map((request) => String(request.workspace_id)));
+    const requestable = archived.filter((workspace) => !pendingWorkspaceIds.has(String(workspace.id)));
+    const canRequest = requestable.length > 0;
+    host.innerHTML = `<h3>Archived workspace restores</h3>
+      ${canRequest ? `<form class="workspace-storage-request-inline workspace-restore-request-inline">
+        <label>Archived workspace<select name="workspaceId">${requestable.map((workspace) => `<option value="${escapeWorkspaceHtml(workspace.id)}">${escapeWorkspaceHtml(workspace.name)}</option>`).join("")}</select></label>
+        <label>Message to admin<textarea name="message" rows="2" maxlength="1000" placeholder="Why you need it back"></textarea></label>
+        <button type="submit" class="primary">Request restore</button>
+        <small>Admin approves or denies with a message. Nothing was deleted when it was archived - approval just re-enables it.</small>
+      </form>` : `<p class="muted-text">${state.role === "admin" ? "Admin request queue." : archived?.length ? "Restore already requested for your archived workspace(s)." : "Archived workspaces you own will appear here so you can request they be restored."}</p>`}
+      <div class="workspace-storage-request-list workspace-restore-request-list"></div>`;
+    host.querySelector(".workspace-restore-request-inline")?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      try {
+        await api(`/api/workspaces/${encodeURIComponent(form.elements.workspaceId.value)}/restore-request`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: form.elements.message.value.trim() }),
+        });
+        form.reset();
+        await loadWorkspaceRestoreRequests();
+      } catch (error) { alert(error.message); }
+      finally { button.disabled = false; }
+    });
+    const list = host.querySelector(".workspace-restore-request-list");
+    if (!requests.length) { list.innerHTML = '<p class="muted-text">No restore requests yet.</p>'; return; }
+    for (const request of requests) {
+      const row = document.createElement("div");
+      row.className = "workspace-transfer-row workspace-storage-request-row workspace-restore-request-row";
+      row.innerHTML = `<span><strong>${escapeWorkspaceHtml(request.workspace_name)}</strong><small>${escapeWorkspaceHtml(request.status)} · requested by ${escapeWorkspaceHtml(request.requested_by_username || "owner")}</small>${request.message ? `<small>${escapeWorkspaceHtml(request.message)}</small>` : ""}${request.admin_message ? `<small>Admin: ${escapeWorkspaceHtml(request.admin_message)}</small>` : ""}</span><div></div>`;
+      const actions = row.lastElementChild;
+      if (state.role === "admin" && request.status === "pending") {
+        for (const decision of ["approve","deny"]) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = decision === "approve" ? "Approve" : "Deny";
+          if (decision === "approve") button.className = "primary";
+          button.addEventListener("click", async () => {
+            const message = prompt(decision === "approve" ? "Approval message to owner" : "Denial message to owner", "");
+            if (message === null) return;
+            await api(`/api/workspace-restore-requests/${encodeURIComponent(request.id)}/respond`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ decision, message }) });
+            await loadOrbitWorkspaces();
+          });
+          actions.appendChild(button);
+        }
+      } else if (request.status === "pending") {
+        const cancel = document.createElement("button");
+        cancel.type = "button"; cancel.textContent = "Cancel request";
+        cancel.addEventListener("click", async () => { await api(`/api/workspace-restore-requests/${encodeURIComponent(request.id)}`, { method:"DELETE" }); await loadWorkspaceRestoreRequests(); });
         actions.appendChild(cancel);
       }
       list.appendChild(row);
