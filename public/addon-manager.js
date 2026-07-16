@@ -30,7 +30,7 @@
   }
   async function loadWorkspaceAddonAssets() {
     await loadScript(
-      "/addon-assets/workspaces/workspace-ui.js?v=20260716-mcplink2",
+      "/addon-assets/workspaces/workspace-ui.js?v=20260716-selfgrant1",
       "workspaces-ui"
     );
     await loadScript(

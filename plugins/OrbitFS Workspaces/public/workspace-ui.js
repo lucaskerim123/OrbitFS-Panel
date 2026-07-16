@@ -632,7 +632,14 @@ function renderWorkspaceMembers(container, members, workspace, card, canManage, 
     const row = document.createElement("div");
     row.className = "workspace-member-row";
     const canEditRole = canManage && member.permission !== "owner";
-    const showMcpToggle = canGrantMcp && member.permission !== "owner";
+    // Unlike role changes, MCP access is legitimately self-grantable: a
+    // regular user who owns their own (non-Main) workspace isn't a system
+    // admin, so they don't auto-get unrestricted MCP access the way Main's
+    // owner does - they need an actual grant like anyone else, and they're
+    // the only one who can grant it for their own workspace. Main's owner
+    // never reaches this UI at all (mcp_ui_enabled can't be turned on for
+    // Main), so this never redundantly offers a no-op grant to an admin.
+    const showMcpToggle = canGrantMcp;
     const mcpGranted = mcpGrantedUserIds?.has(String(member.user_id));
     row.innerHTML = `
       <span class="workspace-member-identity"><strong>${escapeWorkspaceHtml(member.username)}</strong><small>${escapeWorkspaceHtml(member.permission)}</small></span>

@@ -212,6 +212,6 @@ startupPickerScript.async = false;
 document.body.appendChild(startupPickerScript);
 
 const layoutTweaksScript = document.createElement("script");
-layoutTweaksScript.src = "layout-tweaks.js?v=20260716-mcplink2";
+layoutTweaksScript.src = "layout-tweaks.js?v=20260716-selfgrant1";
 layoutTweaksScript.async = false;
 document.body.appendChild(layoutTweaksScript);
