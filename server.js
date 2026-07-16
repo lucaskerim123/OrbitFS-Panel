@@ -32,7 +32,6 @@ function withTimeout(promise, ms, message = "Operation timed out") {
 }
 dotenv.config({ path: path.join(__dirname, ".env") });
 await initialiseAddonState();
-startLicenseHeartbeat();
 const PORT = process.env.PANEL_PORT || 4000;
 const LOG_DIR = path.join(__dirname, "logs");
 const WORKSPACE_ROOT = path.dirname(__dirname);
@@ -54,6 +53,33 @@ const SORTER_DIR = ENV_SORTER_DIR
   ? ENV_SORTER_DIR
   : DEFAULT_SORTER_DIR;
 const SORTER_URL = process.env.SORTER_URL || "http://localhost:4055";
+
+function stopWindowsServiceIfRunning(serviceName, reason) {
+  if (!serviceName || CLOUD_MODE) return;
+  execFile(
+    POWERSHELL_CMD,
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `if((Get-Service -Name '${serviceName}' -ErrorAction SilentlyContinue).Status -eq 'Running'){Stop-Service -Name '${serviceName}' -Force}`],
+    { windowsHide:true },
+    (error) => {
+      if (error) logError("license.service_stop.failed", Object.assign(error, { serviceName, reason }));
+      else logEvent("license.service_stop", { serviceName, reason });
+    }
+  );
+}
+
+function enforceLicensedServices(summary) {
+  const mcp = summary?.components?.[COMPONENTS.MCP];
+  const sorter = summary?.components?.[COMPONENTS.SORTER];
+  if (mcp && !(mcp.allowed === true && mcp.lockedToThisInstallation !== false && mcp.state !== "blocked")) {
+    stopWindowsServiceIfRunning(HIVE_SERVICE_NAME, "mcp_license_blocked");
+  }
+  if (sorter && !(sorter.allowed === true && sorter.lockedToThisInstallation !== false && sorter.state !== "blocked")) {
+    stopWindowsServiceIfRunning(SORTER_SERVICE_NAME, "sorter_license_blocked");
+  }
+}
+
+startLicenseHeartbeat({ onUpdate: enforceLicensedServices, onError: (error) => logError("license.heartbeat", error) });
+
 const POWERSHELL_CANDIDATES = [
   process.env.PANEL_POWERSHELL_PATH,
   "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
@@ -360,15 +386,26 @@ app.patch("/api/system/drive-config", requireAdmin, express.json(), async (req,r
 });
 
 async function currentAddonStatuses() {
-  const sorter = await addonStatus("sorter");
+  const [sorter, sorterLicense, workspacesLicense] = await Promise.all([
+    addonStatus("sorter"),
+    getComponentStatus(COMPONENTS.SORTER).catch(() => ({ licensed:false })),
+    getComponentStatus(COMPONENTS.WORKSPACES).catch(() => ({ licensed:false })),
+  ]);
   let online = false;
-  if (sorter.installed) {
+  if (sorter.installed && sorterLicense.licensed) {
     const port = await resolveSorterPort().catch(() => null);
     online = !!port && await sorterOnlineWithRetry(port).catch(() => false);
   }
-  return listAddonStatuses({ sorter:{ online }, workspaces:{ online:await addonEnabled("workspaces") } });
+  const statuses = await listAddonStatuses({
+    sorter:{ online },
+    workspaces:{ online:await addonEnabled("workspaces") && workspacesLicense.licensed },
+  });
+  return statuses.map((addon) => {
+    if (addon.id === "sorter") return { ...addon, licensed:!!sorterLicense.licensed, online, available:!!sorterLicense.licensed && !!addon.installed && !!addon.attached };
+    if (addon.id === "workspaces") return { ...addon, licensed:!!workspacesLicense.licensed, online:!!addon.online && !!workspacesLicense.licensed, available:!!workspacesLicense.licensed && !!addon.installed && !!addon.attached };
+    return addon;
+  });
 }
-
 async function sorterAccessForRequest(req) {
   const workspacesAttached = await addonEnabled("workspaces");
   const restricted = await getRestrictedTabs(req.userId, req.role);
@@ -1059,24 +1096,29 @@ app.get("/api/system/status", async (req, res) => {
     const addonStatuses = await currentAddonStatuses();
     status.addons = addonStatuses.map(({folderPath,requiredFiles,...addon}) => addon);
     const sorterAddon = addonStatuses.find((addon) => addon.id === "sorter");
-    const liveSorterPort = sorterAddon?.attached ? await resolveSorterPort().catch(() => 0) : 0;
-    const sorterReachable = !!liveSorterPort && await sorterOnlineWithRetry(liveSorterPort).catch(() => false);
+    const sorterLicense = await getComponentStatus(COMPONENTS.SORTER).catch(() => ({ licensed:false }));
+    const liveSorterPort = sorterAddon?.attached && sorterLicense.licensed ? await resolveSorterPort().catch(() => 0) : 0;
+    const sorterReachable = sorterLicense.licensed && !!liveSorterPort && await sorterOnlineWithRetry(liveSorterPort).catch(() => false);
     status.sorter = {
       ...(status.sorter || {}),
       installed:!!sorterAddon?.installed,
-      attached:!!sorterAddon?.attached,
-      addonStatus:sorterAddon?.status || "uninstalled",
+      attached:!!sorterAddon?.attached && !!sorterLicense.licensed,
+      licensed:!!sorterLicense.licensed,
+      addonStatus:sorterLicense.licensed ? (sorterAddon?.status || "uninstalled") : "blocked",
       running:sorterReachable,
       reachable:sorterReachable,
-      status:sorterReachable ? "Running" : "Stopped",
+      status:sorterLicense.licensed ? (sorterReachable ? "Running" : "Stopped") : "Blocked by licence",
       url:liveSorterPort ? "http://127.0.0.1:" + liveSorterPort : SORTER_URL,
     };
-    const hiveOk = await hive.ping();
+    const mcpLicense = await getComponentStatus(COMPONENTS.MCP).catch(() => ({ licensed:false }));
+    const hiveOk = mcpLicense.licensed ? await hive.ping().catch(() => false) : false;
     status.hive = {
       ...(status.hive || {}),
+      licensed:!!mcpLicense.licensed,
       running: hiveOk,
       reachable: hiveOk,
-      source: "http_ping",
+      source: mcpLicense.licensed ? "http_ping" : "license_blocked",
+      status: mcpLicense.licensed ? (hiveOk ? "Running" : "Stopped") : "Blocked by licence",
       url: hive.baseUrl,
     };
     res.json(status);
@@ -1099,10 +1141,21 @@ app.post("/api/system/control", requireAdmin, express.json(), async (req, res) =
   const action = req.body?.action || "restart";
   if (!CONTROL_TARGETS.has(target)) return res.status(400).json({ error: "invalid target" });
   if (!CONTROL_ACTIONS.has(action)) return res.status(400).json({ error: "invalid action" });
-  if (target === "sorter" && action !== "stop" && !(await addonEnabled("sorter"))) {
-    return res.status(409).json({ error:"Attach the Sorter addon in Config before starting it." });
+  if (target === "sorter") {
+    const sorterLicense = await getComponentStatus(COMPONENTS.SORTER).catch(() => ({ licensed:false }));
+    if (!sorterLicense.licensed) {
+      return res.status(403).json({ error:"Sorter is blocked by licence.", code:"LICENSE_REQUIRED", license:sorterLicense });
+    }
+    if (action !== "stop" && !(await addonEnabled("sorter"))) {
+      return res.status(409).json({ error:"Attach the Sorter addon in Config before starting it." });
+    }
   }
-
+  if (target === "hive") {
+    const mcpLicense = await getComponentStatus(COMPONENTS.MCP).catch(() => ({ licensed:false }));
+    if (!mcpLicense.licensed) {
+      return res.status(403).json({ error:"MCP is blocked by licence.", code:"LICENSE_REQUIRED", license:mcpLicense });
+    }
+  }
   const scriptPath = path.join(__dirname, "scripts", "system-control.ps1");
 
   if (target === "panel" && action !== "start") {

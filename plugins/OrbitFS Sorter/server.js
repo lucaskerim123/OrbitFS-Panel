@@ -32,7 +32,12 @@ function send(res,code,data){ res.writeHead(code,{'Content-Type':'application/js
 async function body(req){ const chunks=[]; for await(const c of req) chunks.push(c); const raw=Buffer.concat(chunks).toString('utf8'); return raw?JSON.parse(raw):{}; }
 async function api(req,res){
   const url=new URL(req.url,'http://localhost');
-  if(req.method==='GET'&&url.pathname==='/api/status'){ const license=await getComponentStatus(COMPONENTS.SORTER); return send(res,200,{ok:true,license}); }
+  if(req.method==='GET'&&url.pathname==='/api/status'){ const license=await getComponentStatus(COMPONENTS.SORTER); return send(res,200,{ok:true,license,blocked:!license.licensed}); }
+  const license=await getComponentStatus(COMPONENTS.SORTER);
+  if(!license.licensed){
+    if(req.method==='GET'&&(url.pathname==='/api/license'||url.pathname==='/api/setup'||url.pathname==='/api/check')) return send(res,200,{ok:false,blocked:true,license});
+    return send(res,403,{error:'Sorter is blocked by licence',code:'LICENSE_REQUIRED',license});
+  }
   await assertComponentLicensed(COMPONENTS.SORTER);
   const ctx=context(req); const state=states.get(ctx.workspaceId)||{status:'idle',safeMode:true,items:[],lastRun:null};
   if(req.method==='GET'&&url.pathname==='/api/session') return send(res,200,state);

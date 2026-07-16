@@ -190,19 +190,22 @@ function logout() {
 
 async function checkSorterAvailable() {
   let online = false;
+  let licensed = false;
   let access = { useSorter:false, accessSorterSettings:false };
   try {
-    const [availability, permission] = await Promise.all([
-      api("/api/sorter-available"),
-      api("/api/sorter-access"),
-    ]);
-    online = !!availability.online;
-    access = permission || access;
+    const availability = await api("/api/sorter-available");
+    licensed = !!availability.license?.licensed || !!availability.available;
+    if (licensed) {
+      const permission = await api("/api/sorter-access");
+      online = !!availability.online;
+      access = permission || access;
+    }
   } catch {
     online = false;
+    licensed = false;
   }
-  state.sorterAccess = access;
-  if (access.workspace) {
+  state.sorterAccess = licensed ? access : { useSorter:false, accessSorterSettings:false };
+  if (licensed && access.workspace) {
     state.workspaces = Array.isArray(state.workspaces) ? state.workspaces : [];
     const index = state.workspaces.findIndex((item) => String(item.id) === String(access.workspace.id));
     if (index >= 0) state.workspaces[index] = { ...state.workspaces[index], ...access.workspace };
@@ -210,11 +213,12 @@ async function checkSorterAvailable() {
     if (!state.workspaceId) state.workspaceId = String(access.workspace.id);
     if (typeof sorterRenderWorkspaceSelector === "function") sorterRenderWorkspaceSelector();
   }
-  if ((!online || !access.useSorter) && document.getElementById("tab-sorter")?.classList.contains("active")) switchTab("files");
+  if ((!licensed || !online || !state.sorterAccess.useSorter) && document.getElementById("tab-sorter")?.classList.contains("active")) switchTab("files");
   if (typeof refreshSorterHeader === "function") refreshSorterHeader();
-  document.getElementById("infra-item-sorter")?.classList.remove("hidden");
-  document.getElementById("service-row-sorter")?.classList.remove("hidden");
-  return online && !!access.useSorter;
+  document.getElementById("tab-sorter")?.classList.toggle("hidden", !licensed);
+  document.getElementById("infra-item-sorter")?.classList.toggle("hidden", !licensed);
+  document.getElementById("service-row-sorter")?.classList.toggle("hidden", !licensed);
+  return licensed && online && !!state.sorterAccess.useSorter;
 }
 
 function showApp() {
