@@ -463,34 +463,38 @@ function renderRow(list, entry) {
   // entry.permissions describes what a normal user may do so Admin can edit
   // that rule. It must never hide Admin's own controls.
   const permissions = state.role === "admin" && (!(typeof currentWorkspace === "function" && currentWorkspace()?.is_main) || currentWorkspace()?.permission === "owner") ? { ...ALL_FILE_PERMISSIONS } : effectivePermissions(entry.permissions);
-  if (entry.type === "file" && permissions.download) {
-    const dl = document.createElement("button");
-    dl.className = "icon-btn";
-    dl.textContent = "⬇";
-    dl.title = "Download";
-    dl.addEventListener("click", (e) => { e.stopPropagation(); downloadFile(full); });
-    actions.appendChild(dl);
+  if (entry.type === "file") {
+    const open = document.createElement("button");
+    open.className = "icon-btn";
+    open.textContent = "Edit";
+    open.title = "Open file";
+    open.addEventListener("click", (e) => { e.stopPropagation(); isTextFile(entry.name) ? openFile(full) : openPreview(full, entry); });
+    actions.appendChild(open);
 
-    const ex = document.createElement("button");
-    ex.className = "icon-btn";
-    ex.textContent = "⇩";
-    ex.title = "Export as DOCX/PDF/TXT/HTML/MD";
-    ex.addEventListener("click", (e) => { e.stopPropagation(); exportFile(full); });
-    actions.appendChild(ex);
+    if (permissions.download) {
+      const sh = document.createElement("button");
+      sh.className = "icon-btn";
+      sh.textContent = "Share";
+      sh.title = "Create no-login share link";
+      sh.addEventListener("click", (e) => { e.stopPropagation(); shareFile(full); });
+      actions.appendChild(sh);
+    }
+  }
 
-    const sh = document.createElement("button");
-    sh.className = "icon-btn";
-    sh.textContent = "🔗";
-    sh.title = "Create no-login share link";
-    sh.addEventListener("click", (e) => { e.stopPropagation(); shareFile(full); });
-    actions.appendChild(sh);
+  if (entry.type === "dir" && permissions.move && !protectedRoot) {
+    const rn = document.createElement("button");
+    rn.className = "icon-btn";
+    rn.textContent = "Rename";
+    rn.title = "Rename folder";
+    rn.addEventListener("click", (e) => { e.stopPropagation(); openMovePicker(full); });
+    actions.appendChild(rn);
   }
 
   if (permissions.move && !protectedRoot) {
     const mv = document.createElement("button");
     mv.className = "icon-btn";
     mv.textContent = "↦";
-    mv.title = "Move / rename";
+    mv.title = entry.type === "dir" ? "Move folder" : "Move file";
     mv.addEventListener("click", (e) => { e.stopPropagation(); openMovePicker(full); });
     actions.appendChild(mv);
   }
@@ -2474,13 +2478,7 @@ function clearBulkFileSelection() {
 async function bulkMoveSelected() {
   const items = [...state.selectedFiles.values()];
   if (!items.length) return;
-  const destination = prompt("Move selected items into folder path:", state.subpath || "");
-  if (destination == null) return;
-  try {
-    await api("/api/bulk-move", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ paths:items.map(item=>item.path), destination:destination.trim() }) });
-    clearBulkFileSelection();
-    await loadFiles();
-  } catch(error) { alert(error.message); }
+  openBulkMovePicker(items);
 }
 
 async function bulkTrashSelected() {

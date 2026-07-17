@@ -115,11 +115,11 @@ async function writeShareLinks(links) {
 }
 
 function shareBaseUrl(req) {
-  const configured = String(process.env.PANEL_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
+  const configured = String(process.env.PANEL_PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
   if (configured) return configured;
-  const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  return `${proto}://${host}`;
+  const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+  return host ? `${proto}://${host}` : "";
 }
 
 async function pruneShareLinks(links) {
@@ -154,7 +154,8 @@ async function createShareLinkRecord(req, filepath, ttlMs = SHARE_DEFAULT_TTL_MS
     lastAccessedAt: null,
   };
   await writeShareLinks(links);
-  return { token, ...links[token], url: `${shareBaseUrl(req)}/share/${token}` };
+  const base = shareBaseUrl(req);
+  return { token, ...links[token], url: `${base}/s/${token}`, legacyUrl: `${base}/share/${token}` };
 }
 
 
@@ -1163,17 +1164,22 @@ app.post("/api/share", express.json(), async (req, res) => {
   }
 });
 
-app.get("/share/:token", async (req, res) => {
+async function renderSharePage(req, res) {
   try {
     const link = await getShareLink(req.params.token);
     if (!link) return res.status(404).send("Share link expired or not found.");
-    res.type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OrbitFS shared file</title><style>body{margin:0;background:#07101d;color:#edf3ff;font-family:Inter,system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:18px;overflow:hidden}body:before{content:"";position:fixed;inset:-20%;background:radial-gradient(circle at 20% 20%,rgba(57,115,200,.24),transparent 32%),radial-gradient(circle at 85% 70%,rgba(69,205,180,.14),transparent 34%),linear-gradient(135deg,#07101d,#101827 55%,#07101d);z-index:-2}.promo-bg{position:fixed;left:0;right:0;bottom:0;padding:14px 18px;background:linear-gradient(90deg,rgba(57,115,200,.18),rgba(20,28,41,.86));border-top:1px solid rgba(120,168,255,.28);backdrop-filter:blur(10px);text-align:center;color:#cbd6e8;font-size:.92rem}.promo-bg a{color:#8bb5ff;font-weight:900;text-decoration:none}.card{width:min(520px,100%);background:rgba(20,28,41,.92);border:1px solid #2b374c;border-radius:18px;padding:18px;box-shadow:0 18px 60px rgba(0,0,0,.35);backdrop-filter:blur(14px)}h1{font-size:1.1rem;margin:.2rem 0 .6rem}.path{overflow-wrap:anywhere;color:#aebbd0;font-size:.9rem}.btn{display:block;text-align:center;margin-top:16px;padding:13px;border-radius:12px;background:#3973c8;color:white;text-decoration:none;font-weight:800}.muted{color:#98a6bd;font-size:.8rem;margin-top:12px}</style></head><body><main class="card"><h1>OrbitFS shared file</h1><p class="path">${escapeHtml(link.path)}</p><a class="btn" href="/share/${req.params.token}/download">Download file</a><p class="muted">No account required. Link expires ${escapeHtml(new Date(link.expiresAt).toLocaleString())}.</p></main><div class="promo-bg">Want your own workspace? Come check us out at <a href="${shareBaseUrl(req)}">${escapeHtml(shareBaseUrl(req))}</a></div></body></html>`);
+    const base = shareBaseUrl(req) || "/";
+    const token = encodeURIComponent(req.params.token);
+    res.type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OrbitFS shared file</title><style>body{margin:0;background:#07101d;color:#edf3ff;font-family:Inter,system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:18px 18px 88px;overflow:hidden}body:before{content:"";position:fixed;inset:-20%;background:radial-gradient(circle at 20% 20%,rgba(57,115,200,.24),transparent 32%),radial-gradient(circle at 85% 70%,rgba(69,205,180,.14),transparent 34%),linear-gradient(135deg,#07101d,#101827 55%,#07101d);z-index:-2}.promo-bg{position:fixed;left:12px;right:12px;bottom:12px;padding:15px 16px;background:linear-gradient(90deg,rgba(57,115,200,.28),rgba(20,28,41,.92));border:1px solid rgba(120,168,255,.30);border-radius:18px;backdrop-filter:blur(12px);text-align:center;color:#dbe6f7;font-size:.94rem;box-shadow:0 16px 42px rgba(0,0,0,.32)}.promo-bg a{color:#91bcff;font-weight:900;text-decoration:none}.card{width:min(520px,100%);background:rgba(20,28,41,.92);border:1px solid #2b374c;border-radius:18px;padding:18px;box-shadow:0 18px 60px rgba(0,0,0,.35);backdrop-filter:blur(14px)}h1{font-size:1.1rem;margin:.2rem 0 .6rem}.path{overflow-wrap:anywhere;color:#aebbd0;font-size:.9rem}.btn{display:block;text-align:center;margin-top:16px;padding:13px;border-radius:12px;background:#3973c8;color:white;text-decoration:none;font-weight:800}.muted{color:#98a6bd;font-size:.8rem;margin-top:12px}</style></head><body><main class="card"><h1>OrbitFS shared file</h1><p class="path">${escapeHtml(link.path)}</p><a class="btn" href="/s/${token}/download">Download file</a><p class="muted">No account required. Link expires ${escapeHtml(new Date(link.expiresAt).toLocaleString())}.</p></main><div class="promo-bg">Want your own workspace? Come check us out at <a href="${base}">${escapeHtml(base)}</a></div></body></html>`);
   } catch (err) {
     res.status(500).send("Share link failed.");
   }
-});
+}
 
-app.get("/share/:token/download", async (req, res) => {
+app.get("/s/:token", renderSharePage);
+app.get("/share/:token", renderSharePage);
+
+async function downloadSharedFile(req, res) {
   try {
     const links = await pruneShareLinks(await readShareLinks());
     const link = links[req.params.token];
@@ -1191,7 +1197,7 @@ app.get("/share/:token/download", async (req, res) => {
   } catch (err) {
     res.status(404).send("File unavailable.");
   }
-});
+}
 
 // View raw bytes in the panel under read permission without granting the
 // separate right to download/save the file.
