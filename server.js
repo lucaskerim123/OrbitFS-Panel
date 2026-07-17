@@ -94,9 +94,9 @@ const localOrbitFSRoot = resolveLocalOrbitFSRoot(HIVE_SERVER_DIR);
 const localOps = localOrbitFSRoot ? makeLocalOps(localOrbitFSRoot) : null;
 
 function mcpAddonStatus() {
-  const installed = fs.existsSync(HIVE_SERVER_DIR)
-    && fs.existsSync(path.join(HIVE_SERVER_DIR, "package.json"))
-    && fs.existsSync(path.join(HIVE_SERVER_DIR, "server-core.js"));
+  const installed = fsSync.existsSync(HIVE_SERVER_DIR)
+    && fsSync.existsSync(path.join(HIVE_SERVER_DIR, "package.json"))
+    && fsSync.existsSync(path.join(HIVE_SERVER_DIR, "server-core.js"));
   return {
     id: "mcp",
     name: "OrbitFS MCP",

@@ -1,16 +1,16 @@
 {
   "workspaces": {
-    "attached": true,
+    "attached": false,
     "attachedAt": "2026-07-16T21:09:12.018Z",
     "migrated": true,
-    "detachedAt": "2026-07-16T21:09:06.703Z",
-    "reason": null
+    "detachedAt": "2026-07-17T11:25:06.498Z",
+    "reason": "manual"
   },
   "sorter": {
-    "attached": true,
+    "attached": false,
     "attachedAt": "2026-07-15T22:32:00.696Z",
     "migrated": true,
-    "detachedAt": "2026-07-15T22:31:37.765Z",
-    "reason": null
+    "detachedAt": "2026-07-17T11:25:09.872Z",
+    "reason": "manual"
   }
 }
