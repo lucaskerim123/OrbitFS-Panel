@@ -37,3 +37,17 @@ export function loadAddonConfig(rootDir = __dirname) {
       port: mcpPort,
       url: process.env.HIVE_URL || `http://localhost:${mcpPort}`,
     },
+    sorter: {
+      id: "sorter",
+      serviceName: process.env.SORTER_SERVICE_NAME || "OrbitFSSorter",
+      path: sorterDir,
+      defaultPath: defaultSorterDir,
+      port: sorterPort,
+      url: process.env.SORTER_URL || `http://localhost:${sorterPort}`,
+    },
+    workspaces: {
+      id: "workspaces",
+      root: process.env.WORKSPACES_ROOT || "F:\\OrbitFS Project\\Branched Workspaces",
+    },
+  };
+}
