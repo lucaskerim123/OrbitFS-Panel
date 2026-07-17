@@ -470,6 +470,20 @@ function renderRow(list, entry) {
     dl.title = "Download";
     dl.addEventListener("click", (e) => { e.stopPropagation(); downloadFile(full); });
     actions.appendChild(dl);
+
+    const ex = document.createElement("button");
+    ex.className = "icon-btn";
+    ex.textContent = "⇩";
+    ex.title = "Export as DOCX/PDF/TXT/HTML/MD";
+    ex.addEventListener("click", (e) => { e.stopPropagation(); exportFile(full); });
+    actions.appendChild(ex);
+
+    const sh = document.createElement("button");
+    sh.className = "icon-btn";
+    sh.textContent = "🔗";
+    sh.title = "Create no-login share link";
+    sh.addEventListener("click", (e) => { e.stopPropagation(); shareFile(full); });
+    actions.appendChild(sh);
   }
 
   if (permissions.move && !protectedRoot) {
@@ -593,6 +607,7 @@ async function openFile(filepath) {
     document.getElementById("save-file-btn").classList.toggle("hidden", !state.currentPermissions.write);
     document.getElementById("editor-find-btn").classList.toggle("hidden", !state.currentPermissions.write);
     document.getElementById("editor-download-btn").classList.toggle("hidden", !state.currentPermissions.download);
+    document.getElementById("editor-export-btn").classList.toggle("hidden", !state.currentPermissions.download);
     document.getElementById("move-file-btn").classList.toggle("hidden", !state.currentPermissions.move);
     document.getElementById("delete-file-btn").classList.toggle("hidden", !state.currentPermissions.delete);
     setTimeout(() => editor.refresh(), 30);
@@ -722,6 +737,8 @@ async function openPreview(filepath, entry) {
 
   const kind = mediaKindFor(entry.name);
   document.getElementById("preview-download-btn").classList.toggle("hidden", !state.currentPermissions.download);
+  document.getElementById("preview-export-btn").classList.toggle("hidden", !state.currentPermissions.download);
+  document.getElementById("preview-share-btn")?.classList.toggle("hidden", !state.currentPermissions.download);
   document.getElementById("preview-move-btn").classList.toggle("hidden", !state.currentPermissions.move);
   document.getElementById("preview-delete-btn").classList.toggle("hidden", !state.currentPermissions.delete);
   if (!kind) {
@@ -987,11 +1004,15 @@ document.getElementById("save-file-btn").addEventListener("click", async () => {
 });
 
 document.getElementById("editor-download-btn").addEventListener("click", () => state.openFile && downloadFile(state.openFile));
+document.getElementById("editor-export-btn").addEventListener("click", () => state.openFile && exportFile(state.openFile));
 document.getElementById("delete-file-btn").addEventListener("click", () => state.openFile && trashPath(state.openFile, closeAllPanels));
 document.getElementById("preview-delete-btn").addEventListener("click", () => state.previewFile && trashPath(state.previewFile, closeAllPanels));
 document.getElementById("move-file-btn").addEventListener("click", () => state.openFile && openMovePicker(state.openFile, closeAllPanels));
 document.getElementById("preview-move-btn").addEventListener("click", () => state.previewFile && openMovePicker(state.previewFile, closeAllPanels));
 document.getElementById("preview-download-btn").addEventListener("click", () => state.previewFile && downloadFile(state.previewFile));
+document.getElementById("preview-export-btn").addEventListener("click", () => state.previewFile && exportFile(state.previewFile));
+document.getElementById("preview-share-btn")?.addEventListener("click", () => state.previewFile && shareFile(state.previewFile));
+document.getElementById("preview-extract-btn")?.addEventListener("click", () => state.previewFile && extractSourceToMarkdown(state.previewFile));
 
 async function trashPath(filepath, onDone) {
   if (!confirm(`Move ${filepath} to _trash?`)) return;
@@ -1008,14 +1029,17 @@ async function trashPath(filepath, onDone) {
   }
 }
 
-const movePicker = { source: "", folder: "", onDone: null, folders: [], canCreate: true };
+const movePicker = { source: "", sources: [], folder: "", onDone: null, folders: [], canCreate: true, mode: "single" };
 
 function movePickerDestination() {
+  if (movePicker.mode === "bulk") return movePicker.folder || "";
   const name = document.getElementById("move-picker-name").value.trim();
   return movePicker.folder ? `${movePicker.folder}/${name}` : name;
 }
 
 function updateMovePickerDestination() {
+  const label = movePicker.mode === "bulk" ? "Folder" : "Destination";
+  document.getElementById("move-picker-destination-label").textContent = label;
   document.getElementById("move-picker-destination").textContent = `/${movePickerDestination()}`;
 }
 
@@ -1077,19 +1101,44 @@ async function loadMovePickerFolder(folder) {
 function closeMovePicker() {
   document.getElementById("move-picker-overlay").classList.add("hidden");
   movePicker.source = "";
+  movePicker.sources = [];
+  movePicker.mode = "single";
   movePicker.onDone = null;
+}
+
+function setMovePickerNameVisible(visible) {
+  document.getElementById("move-picker-name-row")?.classList.toggle("hidden", !visible);
 }
 
 function openMovePicker(filepath, onDone) {
   const parts = filepath.split("/");
   const name = parts.pop();
+  movePicker.mode = "single";
   movePicker.source = filepath;
+  movePicker.sources = [];
   movePicker.onDone = onDone || null;
+  setMovePickerNameVisible(true);
+  document.getElementById("move-picker-title").textContent = "Move item";
+  document.getElementById("move-picker-confirm").textContent = "Move here";
   document.getElementById("move-picker-source").textContent = `Moving: ${name}`;
   document.getElementById("move-picker-name").value = name;
   document.getElementById("move-picker-filter").value = "";
   document.getElementById("move-picker-overlay").classList.remove("hidden");
   loadMovePickerFolder(parts.join("/"));
+}
+
+function openBulkMovePicker(items) {
+  movePicker.mode = "bulk";
+  movePicker.source = "";
+  movePicker.sources = items.map((item) => item.path);
+  movePicker.onDone = null;
+  setMovePickerNameVisible(false);
+  document.getElementById("move-picker-title").textContent = "Move selected items";
+  document.getElementById("move-picker-confirm").textContent = "Move selected here";
+  document.getElementById("move-picker-source").textContent = `Moving ${items.length} selected item${items.length === 1 ? "" : "s"}`;
+  document.getElementById("move-picker-filter").value = "";
+  document.getElementById("move-picker-overlay").classList.remove("hidden");
+  loadMovePickerFolder(state.subpath || "");
 }
 
 document.getElementById("move-picker-up").addEventListener("click", () => {
@@ -1105,18 +1154,18 @@ document.getElementById("move-picker-overlay").addEventListener("click", (event)
 document.getElementById("move-picker-confirm").addEventListener("click", async () => {
   const destination = movePickerDestination();
   const error = document.getElementById("move-picker-error");
-  if (!destination) return void (error.textContent = "Enter a file or folder name.");
+  if (movePicker.mode !== "bulk" && !destination) return void (error.textContent = "Enter a file or folder name.");
   if (!movePicker.canCreate) return void (error.textContent = "You cannot move items into this folder.");
-  if (destination === movePicker.source) return closeMovePicker();
+  if (movePicker.mode !== "bulk" && destination === movePicker.source) return closeMovePicker();
   const button = document.getElementById("move-picker-confirm");
   button.disabled = true;
   error.textContent = "";
   try {
-    await api("/api/move", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from: movePicker.source, to: destination }),
-    });
+    if (movePicker.mode === "bulk") {
+      await api("/api/bulk-move", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ paths:movePicker.sources, destination:movePicker.folder || "" }) });
+    } else {
+      await api("/api/move", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from: movePicker.source, to: destination }) });
+    }
     const onDone = movePicker.onDone;
     closeMovePicker();
     onDone?.();
@@ -1127,6 +1176,41 @@ document.getElementById("move-picker-confirm").addEventListener("click", async (
     button.disabled = false;
   }
 });
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.style.position = "fixed";
+  area.style.left = "-9999px";
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  const ok = document.execCommand("copy");
+  area.remove();
+  return ok;
+}
+
+async function shareFile(filepath) {
+  try {
+    const daysRaw = prompt("Share link expires after how many days?", "7");
+    if (daysRaw === null) return;
+    const days = Math.max(1, Math.min(30, Number(daysRaw) || 7));
+    const resp = await api("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: filepath, days }),
+    });
+    const copied = await copyText(resp.url).catch(() => false);
+    alert(copied ? `Share link copied. Expires: ${new Date(resp.expiresAt).toLocaleString()}` : `Share link:
+${resp.url}`);
+  } catch (err) {
+    alert(err.message);
+  }
+}
 
 async function downloadFile(filepath) {
   try {
@@ -1143,6 +1227,50 @@ async function downloadFile(filepath) {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function downloadBlobResponse(resp, fallbackName) {
+  const blob = await resp.blob();
+  const disposition = resp.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  const filename = match ? decodeURIComponent(match[1]) : fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function chooseExportFormat(filepath) {
+  const raw = prompt("Export as: docx, pdf, txt, html, or md", "docx");
+  if (!raw) return null;
+  const format = raw.trim().toLowerCase().replace(/^\./, "");
+  if (!["docx", "pdf", "txt", "html", "md"].includes(format)) {
+    alert("Choose one: docx, pdf, txt, html, md");
+    return null;
+  }
+  return format;
+}
+
+async function exportFile(filepath) {
+  const format = chooseExportFormat(filepath);
+  if (!format) return;
+  try {
+    const resp = await fetch(`/api/export?path=${encodeURIComponent(filepath)}&format=${encodeURIComponent(format)}`, {
+      headers: { Authorization: `Bearer ${state.token}` },
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      throw new Error(body.error || `Export failed: ${resp.status}`);
+    }
+    const base = filepath.split("/").pop().replace(/\.[^.]+$/, "") || "export";
+    await downloadBlobResponse(resp, `${base}.${format}`);
   } catch (err) {
     alert(err.message);
   }

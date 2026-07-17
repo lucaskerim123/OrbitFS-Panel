@@ -1368,3 +1368,57 @@ table.data-table tr:hover td { background: var(--bg); }
 .license-actions.compact{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .license-change-panel{display:grid;gap:8px;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.03)}
 @media(max-width:650px){.license-detail-grid.compact,.license-component-grid.compact{grid-template-columns:1fr}.license-actions.compact button{flex:1}}
+
+/* Mobile bottom tap clearance: keep final buttons/files above Android/Chrome bottom controls. */
+@media(max-width:760px){
+  html{
+    scroll-padding-bottom:calc(140px + env(safe-area-inset-bottom,0px));
+  }
+  body{
+    min-height:100dvh;
+    padding-bottom:calc(120px + env(safe-area-inset-bottom,0px));
+    overscroll-behavior-y:contain;
+  }
+  .tab-panel{
+    padding-bottom:calc(140px + env(safe-area-inset-bottom,0px))!important;
+    scroll-padding-bottom:calc(160px + env(safe-area-inset-bottom,0px));
+  }
+  .file-list,
+  .sorter-item-list,
+  .sorter-folder-list,
+  .move-picker-folders,
+  .workspace-trash-list,
+  .workspace-trash-compact-rows,
+  .upload-queue,
+  .table-wrap,
+  .zip-list,
+  .rendered-view{
+    padding-bottom:calc(120px + env(safe-area-inset-bottom,0px));
+    scroll-padding-bottom:calc(150px + env(safe-area-inset-bottom,0px));
+  }
+  .file-list li:last-child,
+  .sorter-item-list li:last-child,
+  .sorter-folder-list li:last-child,
+  .move-picker-folders li:last-child,
+  .workspace-trash-row:last-child,
+  .workspace-trash-compact-row:last-child,
+  .upload-queue li:last-child{
+    margin-bottom:calc(88px + env(safe-area-inset-bottom,0px));
+  }
+  .file-list li,
+  .sorter-item-list li,
+  .sorter-folder-list li,
+  .move-picker-folders li,
+  button,
+  [role="button"]{
+    scroll-margin-bottom:calc(140px + env(safe-area-inset-bottom,0px));
+  }
+}
+
+.rendered-toc{position:sticky;top:0;z-index:2;margin:0 0 1rem;padding:.75rem;border:1px solid var(--border);border-radius:var(--radius);background:rgba(15,23,42,.96);display:grid;gap:.35rem}
+.rendered-toc strong{font-size:.82rem;color:var(--text)}
+.rendered-toc a{color:var(--muted);text-decoration:none;font-size:.82rem;line-height:1.25;overflow-wrap:anywhere}
+.rendered-toc a.lvl-2{padding-left:.75rem}.rendered-toc a.lvl-3{padding-left:1.5rem}
+.rendered-view{font-size:1rem;line-height:1.65;max-width:860px;margin:0 auto;padding-bottom:8rem}
+.rendered-view h1,.rendered-view h2,.rendered-view h3{scroll-margin-top:5rem;line-height:1.2}
+#move-picker-name-row.hidden{display:none!important}

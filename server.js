@@ -6,6 +6,9 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import { execFile, spawn } from "child_process";
 import { Readable } from "stream";
+import crypto from "crypto";
+import mammoth from "mammoth";
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { makeOrbitFSClient } from "./orbitfs-client.js";
 import { resolveLocalOrbitFSRoot, makeLocalOps } from "./local-orbitfs-ops.js";
 import { verifyLogin, validateSession, invalidateSession, listUsers, upsertUser, removeUser, getUserProfile, updateUserProfile } from "./auth.js";
@@ -93,6 +96,67 @@ let hive = makeOrbitFSClient(process.env.HIVE_URL, process.env.HIVE_API_KEY);
 // server is down - see local-orbitfs-ops.js for why writes aren't covered here.
 const localOrbitFSRoot = resolveLocalOrbitFSRoot(HIVE_SERVER_DIR);
 const localOps = localOrbitFSRoot ? makeLocalOps(localOrbitFSRoot) : null;
+const SHARE_LINKS_PATH = path.join(__dirname, "runtime", "share-links.json");
+const SHARE_DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SHARE_MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function readShareLinks() {
+  try {
+    const parsed = JSON.parse(await fs.readFile(SHARE_LINKS_PATH, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeShareLinks(links) {
+  await fs.mkdir(path.dirname(SHARE_LINKS_PATH), { recursive: true });
+  await fs.writeFile(SHARE_LINKS_PATH, JSON.stringify(links, null, 2), "utf8");
+}
+
+function shareBaseUrl(req) {
+  const configured = String(process.env.PANEL_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
+  if (configured) return configured;
+  const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  return `${proto}://${host}`;
+}
+
+async function pruneShareLinks(links) {
+  const now = Date.now();
+  let changed = false;
+  for (const [token, link] of Object.entries(links)) {
+    if (!link?.expiresAt || Date.parse(link.expiresAt) <= now) {
+      delete links[token];
+      changed = true;
+    }
+  }
+  if (changed) await writeShareLinks(links);
+  return links;
+}
+
+async function getShareLink(token) {
+  const links = await pruneShareLinks(await readShareLinks());
+  return links[token] || null;
+}
+
+async function createShareLinkRecord(req, filepath, ttlMs = SHARE_DEFAULT_TTL_MS) {
+  const links = await pruneShareLinks(await readShareLinks());
+  const token = crypto.randomBytes(24).toString("base64url");
+  const safeTtl = Math.min(Math.max(Number(ttlMs || SHARE_DEFAULT_TTL_MS), 60 * 60 * 1000), SHARE_MAX_TTL_MS);
+  const now = Date.now();
+  links[token] = {
+    path: normalizeFilePath(filepath),
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + safeTtl).toISOString(),
+    createdBy: req.username || null,
+    downloads: 0,
+    lastAccessedAt: null,
+  };
+  await writeShareLinks(links);
+  return { token, ...links[token], url: `${shareBaseUrl(req)}/share/${token}` };
+}
+
 
 const app = express();
 app.set("etag", false);
@@ -659,6 +723,211 @@ app.use("/api/sorter", express.raw({ type: "*/*", limit: "2mb" }), async (req, r
   }
 });
 
+
+// --- Document conversion/export ----------------------------------------
+const EXPORT_FORMATS = new Set(["md", "txt", "html", "docx", "pdf"]);
+const EXPORT_TEXT_EXTENSIONS = new Set([".md", ".markdown", ".txt", ".json", ".jsonl", ".csv", ".log", ".xml", ".html", ".css", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".yml", ".yaml"]);
+const EXPORT_SOURCE_EXTENSIONS = new Set([".docx", ".pdf"]);
+
+function escapeXml(value = "") {
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function escapeHtml(value = "") {
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function markdownToPlainText(text = "") {
+  return String(text)
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
+    .replace(/^>\s?/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "- ");
+}
+
+function markdownToHtml(text = "", title = "OrbitFS Export") {
+  const rows = String(text).split(/\r?\n/).map((line) => {
+    if (/^###\s+/.test(line)) return `<h3>${escapeHtml(line.replace(/^###\s+/, ""))}</h3>`;
+    if (/^##\s+/.test(line)) return `<h2>${escapeHtml(line.replace(/^##\s+/, ""))}</h2>`;
+    if (/^#\s+/.test(line)) return `<h1>${escapeHtml(line.replace(/^#\s+/, ""))}</h1>`;
+    if (/^\s*[-*+]\s+/.test(line)) return `<p class="bullet">• ${escapeHtml(line.replace(/^\s*[-*+]\s+/, ""))}</p>`;
+    if (!line.trim()) return `<div class="gap"></div>`;
+    return `<p>${escapeHtml(line)}</p>`;
+  }).join("\n");
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Inter,Arial,sans-serif;max-width:820px;margin:32px auto;padding:0 18px;line-height:1.55;color:#111}h1,h2,h3{line-height:1.2}.gap{height:.65rem}.bullet{padding-left:1rem}pre,code{background:#f2f4f7;border-radius:6px;padding:.1rem .25rem}</style></head><body>${rows}</body></html>`;
+}
+
+function crc32(buf) {
+  let c = ~0;
+  for (let i = 0; i < buf.length; i++) {
+    c ^= buf[i];
+    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+  }
+  return (~c) >>> 0;
+}
+
+function dosDateTime(date = new Date()) {
+  const time = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+  const d = ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+  return { time, date: d };
+}
+
+function zipStore(files) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  const dt = dosDateTime();
+  for (const file of files) {
+    const name = Buffer.from(file.name.replace(/\\/g, "/"), "utf8");
+    const data = Buffer.isBuffer(file.data) ? file.data : Buffer.from(String(file.data), "utf8");
+    const crc = crc32(data);
+    const local = Buffer.alloc(30 + name.length);
+    local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x0800, 6); local.writeUInt16LE(0, 8);
+    local.writeUInt16LE(dt.time, 10); local.writeUInt16LE(dt.date, 12); local.writeUInt32LE(crc, 14); local.writeUInt32LE(data.length, 18); local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(name.length, 26); name.copy(local, 30);
+    localParts.push(local, data);
+    const central = Buffer.alloc(46 + name.length);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(0x0800, 8); central.writeUInt16LE(0, 10);
+    central.writeUInt16LE(dt.time, 12); central.writeUInt16LE(dt.date, 14); central.writeUInt32LE(crc, 16); central.writeUInt32LE(data.length, 20); central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(name.length, 28); central.writeUInt32LE(offset, 42); name.copy(central, 46);
+    centralParts.push(central);
+    offset += local.length + data.length;
+  }
+  const centralSize = centralParts.reduce((sum, b) => sum + b.length, 0);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(centralSize, 12); end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...localParts, ...centralParts, end]);
+}
+
+function textToDocx(text = "", title = "OrbitFS Export") {
+  const paragraphs = String(text).split(/\r?\n/).map((line) => {
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    const style = heading ? `<w:pPr><w:pStyle w:val="Heading${heading[1].length}"/></w:pPr>` : "";
+    const value = heading ? heading[2] : line;
+    return `<w:p>${style}<w:r><w:t xml:space="preserve">${escapeXml(value)}</w:t></w:r></w:p>`;
+  }).join("");
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`;
+  const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:b/><w:sz w:val="22"/></w:rPr></w:style></w:styles>`;
+  return zipStore([
+    { name: "[Content_Types].xml", data: `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>` },
+    { name: "_rels/.rels", data: `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>` },
+    { name: "word/_rels/document.xml.rels", data: `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+    { name: "word/document.xml", data: documentXml },
+    { name: "word/styles.xml", data: stylesXml },
+  ]);
+}
+
+function textToPdf(text = "", title = "OrbitFS Export") {
+  const lines = [`${title}`, "", ...markdownToPlainText(text).split(/\r?\n/)];
+  const pages = [];
+  for (let i = 0; i < lines.length; i += 42) pages.push(lines.slice(i, i + 42));
+  const objects = [];
+  const add = (s) => { objects.push(Buffer.from(s, "binary")); return objects.length; };
+  add("<< /Type /Catalog /Pages 2 0 R >>");
+  add("<< /Type /Pages /Kids [" + pages.map((_, i) => `${3 + i * 2} 0 R`).join(" ") + "] /Count " + pages.length + " >>");
+  pages.forEach((pageLines, i) => {
+    const contentId = 4 + i * 2;
+    add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${3 + pages.length * 2} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    const ops = ["BT", "/F1 10 Tf", "50 742 Td"];
+    pageLines.forEach((line, idx) => {
+      if (idx) ops.push("0 -16 Td");
+      ops.push(`(${String(line).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").slice(0, 105)}) Tj`);
+    });
+    ops.push("ET");
+    const stream = ops.join("\n");
+    add(`<< /Length ${Buffer.byteLength(stream, "binary")} >>\nstream\n${stream}\nendstream`);
+  });
+  add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  let body = Buffer.from("%PDF-1.4\n", "binary");
+  const offsets = [0];
+  objects.forEach((obj, i) => { offsets.push(body.length); body = Buffer.concat([body, Buffer.from(`${i + 1} 0 obj\n`, "binary"), obj, Buffer.from("\nendobj\n", "binary")]); });
+  const xref = body.length;
+  const table = [`xref`, `0 ${objects.length + 1}`, `0000000000 65535 f `, ...offsets.slice(1).map((o) => String(o).padStart(10, "0") + " 00000 n "), `trailer << /Root 1 0 R /Size ${objects.length + 1} >>`, `startxref`, String(xref), `%%EOF`].join("\n");
+  return Buffer.concat([body, Buffer.from(table, "binary")]);
+}
+
+function exportName(filepath, format) {
+  const base = path.basename(String(filepath || "export")).replace(/\.[^.]+$/, "") || "export";
+  return `${base}.${format}`;
+}
+
+function exportContent(filepath, content, format) {
+  const title = path.basename(filepath || "OrbitFS Export");
+  if (format === "md") return { body: Buffer.from(String(content), "utf8"), type: "text/markdown; charset=utf-8" };
+  if (format === "txt") return { body: Buffer.from(markdownToPlainText(content), "utf8"), type: "text/plain; charset=utf-8" };
+  if (format === "html") return { body: Buffer.from(markdownToHtml(content, title), "utf8"), type: "text/html; charset=utf-8" };
+  if (format === "docx") return { body: textToDocx(content, title), type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+  if (format === "pdf") return { body: textToPdf(content, title), type: "application/pdf" };
+  throw new Error("Unsupported export format");
+}
+
+async function extractReadableSource(filepath) {
+  const ext = path.extname(String(filepath || "")).toLowerCase();
+  if (EXPORT_TEXT_EXTENSIONS.has(ext)) {
+    try {
+      return { text: await withTimeout(hive.readFile(filepath), 3500, "MCP file read timed out"), sourceType: "text" };
+    } catch (hiveErr) {
+      if (!localOps) throw hiveErr;
+      return { text: await localOps.readFile(filepath), sourceType: "text" };
+    }
+  }
+  if (!EXPORT_SOURCE_EXTENSIONS.has(ext)) {
+    throw new Error("Export/extraction supports readable text, Markdown, DOCX and text-based PDF files.");
+  }
+  if (!localOps) throw new Error("Source extraction needs local OrbitFS disk access.");
+  const absolute = localOps.safeResolve(filepath);
+  if (ext === ".docx") {
+    const result = await mammoth.extractRawText({ path: absolute });
+    const messages = (result.messages || []).map((m) => m.message).filter(Boolean);
+    return { text: result.value || "", sourceType: "docx", warnings: messages };
+  }
+  if (ext === ".pdf") {
+    const result = await pdfParse(await fs.readFile(absolute));
+    const text = result.text || "";
+    const warnings = text.trim().length < 20 ? ["PDF returned little or no text. It may be scanned/image-based."] : [];
+    return { text, sourceType: "pdf", pages: result.numpages || null, warnings };
+  }
+}
+
+async function readExportSource(filepath) {
+  const extracted = await extractReadableSource(filepath);
+  if (!extracted.text || !extracted.text.trim()) throw new Error("No readable text could be extracted from this file.");
+  return extracted.text;
+}
+
+function extractedMarkdown(filepath, extracted) {
+  const title = path.basename(String(filepath || "Source"));
+  const lines = [
+    "---",
+    `source_file: ${JSON.stringify(title)}`,
+    `source_type: ${JSON.stringify(extracted.sourceType || "text")}`,
+    `extracted_at: ${JSON.stringify(new Date().toISOString())}`,
+    extracted.pages ? `pages: ${extracted.pages}` : null,
+    extracted.warnings?.length ? `warnings: ${JSON.stringify(extracted.warnings)}` : null,
+    "---",
+    "",
+    `# ${title}`,
+    "",
+    extracted.text || "",
+  ].filter((line) => line !== null);
+  return lines.join("\n");
+}
+
+function siblingMarkdownPath(filepath) {
+  const clean = normalizeFilePath(filepath);
+  const parsed = path.posix.parse(clean.replace(/\\/g, "/"));
+  return path.posix.join(parsed.dir, `${parsed.name}.md`).replace(/^\/+/, "");
+}
+
+function sourceArchivePath(filepath) {
+  const clean = normalizeFilePath(filepath);
+  const parsed = path.posix.parse(clean.replace(/\\/g, "/"));
+  return path.posix.join(parsed.dir, "_sources", parsed.base).replace(/^\/+/, "");
+}
+
 // --- Files -------------------------------------------------------------
 // Thin passthrough to the OrbitFS MCP node's own REST API (see orbitfs-mcp),
 // except upload/download which stream raw bytes rather than round-tripping
@@ -880,6 +1149,50 @@ app.post("/api/mkdir", express.json(), async (req, res) => {
   }
 });
 
+app.post("/api/share", express.json(), async (req, res) => {
+  try {
+    const filepath = normalizeFilePath(req.body?.path || "");
+    if (!filepath) throw new Error("File path is required");
+    if (!(await requireFileAccess(req, res, filepath, "download"))) return;
+    const days = Number(req.body?.days || 7);
+    const ttlMs = days * 24 * 60 * 60 * 1000;
+    const link = await createShareLinkRecord(req, filepath, ttlMs);
+    res.json({ ok: true, ...link });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/share/:token", async (req, res) => {
+  try {
+    const link = await getShareLink(req.params.token);
+    if (!link) return res.status(404).send("Share link expired or not found.");
+    res.type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OrbitFS shared file</title><style>body{margin:0;background:#07101d;color:#edf3ff;font-family:Inter,system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:18px;overflow:hidden}body:before{content:"";position:fixed;inset:-20%;background:radial-gradient(circle at 20% 20%,rgba(57,115,200,.24),transparent 32%),radial-gradient(circle at 85% 70%,rgba(69,205,180,.14),transparent 34%),linear-gradient(135deg,#07101d,#101827 55%,#07101d);z-index:-2}.promo-bg{position:fixed;left:0;right:0;bottom:0;padding:14px 18px;background:linear-gradient(90deg,rgba(57,115,200,.18),rgba(20,28,41,.86));border-top:1px solid rgba(120,168,255,.28);backdrop-filter:blur(10px);text-align:center;color:#cbd6e8;font-size:.92rem}.promo-bg a{color:#8bb5ff;font-weight:900;text-decoration:none}.card{width:min(520px,100%);background:rgba(20,28,41,.92);border:1px solid #2b374c;border-radius:18px;padding:18px;box-shadow:0 18px 60px rgba(0,0,0,.35);backdrop-filter:blur(14px)}h1{font-size:1.1rem;margin:.2rem 0 .6rem}.path{overflow-wrap:anywhere;color:#aebbd0;font-size:.9rem}.btn{display:block;text-align:center;margin-top:16px;padding:13px;border-radius:12px;background:#3973c8;color:white;text-decoration:none;font-weight:800}.muted{color:#98a6bd;font-size:.8rem;margin-top:12px}</style></head><body><main class="card"><h1>OrbitFS shared file</h1><p class="path">${escapeHtml(link.path)}</p><a class="btn" href="/share/${req.params.token}/download">Download file</a><p class="muted">No account required. Link expires ${escapeHtml(new Date(link.expiresAt).toLocaleString())}.</p></main><div class="promo-bg">Want your own workspace? Come check us out at <a href="${shareBaseUrl(req)}">${escapeHtml(shareBaseUrl(req))}</a></div></body></html>`);
+  } catch (err) {
+    res.status(500).send("Share link failed.");
+  }
+});
+
+app.get("/share/:token/download", async (req, res) => {
+  try {
+    const links = await pruneShareLinks(await readShareLinks());
+    const link = links[req.params.token];
+    if (!link) return res.status(404).send("Share link expired or not found.");
+    if (!localOps) return res.status(503).send("File sharing needs local OrbitFS disk access.");
+    const { stream, filename, size } = await localOps.downloadStream(link.path);
+    link.downloads = Number(link.downloads || 0) + 1;
+    link.lastAccessedAt = new Date().toISOString();
+    links[req.params.token] = link;
+    await writeShareLinks(links);
+    res.set("Content-Type", "application/octet-stream");
+    if (size != null) res.set("Content-Length", String(size));
+    res.set("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+    return stream.pipe(res);
+  } catch (err) {
+    res.status(404).send("File unavailable.");
+  }
+});
+
 // View raw bytes in the panel under read permission without granting the
 // separate right to download/save the file.
 app.get("/api/preview", async (req, res) => {
@@ -907,6 +1220,45 @@ app.get("/api/preview", async (req, res) => {
     return res.status(upstream ? upstream.status : 502).json({ error: "preview failed" });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/export", async (req, res) => {
+  try {
+    const filepath = String(req.query.path || "");
+    const format = String(req.query.format || "").toLowerCase();
+    if (!EXPORT_FORMATS.has(format)) throw new Error("Choose export format: md, txt, html, docx or pdf");
+    if (!(await requireFileAccess(req, res, filepath, "download"))) return;
+    const content = await readExportSource(filepath);
+    const exported = exportContent(filepath, content, format);
+    res.set("Content-Type", exported.type);
+    res.set("Content-Disposition", `attachment; filename="${encodeURIComponent(exportName(filepath, format))}"`);
+    return res.send(exported.body);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post("/api/extract-source", express.json(), async (req, res) => {
+  try {
+    const sourcePath = normalizeFilePath(req.body?.path || "");
+    if (!sourcePath) throw new Error("Source path is required");
+    if (!(await requireFileAccess(req, res, sourcePath, "read"))) return;
+    const targetPath = normalizeFilePath(req.body?.targetPath || siblingMarkdownPath(sourcePath));
+    if (!(await requireFileAccess(req, res, parentPath(targetPath), "create"))) return;
+    if (!(await requireFileAccess(req, res, targetPath, "write"))) return;
+    if (!localOps) throw new Error("Source extraction needs local OrbitFS disk access");
+    const extracted = await extractReadableSource(sourcePath);
+    if (!extracted.text || !extracted.text.trim()) throw new Error("No readable text could be extracted from this source file");
+    const markdown = extractedMarkdown(sourcePath, extracted);
+    const archivePath = sourceArchivePath(sourcePath);
+    const archiveAbsolute = localOps.safeResolve(archivePath);
+    await fs.mkdir(path.dirname(archiveAbsolute), { recursive: true });
+    try { await fs.copyFile(localOps.safeResolve(sourcePath), archiveAbsolute, fsSync.constants.COPYFILE_EXCL); } catch (copyErr) { if (copyErr.code !== "EEXIST") throw copyErr; }
+    await hive.writeFile(targetPath, markdown);
+    res.json({ ok: true, sourcePath, targetPath, archivePath, characters: markdown.length, warnings: extracted.warnings || [] });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

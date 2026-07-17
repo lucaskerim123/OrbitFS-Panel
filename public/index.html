@@ -208,6 +208,7 @@
             <button id="editor-permission-btn" class="hidden">Permission</button>
             <button id="save-file-btn" class="primary">Save</button>
             <button id="editor-download-btn">Download</button>
+            <button id="editor-export-btn">Export</button>
             <button id="move-file-btn">Move</button>
             <button id="delete-file-btn" class="danger">Move To Trash</button>
           </div>
@@ -237,6 +238,9 @@
             <div class="preview-actions">
               <button id="preview-permission-btn" class="hidden">Permission</button>
               <button id="preview-download-btn" class="primary">Download</button>
+              <button id="preview-export-btn">Export</button>
+              <button id="preview-share-btn">Share</button>
+              <button id="preview-extract-btn" class="hidden">Extract MD</button>
               <button id="preview-move-btn">Move</button>
               <button id="preview-delete-btn" class="danger">Move To Trash</button>
             </div>
@@ -687,9 +691,11 @@
         <input id="move-picker-filter" type="search" placeholder="Filter folders..." autocomplete="off" spellcheck="false" />
       </div>
       <ul id="move-picker-folders" class="move-picker-folders"></ul>
-      <label class="move-picker-name-label" for="move-picker-name">File or folder name</label>
-      <input id="move-picker-name" type="text" autocomplete="off" spellcheck="false" />
-      <p class="move-picker-destination">Destination: <strong id="move-picker-destination"></strong></p>
+      <div id="move-picker-name-row">
+        <label class="move-picker-name-label" for="move-picker-name">File or folder name</label>
+        <input id="move-picker-name" type="text" autocomplete="off" spellcheck="false" />
+      </div>
+      <p class="move-picker-destination"><span id="move-picker-destination-label">Destination</span>: <strong id="move-picker-destination"></strong></p>
       <p id="move-picker-error" class="error"></p>
       <div class="modal-actions">
         <button id="move-picker-cancel" type="button">Cancel</button>
