@@ -135,12 +135,24 @@
     <p id="current-user" class="muted-text current-user"></p>
 
     <nav class="tabs">
-      <button class="tab-btn" id="tab-btn-account" data-tab="account">&#128100; Account</button>
+      <button class="tab-btn hidden more-managed-tab" id="tab-btn-account" data-tab="account">&#128100; Account</button>
       <button class="tab-btn active" data-tab="files">&#128193; Files</button>
       <button class="tab-btn hidden" id="tab-btn-workspaces" data-tab="workspaces">&#128451;&#65039; Workspaces</button>
       <button class="tab-btn hidden" id="tab-btn-system" data-tab="system">&#128421;&#65039; System</button>
-      <button class="tab-btn hidden" id="tab-btn-admin" data-tab="admin">&#128737;&#65039; Admin</button>
+      <button class="more-menu-btn" id="more-menu-btn" type="button" aria-expanded="false">&#9776; More</button>
+      <button class="tab-btn hidden more-managed-tab" id="tab-btn-licence" data-tab="licence">&#128273; Licence</button>
+      <button class="tab-btn hidden more-managed-tab" id="tab-btn-admin" data-tab="admin">&#128737;&#65039; Admin</button>
     </nav>
+
+    <div id="more-menu-backdrop" class="more-menu-backdrop hidden"></div>
+    <aside id="more-menu-panel" class="more-menu-panel hidden" aria-label="More OrbitFS controls">
+      <div class="more-menu-head"><strong>More</strong><button id="more-menu-close" type="button" aria-label="Close more menu">&times;</button></div>
+      <button type="button" data-more-tab="account">&#128100; Account</button>
+      <button type="button" data-more-tab="config" data-admin-only="1">&#9881;&#65039; Config</button>
+      <button type="button" data-more-tab="licence" data-admin-only="1">&#128273; Licence</button>
+      <button type="button" data-more-tab="admin" data-admin-only="1">&#128737;&#65039; Admin</button>
+      <button type="button" id="more-sorter-entry" data-more-tab="sorter" class="hidden">&#129533; Sorter</button>
+    </aside>
 
     <section id="tab-files" class="tab-panel active">
       <div class="toolbar">
@@ -150,6 +162,7 @@
         <button id="new-folder-btn">+ Folder</button>
         <button id="upload-btn">Upload</button>
         <button id="select-all-btn" type="button">Select all</button>
+        <button id="files-sorter-btn" type="button" class="hidden">Sorter</button>
         <input id="upload-input" type="file" multiple class="hidden" />
       </div>
       <div id="upload-panel" class="upload-panel hidden" aria-live="polite">
@@ -381,6 +394,58 @@
       <div id="admin-zone-host"></div>
     </section>
 
+    
+    <section id="tab-config" class="tab-panel sys-panel hidden">
+      <div class="sys-header config-header">
+        <div class="sys-header-text"><h2 class="sys-title">Config</h2><p class="sys-subtitle">Addons, runtime paths, startup and behaviour settings.</p></div>
+        <button id="config-refresh-btn" class="sys-refresh-btn" type="button">Refresh</button>
+      </div>
+      <div id="config-zone-main" class="sys-zone">
+        <div class="sys-zone-label"><span class="sys-zone-dot"></span>Configuration</div>
+        <details class="card runtime-config-card" open id="runtime-config-card">
+          <summary><span>Runtime configuration</span><small>Paths, ports and services</small></summary>
+          <p class="muted-text">Configuration controls where components are installed and how they run. Licensing controls whether they are allowed to run.</p>
+          <div id="runtime-config-grid" class="runtime-config-grid"><p class="muted-text">Loading configuration...</p></div>
+        </details>
+      </div>
+    </section>
+
+    <section id="tab-licence" class="tab-panel sys-panel">
+      <div class="sys-header">
+        <div class="sys-header-text">
+          <h2 class="sys-title">Licence</h2>
+          <p class="sys-subtitle">Entitlements decide what can run. Configuration lives in Config.</p>
+        </div>
+        <button id="licence-refresh-btn" class="sys-refresh-btn" type="button">Refresh</button>
+      </div>
+      <div class="sys-zone">
+        <div class="sys-zone-label"><span class="sys-zone-dot"></span>Entitlements</div>
+        <details class="card compact-license-card" open id="system-license-card">
+          <summary><span>OrbitFS licence</span><small id="system-license-summary">Checking</small></summary>
+          <div class="license-status-head">
+            <div><strong id="system-license-label">Checking licence...</strong><p id="system-license-message" class="muted-text"></p></div>
+            <span id="system-license-pill" class="pill unknown">checking</span>
+          </div>
+          <div id="system-license-components" class="license-component-grid compact"></div>
+          <div class="license-detail-grid compact">
+            <div><span>Install</span><strong id="system-license-installation">-</strong></div>
+            <div><span>Expiry</span><strong id="system-license-expiry">-</strong></div>
+            <div><span>Checked</span><strong id="system-license-checked">-</strong></div>
+          </div>
+          <div class="license-actions compact">
+            <button id="system-license-refresh" type="button">Refresh licence</button>
+            <button id="system-license-change-toggle" type="button">Install or replace key</button>
+          </div>
+          <div id="system-license-change-panel" class="license-change-panel hidden">
+            <input id="system-license-replace-key" type="text" maxlength="24" placeholder="OFS-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+            <button id="system-license-activate" type="button" class="primary">Install / Activate key</button>
+            <p class="field-hint">Enter a licence key to bind this Panel. The installed key is never displayed here.</p>
+          </div>
+          <p id="system-license-action-message" class="muted-text"></p>
+        </details>
+      </div>
+    </section>
+
     <section id="tab-system" class="tab-panel sys-panel">
       <div class="sys-header">
         <div class="sys-header-text">
@@ -495,29 +560,7 @@
       <div class="sys-zone sys-zone-controls">
         <div class="sys-zone-label"><span class="sys-zone-dot"></span>Controls</div>
 
-        <details class="card compact-license-card" open id="system-license-card">
-          <summary><span>OrbitFS licence</span><small id="system-license-summary">Checking</small></summary>
-          <div class="license-status-head">
-            <div><strong id="system-license-label">Checking licence...</strong><p id="system-license-message" class="muted-text"></p></div>
-            <span id="system-license-pill" class="pill unknown">checking</span>
-          </div>
-          <div id="system-license-components" class="license-component-grid compact"></div>
-          <div class="license-detail-grid compact">
-            <div><span>Install</span><strong id="system-license-installation">-</strong></div>
-            <div><span>Expiry</span><strong id="system-license-expiry">-</strong></div>
-            <div><span>Checked</span><strong id="system-license-checked">-</strong></div>
-          </div>
-          <div class="license-actions compact">
-            <button id="system-license-refresh" type="button">Refresh licence</button>
-            <button id="system-license-change-toggle" type="button">Install or replace key</button>
-          </div>
-          <div id="system-license-change-panel" class="license-change-panel hidden">
-            <input id="system-license-replace-key" type="text" maxlength="24" placeholder="OFS-XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-            <button id="system-license-activate" type="button" class="primary">Install / Activate key</button>
-            <p class="field-hint">Enter a licence key to bind this Panel. The installed key is never displayed here.</p>
-          </div>
-          <p id="system-license-action-message" class="muted-text"></p>
-        </details>
+
         <details class="card" open>
           <summary>Startup Load Control</summary>
           <p class="muted-text">No default project. Configure the real OrbitFS files loaded by each project preset. One OrbitFS-relative file path per line. Archive remains excluded.</p>
@@ -748,7 +791,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="app.js?v=20260715-customfix"></script>
+  <script src="app.js?v=20260717-more-nav1"></script>
   <script src="permissions.js?v=20260716-selfgrant1"></script>
 </body>
 </html>

@@ -50,6 +50,77 @@
     return panel;
   }
 
+  function ensureLicenceTab() {
+    const nav = q("nav");
+    const configButton = q('.tab-btn[data-tab="config"]') || q('.tab-btn[data-tab="system"]');
+    if (!nav || !configButton) return null;
+    let button = q('.tab-btn[data-tab="licence"]');
+    if (!button) {
+      button = document.createElement("button");
+      button.type = "button";
+      button.className = "tab-btn";
+      button.dataset.tab = "licence";
+      button.textContent = "🔐 Licence";
+      configButton.insertAdjacentElement("afterend", button);
+      button.addEventListener("click", () => {
+        if (typeof switchTab === "function") switchTab("licence");
+        if (typeof loadLicensePanel === "function") loadLicensePanel(true);
+      });
+    }
+    let panel = q("#tab-licence");
+    if (!panel) {
+      panel = document.createElement("section");
+      panel.id = "tab-licence";
+      panel.className = "tab-panel sys-panel";
+      panel.innerHTML = `<div class="sys-header licence-header"><div class="sys-header-text"><h2 class="sys-title">Licence</h2><p class="sys-subtitle">Entitlements decide what can run. Configuration lives in Config.</p></div><button id="licence-refresh-btn" class="sys-refresh-btn" type="button">⟳ Refresh</button></div><div id="licence-zone-main" class="sys-zone"><div class="sys-zone-label"><span class="sys-zone-dot"></span>Entitlements</div></div>`;
+      const configPanel = q("#tab-config");
+      configPanel?.insertAdjacentElement("afterend", panel);
+      q("#licence-refresh-btn", panel)?.addEventListener("click", () => loadLicensePanel(true));
+    }
+    return panel;
+  }
+
+  function moveLicenceCard() {
+    const panel = ensureLicenceTab();
+    const host = q("#licence-zone-main", panel);
+    const card = q("#system-license-card");
+    if (host && card && card.parentElement !== host) host.appendChild(card);
+  }
+
+  function ensureRuntimeConfigCard() {
+    const panel = ensureConfigTab();
+    const host = q("#config-zone-main", panel);
+    if (!host || q("#runtime-config-card", host)) return;
+    const card = document.createElement("details");
+    card.id = "runtime-config-card";
+    card.className = "card runtime-config-card";
+    card.open = true;
+    card.innerHTML = `<summary><span>Runtime configuration</span><small>Paths, ports and service names</small></summary><p class="muted-text">Configuration controls where components are installed and how they run. Licensing only controls whether they are allowed to run.</p><div id="runtime-config-grid" class="runtime-config-grid"><p class="muted-text">Loading configuration…</p></div>`;
+    host.prepend(card);
+  }
+
+  function escapeConfig(value) {
+    const div = document.createElement("div");
+    div.textContent = String(value ?? "");
+    return div.innerHTML;
+  }
+
+  async function refreshRuntimeConfig() {
+    ensureRuntimeConfigCard();
+    const grid = q("#runtime-config-grid");
+    if (!grid || typeof api !== "function") return;
+    try {
+      const result = await api("/api/config/runtime");
+      const config = result.config || {};
+      grid.innerHTML = Object.entries(config).map(([id, item]) => {
+        const fields = Object.entries(item || {}).filter(([, value]) => value !== undefined && value !== null && value !== "");
+        return `<article class="runtime-config-item"><strong>${escapeConfig(id)}</strong>${fields.map(([key, value]) => `<div><span>${escapeConfig(key)}</span><code>${escapeConfig(value)}</code></div>`).join("")}</article>`;
+      }).join("") || '<p class="muted-text">No runtime configuration found.</p>';
+    } catch (error) {
+      grid.innerHTML = `<p class="muted-text">${escapeConfig(error.message)}</p>`;
+    }
+  }
+
   function moveConfigurationCards() {
     const panel = ensureConfigTab();
     const host = q("#config-zone-main", panel);
@@ -63,6 +134,7 @@
 
     const trash = findCard("Trash settings");
     if (trash && trash.parentElement !== host) host.appendChild(trash);
+    ensureRuntimeConfigCard();
   }
 
   function renameSharedMcpCard() {
@@ -288,7 +360,7 @@
     try {
       moveConfigurationCards();
       if (typeof loadStartupConfig === "function") await loadStartupConfig();
-      if (typeof loadSystem === "function") await loadSystem();
+      await refreshRuntimeConfig();
       installConfigFeedback();
     } finally {
       if (button) { button.disabled = false; button.textContent = "⟳ Refresh"; }
@@ -302,6 +374,7 @@
     ensureSystemSessionsZone();
     consolidateLogs();
     placeHardStop();
+    moveLicenceCard();
     await Promise.allSettled([refreshServiceMeta(), refreshSessions()]);
   }
   window.refreshFinalSystem = refreshFinalSystem;
@@ -333,6 +406,7 @@
     style.id = "system-admin-final-style";
     style.textContent = `
       .system-service-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+      .runtime-config-grid{display:grid;gap:9px;margin-top:10px}.runtime-config-item{display:grid;gap:6px;padding:10px;border:1px solid var(--border,#30384a);border-radius:10px}.runtime-config-item>div{display:grid;grid-template-columns:minmax(90px,.35fr) 1fr;gap:8px;align-items:start}.runtime-config-item span{color:var(--muted,#9aa3b2);font-size:12px}.runtime-config-item code{white-space:normal;overflow-wrap:anywhere;font-size:11px}
       .system-service-meta>div{display:grid;gap:3px;padding:9px;border:1px solid var(--border,#30384a);border-radius:9px;background:rgba(255,255,255,.025)}
       .system-service-meta span{font-size:12px;color:var(--muted,#9aa3b2)}
       .compact-admin-list{display:grid;gap:8px;margin-top:10px}.compact-admin-row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px;border:1px solid var(--border,#30384a);border-radius:9px}.compact-admin-row>div{display:grid;gap:2px}.compact-admin-row small{color:var(--muted,#9aa3b2)}
@@ -347,7 +421,9 @@
 
   function applyLayout() {
     ensureConfigTab();
+    ensureLicenceTab();
     moveConfigurationCards();
+    moveLicenceCard();
     renameSharedMcpCard();
     ensureServiceMeta();
     ensureSystemSessionsZone();
@@ -363,6 +439,7 @@
   function install() {
     installStyles();
     applyLayout();
+    refreshRuntimeConfig();
     refreshFinalSystem();
     if (state?.role === "admin") refreshFinalAdmin();
     const observer = new MutationObserver(() => requestAnimationFrame(applyLayout));

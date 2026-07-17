@@ -23,6 +23,7 @@ import { getRestrictedTabs } from "./tab-restrictions.js";
 import { resolveMcpIdentity } from "./workspace-mcp.js";
 import { query } from "./db.js";
 import { COMPONENTS, activateComponents, assertComponentLicensed, getComponentStatus, getLicenseSummary, isLicenseEnforced, licenseGuard, startLicenseHeartbeat } from "./license.js";
+import { loadAddonConfig } from "./addon-config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,27 +36,22 @@ function withTimeout(promise, ms, message = "Operation timed out") {
 }
 dotenv.config({ path: path.join(__dirname, ".env") });
 await initialiseAddonState();
-const PORT = process.env.PANEL_PORT || 4000;
+const ADDON_CONFIG = loadAddonConfig(__dirname);
+const PORT = ADDON_CONFIG.panel.port || 4000;
 const LOG_DIR = path.join(__dirname, "logs");
 const WORKSPACE_ROOT = path.dirname(__dirname);
 const CLOUD_MODE = ["1", "true", "yes"].includes(String(process.env.ORBITFS_CLOUD || "").toLowerCase());
 const PANEL_EVENT_LOG = path.join(LOG_DIR, "orbitfs-panel-events.jsonl");
 const PANEL_ERROR_LOG = path.join(LOG_DIR, "orbitfs-panel-errors.jsonl");
-const PANEL_SERVICE_NAME = process.env.PANEL_SERVICE_NAME || "OrbitFSPanel";
-const HIVE_SERVICE_NAME = process.env.HIVE_SERVICE_NAME || "OrbitFSMcpServer";
-const HIVE_SERVER_DIR = process.env.HIVE_SERVER_DIR || "F:\\OrbitFS Project\\orbitfs-mcp";
-const HIVE_LOG_DIR = process.env.HIVE_LOG_DIR || path.join(HIVE_SERVER_DIR, "logs");
-const CLOUDFLARED_SERVICE_NAME = process.env.CLOUDFLARED_SERVICE_NAME || "OrbitFSTunnel";
-const CLOUDFLARED_DIR = process.env.CLOUDFLARED_DIR || "C:\\cloudflared";
-const SORTER_SERVICE_NAME = process.env.SORTER_SERVICE_NAME || "OrbitFSSorter";
-const DEFAULT_SORTER_DIR = path.join(__dirname, "plugins", "OrbitFS Sorter");
-const ENV_SORTER_DIR = process.env.SORTER_DIR;
-const SORTER_DIR = ENV_SORTER_DIR
-  && !isPathInParkedAddons(ENV_SORTER_DIR)
-  && fsSync.existsSync(path.join(ENV_SORTER_DIR, "server.js"))
-  ? ENV_SORTER_DIR
-  : DEFAULT_SORTER_DIR;
-const SORTER_URL = process.env.SORTER_URL || "http://localhost:4055";
+const PANEL_SERVICE_NAME = ADDON_CONFIG.panel.serviceName;
+const HIVE_SERVICE_NAME = ADDON_CONFIG.mcp.serviceName;
+const HIVE_SERVER_DIR = ADDON_CONFIG.mcp.path;
+const HIVE_LOG_DIR = ADDON_CONFIG.mcp.logDir;
+const CLOUDFLARED_SERVICE_NAME = ADDON_CONFIG.tunnel.serviceName;
+const CLOUDFLARED_DIR = ADDON_CONFIG.tunnel.path;
+const SORTER_SERVICE_NAME = ADDON_CONFIG.sorter.serviceName;
+const SORTER_DIR = ADDON_CONFIG.sorter.path;
+const SORTER_URL = ADDON_CONFIG.sorter.url;
 
 function stopWindowsServiceIfRunning(serviceName, reason) {
   if (!serviceName || CLOUD_MODE) return;
@@ -302,6 +298,19 @@ app.post("/api/logout", async (req, res) => {
 });
 
 // --- Licensing -----------------------------------------------------------
+
+app.get("/api/config/runtime", requireAdmin, async (req, res) => {
+  res.json({
+    ok: true,
+    config: {
+      panel: ADDON_CONFIG.panel,
+      mcp: ADDON_CONFIG.mcp,
+      sorter: ADDON_CONFIG.sorter,
+      workspaces: ADDON_CONFIG.workspaces,
+      tunnel: ADDON_CONFIG.tunnel,
+    },
+  });
+});
 
 app.get("/api/license/status", async (req, res) => {
   try {
