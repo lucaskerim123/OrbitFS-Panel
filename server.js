@@ -1,4 +1,4 @@
-﻿import dotenv from "dotenv";
+import dotenv from "dotenv";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -96,6 +96,21 @@ let hive = makeOrbitFSClient(process.env.HIVE_URL, process.env.HIVE_API_KEY);
 // server is down - see local-orbitfs-ops.js for why writes aren't covered here.
 const localOrbitFSRoot = resolveLocalOrbitFSRoot(HIVE_SERVER_DIR);
 const localOps = localOrbitFSRoot ? makeLocalOps(localOrbitFSRoot) : null;
+
+function mcpAddonStatus() {
+  const installed = fs.existsSync(HIVE_SERVER_DIR)
+    && fs.existsSync(path.join(HIVE_SERVER_DIR, "package.json"))
+    && fs.existsSync(path.join(HIVE_SERVER_DIR, "server-core.js"));
+  return {
+    id: "mcp",
+    name: "OrbitFS MCP",
+    installed,
+    attached: installed,
+    folderPath: HIVE_SERVER_DIR,
+    status: installed ? "attached" : "uninstalled",
+  };
+}
+
 const SHARE_LINKS_PATH = path.join(__dirname, "runtime", "share-links.json");
 const SHARE_DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SHARE_MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -164,6 +179,12 @@ app.set("etag", false);
 const workspaceAddonAssets = express.static(path.join(addonPath("workspaces"), "public"), {
   setHeaders: (res) => res.set("Cache-Control", "no-store"),
 });
+app.use("/viewer-assets/pdfjs", express.static(path.join(__dirname, "node_modules", "pdfjs-dist", "build"), { setHeaders: (res) => res.set("Cache-Control", "public, max-age=86400") }));
+app.use("/viewer-assets/docx", express.static(path.join(__dirname, "node_modules", "docx-preview", "dist"), { setHeaders: (res) => res.set("Cache-Control", "public, max-age=86400") }));
+app.use("/viewer-assets/marked", express.static(path.join(__dirname, "node_modules", "marked"), { setHeaders: (res) => res.set("Cache-Control", "public, max-age=86400") }));
+app.use("/viewer-assets/highlight", express.static(path.join(__dirname, "node_modules", "highlight.js"), { setHeaders: (res) => res.set("Cache-Control", "public, max-age=86400") }));
+app.use("/viewer-assets/dompurify", express.static(path.join(__dirname, "node_modules", "dompurify", "dist"), { setHeaders: (res) => res.set("Cache-Control", "public, max-age=86400") }));
+
 app.use("/addon-assets/workspaces", async (req,res,next) => {
   try {
     if (!(await addonEnabled("workspaces"))) return res.status(404).end();
@@ -738,6 +759,55 @@ function escapeHtml(value = "") {
   return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+
+const SHARE_INLINE_EXTENSIONS = new Set([".pdf", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".mp4", ".webm", ".mov", ".m4v", ".mp3", ".wav", ".ogg", ".txt", ".md", ".markdown", ".json", ".csv", ".log", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".css", ".html", ".xml", ".yml", ".yaml"]);
+
+function contentTypeForSharedPath(filepath = "") {
+  const ext = path.extname(String(filepath)).toLowerCase();
+  const map = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".m4v": "video/mp4",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+    ".md": "text/markdown; charset=utf-8",
+    ".markdown": "text/markdown; charset=utf-8",
+    ".csv": "text/csv; charset=utf-8",
+    ".xml": "application/xml; charset=utf-8",
+    ".yml": "text/plain; charset=utf-8",
+    ".yaml": "text/plain; charset=utf-8",
+    ".log": "text/plain; charset=utf-8",
+  };
+  return map[ext] || "application/octet-stream";
+}
+
+function shareViewerMode(filepath = "") {
+  const ext = path.extname(String(filepath)).toLowerCase();
+  if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext)) return "image";
+  if ([".mp4", ".webm", ".mov", ".m4v"].includes(ext)) return "video";
+  if ([".mp3", ".wav", ".ogg"].includes(ext)) return "audio";
+  if (ext === ".pdf") return "pdf";
+  if (ext === ".docx") return "extracted";
+  if ([".md", ".markdown", ".txt", ".json", ".csv", ".log", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".css", ".html", ".xml", ".yml", ".yaml"].includes(ext)) return "text";
+  return "download";
+}
+
 function markdownToPlainText(text = "") {
   return String(text)
     .replace(/^#{1,6}\s+/gm, "")
@@ -1171,7 +1241,34 @@ async function renderSharePage(req, res) {
     if (!link) return res.status(404).send("Share link expired or not found.");
     const base = shareBaseUrl(req) || "/";
     const token = encodeURIComponent(req.params.token);
-    res.type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OrbitFS shared file</title><style>body{margin:0;background:#07101d;color:#edf3ff;font-family:Inter,system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:18px 18px 88px;overflow:hidden}body:before{content:"";position:fixed;inset:-20%;background:radial-gradient(circle at 20% 20%,rgba(57,115,200,.24),transparent 32%),radial-gradient(circle at 85% 70%,rgba(69,205,180,.14),transparent 34%),linear-gradient(135deg,#07101d,#101827 55%,#07101d);z-index:-2}.promo-bg{position:fixed;left:12px;right:12px;bottom:12px;padding:15px 16px;background:linear-gradient(90deg,rgba(57,115,200,.28),rgba(20,28,41,.92));border:1px solid rgba(120,168,255,.30);border-radius:18px;backdrop-filter:blur(12px);text-align:center;color:#dbe6f7;font-size:.94rem;box-shadow:0 16px 42px rgba(0,0,0,.32)}.promo-bg a{color:#91bcff;font-weight:900;text-decoration:none}.card{width:min(520px,100%);background:rgba(20,28,41,.92);border:1px solid #2b374c;border-radius:18px;padding:18px;box-shadow:0 18px 60px rgba(0,0,0,.35);backdrop-filter:blur(14px)}h1{font-size:1.1rem;margin:.2rem 0 .6rem}.path{overflow-wrap:anywhere;color:#aebbd0;font-size:.9rem}.btn{display:block;text-align:center;margin-top:16px;padding:13px;border-radius:12px;background:#3973c8;color:white;text-decoration:none;font-weight:800}.muted{color:#98a6bd;font-size:.8rem;margin-top:12px}</style></head><body><main class="card"><h1>OrbitFS shared file</h1><p class="path">${escapeHtml(link.path)}</p><a class="btn" href="/s/${token}/download">Download file</a><p class="muted">No account required. Link expires ${escapeHtml(new Date(link.expiresAt).toLocaleString())}.</p></main><div class="promo-bg">Want your own workspace? Come check us out at <a href="${base}">${escapeHtml(base)}</a></div></body></html>`);
+    const rawUrl = `/s/${token}/view`;
+    const downloadUrl = `/s/${token}/download`;
+    const filename = path.basename(link.path || "shared-file");
+    const ext = path.extname(filename).toLowerCase();
+    const mode = shareViewerMode(link.path);
+    res.type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escapeHtml(filename)} - OrbitFS</title><link rel="stylesheet" href="/viewer-assets/highlight/styles/github-dark.min.css"><style>
+:root{color-scheme:dark;--bg:#050914;--panel:#101827;--panel2:#0b1220;--border:#263246;--text:#edf3ff;--muted:#9aa8bd;--blue:#3973c8;--green:#31d3a5}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}body:before{content:"";position:fixed;inset:-20%;background:radial-gradient(circle at 12% 12%,rgba(57,115,200,.25),transparent 30%),radial-gradient(circle at 88% 70%,rgba(49,211,165,.16),transparent 35%),linear-gradient(135deg,#050914,#101827 58%,#050914);z-index:-2}.share-shell{min-height:100vh;display:grid;grid-template-rows:auto 1fr auto;padding:10px 10px max(10px,env(safe-area-inset-bottom));gap:10px}.topbar{display:flex;align-items:center;gap:10px;min-height:54px;padding:10px 12px;background:rgba(16,24,39,.86);border:1px solid var(--border);border-radius:18px;backdrop-filter:blur(14px);box-shadow:0 12px 34px rgba(0,0,0,.25)}.brand{font-weight:900;letter-spacing:.02em;color:#b7d0ff}.filemeta{min-width:0;flex:1}.filename{font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.filepath{font-size:.78rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.actions{display:flex;gap:8px;align-items:center}.btn{border:1px solid var(--border);background:#172238;color:var(--text);border-radius:12px;padding:10px 12px;font-weight:800;text-decoration:none;white-space:nowrap}.btn.primary{background:var(--blue);border-color:rgba(255,255,255,.12);color:white}.viewer-shell{min-height:0;background:rgba(8,13,24,.72);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,.35)}.viewer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);background:rgba(16,24,39,.75)}.pill{border:1px solid #314365;border-radius:999px;padding:.25rem .58rem;color:#a9d4ff;font-size:.75rem}.status{font-size:.78rem;color:var(--muted)}#viewer{height:calc(100vh - 184px);min-height:360px;overflow:auto;background:#070b14}.media-wrap{height:100%;display:grid;place-items:center;background:#03060c}.media-wrap img{max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom}.media-wrap video{width:100%;height:100%;max-height:100%;background:#000}.media-wrap audio{width:min(720px,92%)}.pdf-pages{display:grid;gap:14px;justify-items:center;padding:14px;background:#2b2f38}.pdf-page{max-width:100%;background:white;box-shadow:0 10px 28px rgba(0,0,0,.35);border-radius:4px}.doc-view,.text-view{max-width:920px;margin:0 auto;padding:22px;background:#0d1422;color:#e9eef8;min-height:100%;line-height:1.62}.doc-view{background:#f7f7f2;color:#161b22}.doc-view :where(p,li){font-size:1rem}.text-view pre{white-space:pre-wrap;word-break:break-word;margin:0;font:14px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}.markdown-body{font-size:1rem}.markdown-body h1,.markdown-body h2,.markdown-body h3{line-height:1.18}.markdown-body code{background:#1b2435;border-radius:5px;padding:.08rem .28rem}.markdown-body pre{background:#050914;border:1px solid var(--border);border-radius:12px;padding:12px;overflow:auto}.empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--muted);padding:22px}.promo{padding:12px 14px;text-align:center;color:#dbe6f7;background:linear-gradient(90deg,rgba(57,115,200,.22),rgba(16,24,39,.78));border:1px solid rgba(120,168,255,.26);border-radius:18px;backdrop-filter:blur(12px)}.promo a{color:#91bcff;font-weight:900;text-decoration:none}@media(max-width:720px){.share-shell{padding:7px;gap:7px}.topbar{align-items:flex-start;border-radius:16px}.brand{display:none}.actions{flex-wrap:wrap;justify-content:flex-end}.btn{padding:9px 10px;font-size:.84rem}.viewer-head{padding:8px 10px}#viewer{height:calc(100vh - 174px);min-height:300px}.doc-view,.text-view{padding:15px}.promo{font-size:.85rem;padding:10px}}
+</style></head><body><div class="share-shell"><header class="topbar"><div class="brand">OrbitFS</div><div class="filemeta"><div class="filename">${escapeHtml(filename)}</div><div class="filepath">${escapeHtml(link.path)}</div></div><div class="actions"><button id="copyBtn" class="btn">Copy Link</button><a class="btn primary" href="${downloadUrl}">Download</a></div></header><main class="viewer-shell"><div class="viewer-head"><span class="pill">${escapeHtml(mode.toUpperCase())}</span><span id="viewerStatus" class="status">Loading viewer…</span></div><section id="viewer" data-mode="${escapeHtml(mode)}" data-ext="${escapeHtml(ext)}" data-raw="${rawUrl}"><div class="empty">Loading…</div></section></main><footer class="promo">Want your own workspace? Come check us out at <a href="${base}">${escapeHtml(base)}</a></footer></div><script type="module">
+import * as pdfjsLib from '/viewer-assets/pdfjs/pdf.mjs';
+import { renderAsync } from '/viewer-assets/docx/docx-preview.mjs';
+import { marked } from '/viewer-assets/marked/lib/marked.esm.js';
+import DOMPurify from '/viewer-assets/dompurify/purify.es.mjs';
+import hljs from '/viewer-assets/highlight/es/common.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/viewer-assets/pdfjs/pdf.worker.mjs';
+const viewer = document.getElementById('viewer');
+const status = document.getElementById('viewerStatus');
+const mode = viewer.dataset.mode;
+const ext = viewer.dataset.ext;
+const rawUrl = viewer.dataset.raw;
+document.getElementById('copyBtn').addEventListener('click', async () => { try { await navigator.clipboard.writeText(location.href); status.textContent = 'Link copied'; } catch { status.textContent = 'Copy failed'; } });
+function setStatus(text){ status.textContent = text; }
+function media(tag){ viewer.innerHTML = '<div class="media-wrap"></div>'; const wrap = viewer.firstChild; const el = document.createElement(tag); el.src = rawUrl; if(tag !== 'img'){ el.controls = true; el.playsInline = true; el.preload = 'metadata'; } if(tag === 'img') el.alt = ${JSON.stringify(filename)}; wrap.appendChild(el); setStatus('Ready'); }
+async function renderPdf(){ viewer.innerHTML = '<div class="pdf-pages"></div>'; const pages = viewer.firstChild; const pdf = await pdfjsLib.getDocument(rawUrl).promise; setStatus(pdf.numPages + ' page' + (pdf.numPages === 1 ? '' : 's')); const maxWidth = Math.min(980, Math.max(320, viewer.clientWidth - 30)); for(let n=1;n<=pdf.numPages;n++){ const page = await pdf.getPage(n); const baseViewport = page.getViewport({ scale: 1 }); const scale = Math.min(2, maxWidth / baseViewport.width); const viewport = page.getViewport({ scale }); const canvas = document.createElement('canvas'); canvas.className = 'pdf-page'; canvas.width = Math.floor(viewport.width); canvas.height = Math.floor(viewport.height); canvas.style.width = Math.floor(viewport.width) + 'px'; canvas.style.height = Math.floor(viewport.height) + 'px'; pages.appendChild(canvas); await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise; } }
+async function renderDocx(){ viewer.innerHTML = '<div class="doc-view"></div>'; const target = viewer.firstChild; const buf = await (await fetch(rawUrl)).arrayBuffer(); await renderAsync(buf, target, null, { className: 'docx', inWrapper: true, ignoreWidth: false, ignoreHeight: false, breakPages: true }); setStatus('DOCX rendered'); }
+async function renderText(){ const text = await (await fetch(rawUrl)).text(); viewer.innerHTML = '<div class="text-view"></div>'; const box = viewer.firstChild; if(ext === '.md' || ext === '.markdown'){ box.className = 'text-view markdown-body'; box.innerHTML = DOMPurify.sanitize(marked.parse(text)); box.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block)); setStatus('Markdown rendered'); } else { const pre = document.createElement('pre'); const code = document.createElement('code'); code.textContent = text; pre.appendChild(code); box.appendChild(pre); if(['.js','.mjs','.ts','.tsx','.jsx','.css','.html','.xml','.json','.yml','.yaml'].includes(ext)) { hljs.highlightElement(code); setStatus('Code rendered'); } else setStatus('Text rendered'); } }
+async function main(){ try { if(mode === 'image') media('img'); else if(mode === 'video') media('video'); else if(mode === 'audio') media('audio'); else if(mode === 'pdf') await renderPdf(); else if(mode === 'extracted') await renderDocx(); else if(mode === 'text') await renderText(); else { viewer.innerHTML = '<div class="empty"><div><strong>Preview unavailable</strong><br>Download this file to open it.</div></div>'; setStatus('Download required'); } } catch(err){ console.error(err); viewer.innerHTML = '<div class="empty"><div><strong>Viewer failed</strong><br>' + DOMPurify.sanitize(err.message || 'Could not load this file') + '</div></div>'; setStatus('Viewer failed'); } }
+main();
+</script></body></html>`);
   } catch (err) {
     res.status(500).send("Share link failed.");
   }
@@ -1181,6 +1278,27 @@ app.get("/s/:token", renderSharePage);
 app.get("/share/:token", renderSharePage);
 app.get("/s/:token/download", downloadSharedFile);
 app.get("/share/:token/download", downloadSharedFile);
+
+app.get("/s/:token/view", async (req, res) => {
+  try {
+    const link = await getShareLink(req.params.token);
+    if (!link) return res.status(404).send("Share link expired or not found.");
+    if (!localOps) return res.status(503).send("File sharing needs local OrbitFS disk access.");
+    const ext = path.extname(link.path).toLowerCase();
+    if (!SHARE_INLINE_EXTENSIONS.has(ext)) return res.status(415).send("Preview unavailable for this file type.");
+    const { stream, size } = await localOps.downloadStream(link.path);
+    res.set("Content-Type", contentTypeForSharedPath(link.path));
+    res.set("Content-Disposition", `inline; filename="${encodeURIComponent(path.basename(link.path))}"`);
+    if (size != null) res.set("Content-Length", String(size));
+    res.set("Accept-Ranges", "bytes");
+    res.set("Cache-Control", "private, max-age=120");
+    return stream.pipe(res);
+  } catch (err) {
+    res.status(404).send("Preview unavailable.");
+  }
+});
+
+app.get("/share/:token/view", (req, res) => res.redirect(302, `/s/${encodeURIComponent(req.params.token)}/view`));
 
 async function downloadSharedFile(req, res) {
   try {
@@ -1475,16 +1593,21 @@ app.get("/api/system/status", async (req, res) => {
       status:sorterLicense.licensed ? (sorterReachable ? "Running" : "Stopped") : "Blocked by licence",
       url:liveSorterPort ? "http://127.0.0.1:" + liveSorterPort : SORTER_URL,
     };
-    const mcpLicense = await getComponentStatus(COMPONENTS.MCP, { refresh:true }).catch(() => ({ licensed:false }));
-    const hiveOk = mcpLicense.licensed ? await hive.ping().catch(() => false) : false;
+    const mcpAddon = mcpAddonStatus();
+    const mcpLicense = mcpAddon.installed ? await getComponentStatus(COMPONENTS.MCP, { refresh:true }).catch(() => ({ licensed:false })) : { licensed:false, reason:"not_installed" };
+    const hiveOk = mcpAddon.installed && mcpLicense.licensed ? await hive.ping().catch(() => false) : false;
     status.hive = {
       ...(status.hive || {}),
+      installed:!!mcpAddon.installed,
+      attached:!!mcpAddon.attached,
+      addonStatus:mcpAddon.status,
+      folderPath:mcpAddon.folderPath,
       licensed:!!mcpLicense.licensed,
-      running: hiveOk,
-      reachable: hiveOk,
-      source: mcpLicense.licensed ? "http_ping" : "license_blocked",
-      status: mcpLicense.licensed ? (hiveOk ? "Running" : "Stopped") : "Blocked by licence",
-      url: hive.baseUrl,
+      running:hiveOk,
+      reachable:hiveOk,
+      source: !mcpAddon.installed ? "not_installed" : (mcpLicense.licensed ? "http_ping" : "license_blocked"),
+      status: !mcpAddon.installed ? "Not installed" : (mcpLicense.licensed ? (hiveOk ? "Running" : "Stopped") : "Blocked by licence"),
+      url:hive.baseUrl,
     };
     res.json(status);
   } catch (err) {
@@ -1523,12 +1646,16 @@ app.post("/api/system/control", requireAdmin, express.json(), async (req, res) =
     }
   }
   if (target === "hive") {
+    const mcpAddon = mcpAddonStatus();
+    if (action !== "stop" && !mcpAddon.installed) {
+      return res.status(409).json({ error:"MCP addon is not installed. Panel can run without MCP; install the MCP addon before starting it.", code:"MCP_NOT_INSTALLED", addon:mcpAddon });
+    }
     if (action !== "stop") {
       try {
         await activateComponents(null, [COMPONENTS.MCP]);
       } catch (error) {
         stopWindowsServiceIfRunning(HIVE_SERVICE_NAME, "mcp_license_blocked_start_attempt");
-        return res.status(error.status || 403).json({ error:"MCP is blocked by licence. Stop is allowed; start/restart is blocked.", code:error.code || "LICENSE_REQUIRED", license:error.license || null });
+        return res.status(error.status || 403).json({ error:"MCP is blocked by licence. Stop is allowed; start/restart is blocked.", code:error.code || "LICENSE_REQUIRED", license:error.license || null, addon:mcpAddon });
       }
     }
   }

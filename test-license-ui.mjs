@@ -29,6 +29,7 @@ assert.match(app, /activatePanelLicense/);
 assert.match(server, /app\.get\("\/api\/license\/status"/);
 assert.match(server, /app\.post\("\/api\/license\/activate"/);
 assert.match(setup, /INVALID_LICENSE_KEY_FORMAT/);
-assert.match(setup, /COMPONENTS\.WORKSPACES/);
+assert.match(setup, /const activationComponents = \[COMPONENTS\.PANEL\]/);
+assert.doesNotMatch(setup, /const activationComponents = \[[^\]]*COMPONENTS\.WORKSPACES/);
 assert.match(setup, /removeEnvKey\(panelEnvPath, "ORBITFS_LICENSE_KEY"\)/);
 console.log("OrbitFS licence UI integration checks passed");

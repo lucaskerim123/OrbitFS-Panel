@@ -1,99 +1,111 @@
-# OrbitFS paid-module boundary
+# OrbitFS Paid Module Boundary
 
-Purpose: define what stays public, what becomes protected/private, and what remains locally licence-gated.
+Purpose: split OrbitFS so the Panel can run by itself while commercial systems are delivered as protected addons.
 
-## Public open-core code
+This is a planning boundary only. It does not move code yet.
 
-Keep these in the public repositories:
+## Core rule
 
-- Panel shell, login, Systems UI, Config UI, basic file browser.
-- MCP shell and public/free MCP tools.
-- Licence client code that talks to the Azure Licence API.
-- Licence status UI and service-control gates.
-- Add-on loader hooks and placeholder add-on manifests.
-- Basic stub/demo versions of Sorter and Workspaces that do not contain paid logic.
+Public local code can always be edited by the customer. Do not depend on public local code for strong licence protection.
 
-Public code can be edited by users. It must not contain anything that is meant to be commercially protected.
+Protect value by keeping paid implementations outside the public repo and by checking entitlement inside each paid component before doing work.
 
-## Protected/private code
+## Public core
 
-Move or keep these outside public GitHub:
+The public Panel repo should contain:
 
-- Real Sorter engine logic.
-- Real Workspaces implementation if sold as a paid module.
-- Any advanced MCP tools that are paid.
-- Azure Licence API implementation.
-- Azure Licence Manager admin UI.
-- Customer build scripts and release packaging.
-- Any signing keys, API tokens, deployment credentials, or private update endpoints.
+- Panel login and local admin shell
+- Base file browser
+- System status display
+- Addon manager UI
+- Licence client and status UI
+- Placeholder hooks for MCP, Sorter, and Workspaces
+- Service controls that only operate installed/licensed services
+- Clear unavailable states when an addon is missing, blocked, or unlicensed
 
-These should live in a private repository, private package, protected release artifact, or hosted service controlled by OrbitFS.
+The Panel must run without MCP, Sorter, or Workspaces installed.
 
-## Local licence gates that should remain
+## Protected addons
 
-Keep local checks because they stop accidental or casual misuse:
+These should be treated as protected/commercial modules:
 
-- Panel requires `orbitfs_panel` before serving `/api`.
-- MCP requires `orbitfs_mcp` before serving `/mcp`.
-- Workspaces routes require `orbitfs_workspaces` before workspace-only APIs run.
-- Sorter service requires `orbitfs_sorter` before doing sorting work.
-- Panel start/restart checks licence before starting MCP or Sorter.
-- Blocked service components are stopped by Panel enforcement.
+- MCP server implementation
+- Sorter implementation
+- Workspaces implementation
 
-These are enforcement layers, not absolute protection. They are still editable in public code.
+Each protected addon must check its own entitlement before doing work.
 
-## Security rule
+## MCP boundary
 
-Do not rely on frontend hiding, button disabling, or public local code as the source of truth.
+MCP is a main system addon, not required for the Panel shell.
 
-The source of truth is:
+Panel behavior:
 
-- Azure Licence API
-- signed entitlement response/token
-- private paid modules
-- hosted services controlled by OrbitFS
+- MCP missing: Panel still opens and works
+- MCP installed but stopped: Panel shows MCP offline
+- MCP installed but unlicensed: Panel shows MCP blocked by licence
+- MCP licensed: Panel can start/restart MCP
+- MCP stop remains allowed only when explicitly needed for service management
 
-## Target architecture
+MCP implementation should live outside the public Panel repo long-term.
 
-Panel public repo:
+## Sorter boundary
 
-- open shell
-- licence UI
-- service gates
-- plugin loader
-- no paid module internals
+Sorter is a paid addon.
 
-MCP public repo:
+Public Panel should keep:
 
-- open MCP shell
-- licence gates
-- public/free tools
-- no paid tool internals
+- Sorter status row
+- Attach/detach metadata
+- Start/restart/stop controls gated by licence
+- Proxy shell that refuses work if Sorter is missing or blocked
 
-Private paid modules:
+Protected Sorter package should keep:
 
-- `orbitfs-sorter-pro`
-- `orbitfs-workspaces-pro`
-- paid MCP tool packs
+- Real scan logic
+- Destination prediction
+- Preview/session engine
+- Confirm/move execution
+- Learning/history logic
 
-Azure only:
+## Workspaces boundary
 
-- licence creation/editing
-- licence validation
-- audit history
-- entitlement signing
+Workspaces is a paid addon.
 
-## Migration order
+Public Panel should keep:
 
-1. Keep current gates stable.
-2. Define paid module interfaces.
-3. Replace public Sorter with stub/loader.
-4. Move real Sorter to protected package or private release artifact.
-5. Replace public Workspaces with stub/loader if Workspaces is commercial.
-6. Move real Workspaces to protected package or private release artifact.
-7. Add signed entitlement verification.
-8. Add private update/install path from Azure/customer release channel.
+- Addon status
+- Basic UI mount point
+- Blocked/missing state
 
-## Notes
+Protected Workspaces package should keep:
 
-A user can always remove checks from public local code. The goal is to make that useless for paid features by not shipping paid feature logic publicly.
+- Workspace routes
+- Workspace storage/quota logic
+- Members and invitations
+- Restore/storage requests
+- Workspace permission overrides
+- Workspace UI assets
+
+## Licence API boundary
+
+Licence API and Licence Manager stay hosted/private only.
+
+They should control:
+
+- Licence creation
+- Component enable/disable
+- Installation lock/unlock
+- Block/reactivate state
+- Expiry
+- Audit history
+- Signed entitlement response
+
+## Next implementation steps
+
+1. Make Panel treat MCP as an addon-style service instead of required core.
+2. Create public stub folders for MCP, Sorter, and Workspaces.
+3. Move real Sorter and Workspaces implementations into protected folders or private repos.
+4. Move MCP server implementation into protected/private module packaging.
+5. Keep service-level licence gates active during start/restart and inside each component.
+6. Add signed entitlement token verification after the boundary is clean.
