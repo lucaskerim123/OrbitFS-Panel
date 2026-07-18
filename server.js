@@ -428,7 +428,7 @@ app.get("/internal/mcp-identity", async (req, res) => {
   }
 });
 
-app.use("/api", licenseGuard(COMPONENTS.PANEL));
+app.use("/api", licenseGuard(COMPONENTS.PANEL, { readOnlyOnFailure: true }));
 const DEFAULT_MAINTENANCE_MESSAGE = "OrbitFS is in maintenance mode while Main Workspace files are being changed. Do not edit or upload files. Data changed during maintenance may be lost; OrbitFS is not responsible for changes made while this warning is active.";
 
 async function maintenanceStatus() {
